@@ -1,11 +1,11 @@
 import os
 from setuptools import find_packages, setup, Command
-from shutils import rmtree
-
+from shutil import rmtree
+import sys
 
 NAME = 'fixation'
 DESCRIPTION = 'A pure-python FIX engine'
-URL ='github.com/helaoban/fixation',
+URL = 'github.com/helaoban/fixation',
 AUTHOR = 'Carlo Holl'
 EMAIL = 'carloholl@gmail.com'
 REQUIRES_PYTHON = '>=3.6.5'
@@ -27,7 +27,7 @@ with open(os.path.join(here, 'README.md')) as f:
 class Publish(Command):
     """Push to PyPi"""
 
-    def run():
+    def run(self):
         try:
             rmtree(os.path.join(here, 'dist'))
         except OSError:
@@ -45,7 +45,7 @@ setup(
     author='Carlo Holl',
     author_email='carloholl@gmail.com',
     description='A pure-python FIX engine',
-    long_description=long_description
+    long_description=long_description,
     long_description_content_type='text/markdown',
     packages=find_packages(exclude=('tests',)),
     install_requires=REQUIRES,
