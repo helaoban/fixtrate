@@ -11,8 +11,16 @@ EMAIL = 'carloholl@gmail.com'
 REQUIRES_PYTHON = '>=3.6.5'
 
 REQUIRES = [
-    'simplefix'
+    'simplefix',
+    'redis'
 ]
+
+EXTRAS_REQUIRE = {
+    'test': [
+        'pytest',
+        'pytest-asyncio'
+    ]
+}
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -49,6 +57,7 @@ setup(
     long_description_content_type='text/markdown',
     packages=find_packages(exclude=('tests',)),
     install_requires=REQUIRES,
+    extras_require=EXTRAS_REQUIRE,
     include_package_data=True,
     license='MIT',
     classifiers=[

@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 simplefix = "*"
+"e1839a8" = {path = ".", extras = ["test"], editable = true}
 
 [dev-packages]
 
