@@ -13,7 +13,7 @@ class FixConfig(object):
         target_comp_id,
         heartbeat_interval=30,
         reset_sequence=True,
-        encrypt_method=None
+        encrypt_method=None,
     ):
         self.version = version
         self.sender_comp_id = sender_comp_id

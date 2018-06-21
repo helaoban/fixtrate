@@ -1,17 +1,17 @@
 import pytest
 
-from fixation import config, version, parse
+from fixation import config, version, parse, store
 from . import utils
 
 
 @pytest.fixture
 def client_store():
-    return utils.FixMemoryStore()
+    return store.FixMemoryStore()
 
 
 @pytest.fixture
 def server_store():
-    return utils.FixMemoryStore()
+    return store.FixMemoryStore()
 
 
 @pytest.fixture

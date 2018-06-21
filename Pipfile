@@ -8,6 +8,8 @@ simplefix = "*"
 "e1839a8" = {path = ".", extras = ["test"], editable = true}
 
 [dev-packages]
+ipython = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.6"

@@ -59,6 +59,74 @@ class FixStore(object):
         raise NotImplementedError
 
 
+class FixMemoryStore(FixStore):
+
+    def __init__(self):
+        self._local_sequence_number = 0
+        self._remote_sequence_number = 0
+        self._sent_messages = {}
+        self._received_messages = {}
+        self._orders = {}
+
+    def increment_local_sequence_number(self):
+        self._local_sequence_number += 1
+        return self._local_sequence_number
+
+    def increment_remote_sequence_number(self):
+        self._remote_sequence_number += 1
+        return self._remote_sequence_number
+
+    def get_local_sequence_number(self):
+        return self._local_sequence_number
+
+    def get_remote_sequence_number(self):
+        return self._remote_sequence_number
+
+    def set_local_sequence_number(self, new_sequence_number):
+        self._local_sequence_number = new_sequence_number
+
+    def set_remote_sequence_number(self, new_sequence_number):
+        self._remote_sequence_number = new_sequence_number
+
+    def reset_local_sequence_number(self):
+        self._local_sequence_number = 0
+
+    def reset_remote_sequence_number(self):
+        self._remote_sequence_number = 0
+
+    def store_sent_message(self, sequence_number, message):
+        self._sent_messages[sequence_number] = message
+
+    def store_received_message(self, sequence_number, message):
+        self._received_messages[sequence_number] = message
+
+    def get_sent_message_by_sequence(self, sequence_number):
+        return self._sent_messages.get(sequence_number)
+
+    def get_sent_message_by_index(self, index):
+        messages = [v for _, v in sorted(self._sent_messages.items())]
+        return messages[index]
+
+    def get_sent_messages(self):
+        return [(int(k), v) for k, v in sorted(self._sent_messages.items())]
+
+    def get_received_message_by_sequence(self, sequence_number):
+        return self._received_messages.get(sequence_number)
+
+    def get_received_message_by_index(self, index):
+        messages = [v for _, v in sorted(self._received_messages.items())]
+        return messages[index]
+
+    def get_received_messages(self):
+        return [(int(k), v) for k, v in sorted(self._received_messages.items())]
+
+    def add_order(self, order_id, order):
+        self._orders[order_id] = order
+
+    def remove_order(self, order_id):
+        del self._orders[order_id]
+
+
 class FixRedisStore(FixStore):
     def __init__(self, **options):
         self.redis = redis.StrictRedis(host='127.0.0.1', port=6379, db=0, socket_timeout=5)

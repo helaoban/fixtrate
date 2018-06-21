@@ -1,7 +1,9 @@
 import asyncio
 import collections
+import datetime as dt
 import logging
 import sys
+
 
 from . import (
     adapter, values, message,
@@ -226,8 +228,9 @@ class FixConnection(object):
     async def read(self, *args, **kwargs):
         return await self._reader.read(*args, **kwargs)
 
-    def write(self, *args, **kwargs):
-        return self._writer.write(*args, **kwargs)
+    async def write(self, *args, **kwargs):
+        self._writer.write(*args, **kwargs)
+        await self._writer.drain()
 
 
 class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass=MixedClass):
@@ -269,10 +272,21 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def close(self):
         pass
 
-    def send_message(self, message):
-        seq_num = message.get(tags.FixTag.MsgSeqNum)
-        encoded = message.encode()
-        self._connection.write(encoded)
+    async def send_message(self, msg):
+        seq_num = msg.get(tags.FixTag.MsgSeqNum)
+        send_time = msg.get(tags.FixTag.SendingTime)
+
+        if send_time is None:
+            msg.append_utc_timestamp(
+                tags.FixTag.SendingTime,
+                timestamp=dt.datetime.utcnow(),
+                precision=6,
+                header=True
+            )
+
+        encoded = msg.encode()
+        print(encoded)
+        await self._connection.write(encoded)
         self.store.store_sent_message(int(seq_num), encoded)
 
     def send_heartbeat(self, test_request_id=None):
@@ -282,12 +296,12 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         )
         self.send_message(msg)
 
-    def login(self):
+    async def login(self):
         sequence_number = self.store.increment_local_sequence_number()
         login_msg = message.Message.create_login_message(
             sequence_number, self.config
         )
-        self.send_message(login_msg)
+        await self.send_message(login_msg)
 
     def logoff(self):
         sequence_number = self.store.increment_local_sequence_number()
@@ -470,17 +484,18 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def connect(self):
         self._connection = FixConnection(
             self.config,
-            on_connect=self.handle_connect,
-            on_disconnect=self.handle_disconnect
+            on_connect=self.on_connected,
+            on_disconnect=self.on_disconnected
         )
         return self._connection
 
-    def handle_connect(self):
+    def on_connected(self):
         self._connected = True
         self._listener = asyncio.ensure_future(self.listen())
 
-    def handle_disconnect(self):
+    def on_disconnected(self):
         self._connected = False
+        self.shutdown()
 
     async def listen(self):
         parser = parse.FixParser(self.config)
@@ -488,9 +503,18 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         try:
 
             while self._connected:
-                data = await self._connection.read(100)
+                try:
+                    data = await self._connection.read(100)
+                except ConnectionError as error:
+                    logger.error(error)
+                    self.on_disconnected()
+                if len(data) == 0:
+                    logger.error('Server closed the connection!')
+                    self.on_disconnected()
+                    return
                 parser.append_buffer(data)
                 msg = parser.get_message()
+                print(msg)
 
                 if msg is not None:
                     await self.handle_message(msg)
@@ -499,10 +523,11 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             pass
 
     def shutdown(self):
-        self.logoff()
-        self._listener.cancel()
-        self.loop.run_until_complete(self._listener)
+        logger.info('Shutting down...')
+        if self._connected:
+            self.logoff()
         self._out_queue.put_nowait(None)
+        self._listener.cancel()
 
     def __aiter__(self):
         return self
