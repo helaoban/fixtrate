@@ -2,8 +2,8 @@ import asyncio
 import collections
 import datetime as dt
 import logging
+import os
 import sys
-
 
 from . import (
     adapter, values, message,
@@ -522,6 +522,80 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         except asyncio.CancelledError:
             pass
 
+    async def handle_socket_command(self, name, args):
+
+        handler = {
+            'place_order': self.place_order
+        }.get(name)
+
+        try:
+            result = await handler(*args)
+        except Exception as error:
+            raise
+        return result
+
+    @staticmethod
+    def parse_socket_command(self, data):
+
+        lines = data.splitlines()
+        name = lines[0]
+        arg_lines = lines[1: len(data) - 2]
+
+        kwargs = {}
+        for line in arg_lines:
+            items = line.split('\t')
+            key = items[0]
+            value = items[1:]
+
+            if len(value) < 2:
+                value = items[1]
+
+            kwargs[key] = value
+
+        return name, kwargs
+
+    @staticmethod
+    def validate_socket_command(self, data, args):
+        return True
+
+    async def handle_socket_client(self, reader, writer, timeout=10):
+        data = ''
+        while True:
+            try:
+                buf = await asyncio.wait_for(reader.read(4096), timeout)
+            except asyncio.TimeoutError:
+                print('Timeout error!')
+
+                writer.write(b'Timeout!')
+                writer.close()
+                return
+
+            data += buf.decode()
+
+            if 'done\n' in data:
+                break
+
+        try:
+            name, kwargs = self.parse_socket_command(data.decode())
+        except Exception:
+            writer.write(b'error')
+
+        try:
+            self.validate_socket_command(name, kwargs)
+        except Exception:
+            writer.write(b'error')
+            return
+
+        writer.write(b'ok')
+
+        try:
+            await self.handle_socket_command(name, **kwargs)
+        except Exception:
+            writer.write(b'error')
+            return
+
+        writer.write(b'done')
+
     def shutdown(self):
         logger.info('Shutting down...')
         if self._connected:
@@ -539,5 +613,19 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         return msg
 
     def __call__(self, *args, **kwargs):
+
+        socket_coro = asyncio.start_unix_server(
+            self.handle_socket_client,
+            path=os.path.expanduser(
+                '~/.fixation/command_socket'
+            ),
+            loop=self.loop
+        )
+
+        socket_server = self.loop.create_task(socket_coro)
         self.loop.run_until_complete(self.connect())
         self.loop.run_until_complete(self.listen())
+
+        socket_server.cancel()
+        self.loop.run_until_complete(socket_server)
+        self.loop.close()

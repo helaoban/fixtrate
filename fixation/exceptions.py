@@ -10,3 +10,7 @@ class ImproperlyConfigured(Exception):
 class FixRejection(Exception):
     def __init__(self, reason):
         self.reason = reason
+
+
+class UnknownCommand(Exception):
+    pass
