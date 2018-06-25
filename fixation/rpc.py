@@ -1,12 +1,13 @@
 import asyncio
 import errno
 import json
-import jsonschema
+import jsonschema as js
 import logging
 import os
 import socket
+import struct
 
-from fixation import exceptions
+from fixation import exceptions, utils
 
 
 logger = logging.getLogger(__name__)
@@ -60,103 +61,65 @@ class RPCServer(object):
 
         return path
 
-    async def handle_socket_command(self, data):
-
-        jsonschema.validate(data, self.RPC_SCHEMA)
-
-        handler = {
+    def dispatch_socket_command(self, data):
+        return {
             'place_order': self.session.place_order,
             'send_test_request': self.session.mock_send_test_request
         }.get(data['method'])
 
-        if handler:
-            return handler(**data['params'])
+    async def handle_rpc_request(self, message):
+        try:
+            data = json.loads(message.decode())
+        except json.JSONDecodeError:
+            raise exceptions.RPCParseError
 
-        raise exceptions.UnknownCommand
+        try:
+            js.validate(data, self.RPC_SCHEMA)
+        except js.ValidationError as error:
+            raise exceptions.RPCInvalidRequest
 
-    @staticmethod
-    def parse_socket_command(data):
+        handler = await self.dispatch_socket_command(data)
+        if not handler:
+            raise exceptions.RPCMethodNotFound
 
-        lines = data.splitlines()
-        name = lines[0]
-        # remove 'done'
-        arg_lines = lines[1: len(lines) - 1]
+        try:
+            result = handler(**data['params'])
+        # TODO need to inspect method members, or else we swallow
+        # actual TypeErrors in method call.
+        except TypeError:
+            raise exceptions.RPCInvalidParams
 
-        kwargs = {}
-        for line in arg_lines:
-            items = line.split('\t')
-            key = items[0]
-            value = items[1:]
+        return {
+            'result': result,
+            'id': data['id']
+        }
 
-            if len(value) < 2:
-                value = items[1]
-
-            kwargs[key] = value
-
-        return name, kwargs
-
-    def validate_socket_command(self, data):
-        pass
-
-    async def handle_socket_client(self, reader, writer, timeout=10):
-        print('client connected')
+    async def handle_socket_client(self, reader, writer, timeout=30):
         buf = b''
         while True:
             try:
                 buf += await asyncio.wait_for(reader.read(4096), timeout)
-            except asyncio.TimeoutError:
-                print('Timeout error!')
-                writer.write(b'Timeout!')
+            except asyncio.TimeoutError as error:
+                logger.exception(error)
+                return
+            if buf == b'0':
+                logger.info('client disconnected')
                 writer.close()
                 return
+            message, buf = utils.parse_rpc_message(buf)
+            if message is None:
+                continue
+            try:
+                response = await self.handle_rpc_request(message)
+            except exceptions.RPCError as error:
+                response = {
+                    'code': error.code,
+                    'message': error.message,
+                    'data': error.meaning
+                }
 
-            if buf == b'':
-                print('client disconnected')
-                return
-
-            if b'done\n' in buf:
-                break
-
-        data = json.loads(buf.decode())
-
-        # try:
-        #     name, kwargs = self.parse_socket_command(data)
-        # except Exception as error:
-        #     print(error)
-        #     writer.write(b'error')
-        #     return
-
-        try:
-            self.validate_socket_command(name, kwargs)
-        except Exception as error:
-            print(error)
-            writer.write(b'error')
-            return
-
-        writer.write(b'ok\n')
-
-        try:
-            r = await self.handle_socket_command(name, **kwargs)
-        except exceptions.UnknownCommand:
-            writer.write(b'error\n')
-            return
-        except Exception as error:
-            print(error)
-            writer.write(b'error\n')
-            return
-
-        lines = []
-        for k, v in r.items():
-            if hasattr(v, '__iter__') and not isinstance(v, str):
-                v = list(v)
-            else:
-                v = [v]
-
-            line = '{}\n'.format('\t'.join([k, *v]))
-            lines.append(line.encode())
-
-        lines.append(b'done\n')
-        writer.writelines(lines)
+            response = utils.pack_rpc_message(response)
+            writer.write(response)
 
     def shutdown(self):
         logger.info('Shutting down...')

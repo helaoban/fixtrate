@@ -1,6 +1,7 @@
-import uuid
+import json
 import ipaddress
-
+import struct
+import uuid
 
 def validate_ip_address(address):
     ipaddress.ip_address(address)
@@ -38,3 +39,26 @@ def monkeypatch_module(mod):
 
 def is_coro(func):
     return func.__code__.co_flags & (2 << 6) == 128
+
+
+def parse_rpc_message(buf):
+    if len(buf) < 4:
+        return None, buf
+
+    rlen = int(struct.unpack('i', buf[:4])[0])
+    buf = buf[4:]
+
+    if len(buf) < rlen:
+        return None, buf
+
+    return buf[:rlen], buf[rlen:]
+
+
+def pack_rpc_message(message):
+    message = {
+        'jsonrpc': '2.0',
+        **message
+    }
+    message = json.dumps(message).encode()
+    mlen = struct.pack('i', len(message))
+    return mlen + message

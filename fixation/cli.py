@@ -1,9 +1,17 @@
+import logging
 import os
+import threading
+import time
 import socket
 import sys
-import threading
+import uuid
 
 from fixation.client import FixClient
+from fixation import utils
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class CommandTicker(threading.Thread):
@@ -76,63 +84,48 @@ class FixationCommand(object):
 
         return r
 
-    def send_command(self, name, **args):
-        self.f.write('{}\n'.format(name).encode())
+    def send_command(self, name, timeout=30, **args):
 
-        lines = []
-        for k, v in args.items():
-
-            if hasattr(v, '__iter__') and not isinstance(v, str):
-                v = list(v)
-            else:
-                v = [v]
-
-            line = '{}\n'.format('\t'.join([k, *v]))
-            lines.append(line.encode())
-
-        self.f.writelines(lines)
-        self.f.write('done\n'.encode())
+        uid = uuid.uuid4()
+        message = {
+            'jsonrpc': '2.0',
+            'method': name,
+            'params': args,
+            'id': uid
+        }
+        message = utils.pack_rpc_message(message)
+        self.f.write(message)
         self.f.flush()
 
         ticker_thread = CommandTicker()
         ticker_thread.start()
 
         try:
-            ok = self.read() == 'ok'
+            buf = b''
+            t = time.time()
+            while time.time() - t < timeout:
+                buf += self.f.read(4096)
+                resp, buf = utils.parse_rpc_message(buf)
+                if resp is not None:
+                    break
+            else:
+                raise TimeoutError
         except KeyboardInterrupt:
             raise self.BadConnectionError()
-        except Exception as error:
+        except TimeoutError:
+            print('Timeout!')
             raise
+        except Exception as error:
+            logger.exception(error)
+            return
         finally:
             ticker_thread.stop()
             ticker_thread.join()
 
-        if ok:
-            r = {}
-            for i in range(21):
-                if i == 20:
-                    raise Exception('close this connection')
-
-                line = self.read()
-                if line == 'done':
-                    break
-                argval = line.split('\t')
-                r[argval[0]] = argval[1:]
-
-            return r
+        if 'result' in resp:
+            return resp['result']
         else:
-            problems = []
-            for i in range(21):
-                if i == 20:
-                    raise Exception('close this connection!')
-
-                line = self.read()
-                if line == 'done':
-                    break
-
-                problems.append(line)
-
-            raise self.CommandError('\n'.join(problems))
+            raise self.CommandError(resp['error'])
 
     def __getattr__(self, name):
         try:
@@ -204,12 +197,11 @@ def test(args):
 
     with FixationCommand() as fc:
         try:
-            r = fc.send_test_request(**kwargs).get('response', ['No response'])[0]
+            r = fc.send_test_request(**kwargs)
         except Exception as error:
             print(error)
             return
         print(r)
-
 
 @command
 def start(argv):
