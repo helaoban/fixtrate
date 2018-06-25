@@ -35,8 +35,3 @@ class FixClient(object):
             self.loop.run_until_complete(self.listen())
         except (SystemExit, KeyboardInterrupt):
             pass
-
-
-if __name__ == '__main__':
-    client = FixClient()
-    client()

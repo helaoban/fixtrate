@@ -1,8 +1,10 @@
 import asyncio
 import collections
 import datetime as dt
+import errno
 import logging
 import os
+import socket
 import sys
 
 from . import (
@@ -242,6 +244,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     ):
         config.validate()
         self.config = config
+        self.config_path = '~/.fixation'
         self.loop = loop or asyncio.get_event_loop()
         self.store = store or fix_store.FixRedisStore()
         self.reader = None
@@ -249,6 +252,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         self._connected = True
         self._connection = None
         self._listener = None
+        self._socket_server = None
         self._closing = False
 
         self._out_queue = asyncio.Queue()
@@ -492,6 +496,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def on_connected(self):
         self._connected = True
         self._listener = asyncio.ensure_future(self.listen())
+        self.start_socket_server()
 
     def on_disconnected(self):
         self._connected = False
@@ -522,24 +527,61 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         except asyncio.CancelledError:
             pass
 
-    async def handle_socket_command(self, name, args):
+    def make_config_dir(self):
+        path = os.path.expanduser(self.config_path)
+        if not os.path.exists(path):
+            try:
+                os.makedirs(path)
+            except OSError as error:
+                if error.errno != errno.EEXIST:
+                    raise
+        return path
 
-        handler = {
-            'place_order': self.place_order
-        }.get(name)
+    def make_socket_file(self):
+        config_dir = self.make_config_dir()
+        path = os.path.join(config_dir, 'command_socket')
 
         try:
-            result = await handler(*args)
-        except Exception as error:
-            raise
-        return result
+            os.remove(path)
+        except OSError:
+            pass
+
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.bind(path)
+
+        return path
+
+    def start_socket_server(self):
+        socket_path = self.make_socket_file()
+        socket_coro = asyncio.start_unix_server(
+            self.handle_socket_client,
+            path=socket_path,
+            loop=self.loop
+        )
+        self._socket_server = asyncio.ensure_future(socket_coro)
+
+    def mock_send_test_request(self, **kwargs):
+        return {'response': 'test request successful'}
+
+    async def handle_socket_command(self, name, **kwargs):
+
+        handler = {
+            'place_order': self.place_order,
+            'send_test_request': self.mock_send_test_request
+        }.get(name)
+
+        if handler:
+            return handler(**kwargs)
+
+        raise exceptions.UnknownCommand
 
     @staticmethod
-    def parse_socket_command(self, data):
+    def parse_socket_command(data):
 
         lines = data.splitlines()
         name = lines[0]
-        arg_lines = lines[1: len(data) - 2]
+        # remove 'done'
+        arg_lines = lines[1: len(lines) - 1]
 
         kwargs = {}
         for line in arg_lines:
@@ -555,46 +597,68 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         return name, kwargs
 
     @staticmethod
-    def validate_socket_command(self, data, args):
+    def validate_socket_command(data, args):
         return True
 
     async def handle_socket_client(self, reader, writer, timeout=10):
-        data = ''
+        print('client connected')
+        buf = b''
         while True:
             try:
-                buf = await asyncio.wait_for(reader.read(4096), timeout)
+                buf += await asyncio.wait_for(reader.read(4096), timeout)
             except asyncio.TimeoutError:
                 print('Timeout error!')
-
                 writer.write(b'Timeout!')
                 writer.close()
                 return
 
-            data += buf.decode()
+            if buf == b'':
+                print('client disconnected')
+                return
 
-            if 'done\n' in data:
+            if b'done\n' in buf:
                 break
 
+        data = buf.decode()
+
         try:
-            name, kwargs = self.parse_socket_command(data.decode())
-        except Exception:
+            name, kwargs = self.parse_socket_command(data)
+        except Exception as error:
+            print(error)
             writer.write(b'error')
+            return
 
         try:
             self.validate_socket_command(name, kwargs)
-        except Exception:
+        except Exception as error:
+            print(error)
             writer.write(b'error')
             return
 
-        writer.write(b'ok')
+        writer.write(b'ok\n')
 
         try:
-            await self.handle_socket_command(name, **kwargs)
-        except Exception:
-            writer.write(b'error')
+            r = await self.handle_socket_command(name, **kwargs)
+        except exceptions.UnknownCommand:
+            writer.write(b'error\n')
+            return
+        except Exception as error:
+            print(error)
+            writer.write(b'error\n')
             return
 
-        writer.write(b'done')
+        lines = []
+        for k, v in r.items():
+            if hasattr(v, '__iter__') and not isinstance(v, str):
+                v = list(v)
+            else:
+                v = [v]
+
+            line = '{}\n'.format('\t'.join([k, *v]))
+            lines.append(line.encode())
+
+        lines.append(b'done\n')
+        writer.writelines(lines)
 
     def shutdown(self):
         logger.info('Shutting down...')
@@ -602,6 +666,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             self.logoff()
         self._out_queue.put_nowait(None)
         self._listener.cancel()
+        self._socket_server.cancel()
 
     def __aiter__(self):
         return self

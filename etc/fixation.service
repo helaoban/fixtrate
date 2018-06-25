@@ -1,0 +1,17 @@
+[Unit]
+Description=Fixation FIX Engine
+After=network.target
+
+[Service]
+Type=forking
+User=fixation
+Group=fixation
+Restart=always
+RestartSec=5
+WorkingDirectory=/usr/share/python/fixation
+Environment=FIXATION_CONF=/etc/fixation
+ExecStart=/usr/share/python/fixation/bin/fixd
+PIDFile=/user/home/fixation/~.fixation/fixd.pid
+
+[Install]
+WantedBy=multi-user.target

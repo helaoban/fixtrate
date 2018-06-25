@@ -1,12 +1,16 @@
 import os
 import socket
+import subprocess
 import sys
 import threading
+import time
+
+from fixation.client import FixClient
 
 
 class CommandTicker(threading.Thread):
 
-    def __init(self):
+    def __init__(self):
         super().__init__()
 
         self.stop_event = threading.Event()
@@ -54,9 +58,10 @@ class FixationCommand(object):
                     '~/.fixation/command_socket'
                 )
             )
-        except socket.error:
+        except socket.error as error:
+            print(error)
             raise self.CouldNotConnectError
-        self.f = self.s.makefile('r+', 4096)
+        self.f = self.s.makefile('rwb', 4096)
 
     def close(self):
         self.f.close()
@@ -73,13 +78,13 @@ class FixationCommand(object):
 
         return r
 
-    def send_command(self, name, args):
+    def send_command(self, name, **args):
         self.f.write('{}\n'.format(name).encode())
 
         lines = []
-        for k, v in args.iteritems():
+        for k, v in args.items():
 
-            if hasattr(v, '__iter__'):
+            if hasattr(v, '__iter__') and not isinstance(v, str):
                 v = list(v)
             else:
                 v = [v]
@@ -87,8 +92,7 @@ class FixationCommand(object):
             line = '{}\n'.format('\t'.join([k, *v]))
             lines.append(line.encode())
 
-        self.writelines(lines)
-
+        self.f.writelines(lines)
         self.f.write('done\n'.encode())
         self.f.flush()
 
@@ -99,7 +103,8 @@ class FixationCommand(object):
             ok = self.read() == 'ok'
         except KeyboardInterrupt:
             raise self.BadConnectionError()
-
+        except Exception as error:
+            raise
         finally:
             ticker_thread.stop()
             ticker_thread.join()
@@ -113,7 +118,6 @@ class FixationCommand(object):
                 line = self.read()
                 if line == 'done':
                     break
-
                 argval = line.split('\t')
                 r[argval[0]] = argval[1:]
 
@@ -137,15 +141,19 @@ class FixationCommand(object):
             return super().__getattribute__(name)
         except Exception:
             def __command(**kwargs):
-                return self.send_command(name, **kwargs)
+                try:
+                    return self.send_command(name, **kwargs)
+                except Exception as error:
+                    print(error)
             self.__setattr__(name, __command)
             return __command
 
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
 
 commands = {}
 aliases = {}
@@ -161,7 +169,7 @@ def command(func):
     except AttributeError:
         pass
 
-    commands[func.func_name] = func
+    commands[func.__name__] = func
     return func
 
 
@@ -171,29 +179,73 @@ def requires_daemon_running(meth):
             return meth(*args, **kwargs)
         else:
             print('Daemon is not running!')
-    new_meth.func_name = meth.func_name
+    new_meth.__name__ = meth.__name__
     new_meth.__doc__ = meth.__doc__
     return new_meth
 
 
 def is_daemon_running():
-    pidfile = os.path.expanduser('~/.fixation/fixation.pid')
-    try:
-        with open(pidfile, 'r') as f:
-            pid = int(f.read())
-        with open('/proc/{}/cmdline'.format(pid), 'r') as f:
-            cmdline = f.read().lower()
-    except Exception:
-        cmdline = ''
-
-    return 'fixation' in cmdline
+    # pidfile = os.path.expanduser('~/.fixation/fixd.pid')
+    # try:
+    #     with open(pidfile, 'r') as f:
+    #         pid = int(f.read())
+    #     with open('/proc/{}/cmdline'.format(pid), 'r') as f:
+    #         cmdline = f.read().lower()
+    # except Exception:
+    #     cmdline = ''
+    #
+    # return 'fixation' in cmdline
+    return True
 
 
 @command
 @requires_daemon_running
-def some_random_commands(args):
+def test(args):
+    ARGS = ['arg1', 'arg2']
+    kwargs = dict(zip(ARGS, args))
+
     with FixationCommand() as fc:
         try:
-            fc.set_proxy_settings(*args)
-        except Exception:
-            pass
+            r = fc.send_test_request(**kwargs).get('response', ['No response'])[0]
+        except Exception as error:
+            print(error)
+            return
+        print(r)
+
+
+@command
+def start(argv):
+    client = FixClient()
+    client()
+
+
+def usage(argv):
+    print('You aint use this right.\n')
+
+
+def _main(argv):
+    global commands
+    name = argv[1]
+    args = argv[2:]
+
+    if name not in commands:
+        usage(argv)
+        os._exit(0)
+        return
+
+    result = commands[name](args)
+    return result
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+    return _main(argv)
+
+
+if __name__ == "__main__":
+    response = main()
+    if response is not None:
+        sys.exit(response)
+
+
