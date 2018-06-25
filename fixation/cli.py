@@ -1,9 +1,7 @@
 import os
 import socket
-import subprocess
 import sys
 import threading
-import time
 
 from fixation.client import FixClient
 
