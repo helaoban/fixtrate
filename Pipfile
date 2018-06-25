@@ -6,6 +6,7 @@ name = "pypi"
 [packages]
 simplefix = "*"
 "e1839a8" = {path = ".", editable = true}
+jsonschema = "*"
 
 [dev-packages]
 ipython = "*"

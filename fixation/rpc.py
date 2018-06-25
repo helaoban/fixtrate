@@ -1,5 +1,7 @@
 import asyncio
 import errno
+import json
+import jsonschema
 import logging
 import os
 import socket
@@ -12,6 +14,21 @@ logger.setLevel(logging.DEBUG)
 
 
 class RPCServer(object):
+
+    RPC_SCHEMA = {
+        'type': 'object',
+        'properties': {
+            'jsonrpc': {'const': '2.0'},
+            'method': {'type': 'string'},
+            'params': {'type': ['array', 'object']},
+            'id': {'type': ['number', 'string']}
+        },
+        'required': [
+            'jsonrpc',
+            'method',
+            'id'
+        ]
+    }
 
     def __init__(self, fix_session, loop=None):
         self.config_path = '~/.fixation'
@@ -43,15 +60,17 @@ class RPCServer(object):
 
         return path
 
-    async def handle_socket_command(self, name, **kwargs):
+    async def handle_socket_command(self, data):
+
+        jsonschema.validate(data, self.RPC_SCHEMA)
 
         handler = {
             'place_order': self.session.place_order,
             'send_test_request': self.session.mock_send_test_request
-        }.get(name)
+        }.get(data['method'])
 
         if handler:
-            return handler(**kwargs)
+            return handler(**data['params'])
 
         raise exceptions.UnknownCommand
 
@@ -76,9 +95,8 @@ class RPCServer(object):
 
         return name, kwargs
 
-    @staticmethod
-    def validate_socket_command(data, args):
-        return True
+    def validate_socket_command(self, data):
+        pass
 
     async def handle_socket_client(self, reader, writer, timeout=10):
         print('client connected')
@@ -99,14 +117,14 @@ class RPCServer(object):
             if b'done\n' in buf:
                 break
 
-        data = buf.decode()
+        data = json.loads(buf.decode())
 
-        try:
-            name, kwargs = self.parse_socket_command(data)
-        except Exception as error:
-            print(error)
-            writer.write(b'error')
-            return
+        # try:
+        #     name, kwargs = self.parse_socket_command(data)
+        # except Exception as error:
+        #     print(error)
+        #     writer.write(b'error')
+        #     return
 
         try:
             self.validate_socket_command(name, kwargs)
