@@ -62,7 +62,7 @@ class FixMarketDataMixin(object):
 
         self.register_handlers(handlers)
 
-    def request_market_data(self, symbols):
+    async def request_market_data(self, symbols):
         """
         Make a request for market data. Sends a Market Data Request <V>
         message.
@@ -82,7 +82,7 @@ class FixMarketDataMixin(object):
         request_id = msg.get(tags.FixTag.MDReqID)
 
         self.store.register_symbol_request_mapping(symbols, request_id)
-        self.send_message(msg)
+        await self.send_message(msg)
 
     def handle_market_data_full_refresh(self, message):
         market_request_id = message.get(262)
@@ -121,7 +121,7 @@ class FixOrderEntryMixin(object):
     def __init__(self, *args, **kwargs):
         pass
 
-    def place_order(
+    async def place_order(
         self,
         symbol,
         side,
@@ -154,7 +154,7 @@ class FixOrderEntryMixin(object):
             price=price
         )
 
-        self.send_message(msg)
+        await self.send_message(msg)
 
     def handle_execution_report(self, message):
         pass
@@ -291,12 +291,12 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         await self._connection.write(encoded)
         self.store.store_sent_message(int(seq_num), encoded)
 
-    def send_heartbeat(self, test_request_id=None):
+    async def send_heartbeat(self, test_request_id=None):
         sequence_number = self.store.increment_local_sequence_number()
         msg = message.Message.create_heartbeat_message(
             sequence_number, self.config, test_request_id
         )
-        self.send_message(msg)
+        await self.send_message(msg)
 
     async def login(self):
         sequence_number = self.store.increment_local_sequence_number()
@@ -306,30 +306,30 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         # utils.print_to_console(login_msg)
         await self.send_message(login_msg)
 
-    def logoff(self):
+    async def logoff(self):
         sequence_number = self.store.increment_local_sequence_number()
         msg = message.Message.create_logoff_message(
             sequence_number, self.config
         )
-        self.send_message(msg)
+        await self.send_message(msg)
 
-    def send_test_request(self):
+    async def send_test_request(self):
         sequence_number = self.store.increment_local_sequence_number()
         msg = message.Message.create_test_request_message(
             sequence_number,
             self.config
         )
-        self.send_message(msg)
+        await self.send_message(msg)
 
-    def get_security_list(self):
+    async def get_security_list(self):
         sequence_number = self.store.increment_local_sequence_number()
         msg = message.Message.create_security_list_request(
             sequence_number=sequence_number,
             config=self.config
         )
-        self.send_message(msg)
+        await self.send_message(msg)
 
-    def request_resend(self, start_sequence, end_sequence):
+    async def request_resend(self, start_sequence, end_sequence):
         sequence_number = self.store.increment_local_sequence_number()
         msg = message.Message.create_resend_request_message(
             sequence_number=sequence_number,
@@ -337,9 +337,9 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             start_sequence=start_sequence,
             end_sequence=end_sequence
         )
-        self.send_message(msg)
+        await self.send_message(msg)
 
-    def reset_sequence(self, new_sequence_number):
+    async def reset_sequence(self, new_sequence_number):
         sequence_number = self.store.increment_local_sequence_number()
         self.store.set_remote_sequence_number(new_sequence_number - 1)
         msg = message.Message.create_sequence_reset_message(
@@ -347,13 +347,13 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             self.config,
             new_sequence_number
         )
-        self.send_message(msg)
+        await self.send_message(msg)
 
-    def resend_messages(self, start, end):
+    async def resend_messages(self, start, end):
         sequence_range = range(start, end + 1)
         sent_messages = self.store.get_sent_messages()
         for seq in sequence_range:
-            self.send_message(sent_messages[seq])
+            await self.send_message(sent_messages[seq])
 
     async def handle_message(self, msg):
         msg_type = values.FixValue(msg.get(tags.FixTag.MsgType))
@@ -374,7 +374,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             self.store.increment_remote_sequence_number()
 
         self.store.store_received_message(seq_num, msg.encode())
-        self.dispatch(msg)
+        await self.dispatch(msg)
 
     def check_sequence_integrity(self, message):
         seq_num = message.get(tags.FixTag.MsgSeqNum)
@@ -386,7 +386,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def handle_sequence_gap(self, message):
         pass
 
-    def dispatch(self, message):
+    async def dispatch(self, message):
 
         msg_type = message.get(tags.FixTag.MsgType)
         logger.debug('Fix message received: {}'.format(msg_type))
@@ -399,33 +399,37 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
 
         handler = self._handlers.get(msg_type)
         if handler is not None:
-            handler(message)
+
+            if utils.is_coro(handler):
+                await handler(message)
+            else:
+                handler(message)
 
         adapter = self._adapters.get(msg_type, self._default_adapter)
         converted = adapter.dispatch(message)
         self._out_queue.put_nowait(converted)
 
-    def handle_login(self, message):
+    async def handle_login(self, message):
         if self.config.reset_sequence:
             seq_num = int(message.get(tags.FixTag.MsgSeqNum))
             self.store.set_remote_sequence_number(seq_num)
 
-        self.send_heartbeat()
+        await self.send_heartbeat()
         logger.debug('Login successful!')
 
-    def handle_heartbeat(self, message):
+    async def handle_heartbeat(self, message):
         pass
 
-    def handle_resend_request(self, message):
+    async def handle_resend_request(self, message):
         start_sequence_number = message.get(tags.FixTag.BeginSeqNo)
         end_sequence_number = message.get(tags.FixTag.EndSeqNo)
-        self.resend_messages(start_sequence_number, end_sequence_number)
+        await self.resend_messages(start_sequence_number, end_sequence_number)
 
-    def handle_test_request(self, message):
+    async def handle_test_request(self, message):
         test_request_id = message.get(tags.FixTag.TestReqID)
-        self.send_heartbeat(test_request_id=test_request_id)
+        await self.send_heartbeat(test_request_id=test_request_id)
 
-    def handle_reject(self, message):
+    async def handle_reject(self, message):
         reject_reason = message.get(tags.FixTag.Text)
         raise exceptions.FixRejection(reason=reject_reason)
 
@@ -454,31 +458,31 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
 
         handler(message)
 
-    def handle_unknown_security(self):
+    async def handle_unknown_security(self):
         pass
 
-    def handle_unsupported_message_type(self):
+    async def handle_unsupported_message_type(self):
         pass
 
-    def handle_application_not_available(self):
+    async def handle_application_not_available(self):
         pass
 
-    def handle_missing_conditionally_required_field(self):
+    async def handle_missing_conditionally_required_field(self):
         pass
 
-    def handle_deliverto_firm_not_available(self):
+    async def handle_deliverto_firm_not_available(self):
         pass
 
-    def handle_not_authorized(self):
+    async def handle_not_authorized(self):
         pass
 
-    def handle_unknown_id(self):
+    async def handle_unknown_id(self):
         pass
 
-    def handle_unknown_message_type(self):
+    async def handle_unknown_message_type(self):
         pass
 
-    def handle_invalid_price_increment(self):
+    async def handle_invalid_price_increment(self):
         pass
 
     def decode_entry(self, message):
@@ -524,6 +528,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
                 msg = parser.get_message()
 
                 if msg is not None:
+                    # print(msg)
                     await self.handle_message(msg)
 
         except asyncio.CancelledError:

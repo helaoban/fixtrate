@@ -11,7 +11,7 @@ async def test_login(
 ):
     async with fix_session.connect():
         await fix_session.login()
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
 
     first_sent = client_store.get_sent_message_by_index(0)
     first_sent = parse.FixParser.parse(first_sent, client_config)
@@ -40,7 +40,7 @@ async def test_iterate_messages(fix_session):
 
     async def iter_messages():
         async with fix_session.connect():
-            fix_session.login()
+            await fix_session.login()
             async for msg in fix_session:
                 messages.append(msg)
 
@@ -59,7 +59,7 @@ async def test_heartbeat(fix_session, test_server, client_store, client_config):
 
     async def iter_messages():
         async with fix_session.connect():
-            fix_session.login()
+            await fix_session.login()
             async for msg in fix_session:
                 messages.append(msg)
 
@@ -93,8 +93,8 @@ async def test_test_request(fix_session):
 
     async def iter_messages():
         async with fix_session.connect():
-            fix_session.login()
-            fix_session.send_test_request()
+            await fix_session.login()
+            await fix_session.send_test_request()
             async for msg in fix_session:
                 messages.append(msg)
 

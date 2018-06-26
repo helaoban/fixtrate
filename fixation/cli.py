@@ -203,6 +203,7 @@ def test(args):
             return
         print(r)
 
+
 @command
 def start(argv):
     client = FixClient()

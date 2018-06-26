@@ -53,7 +53,7 @@ class Message(simplefix.FixMessage):
 
     def encode(self, raw=False):
         if not raw:
-            if self.get(tags.FixTag.SendingTime):
+            if not self.get(tags.FixTag.SendingTime):
                 self.append_utc_timestamp(
                     tags.FixTag.SendingTime,
                     precision=6,
@@ -144,9 +144,9 @@ class Message(simplefix.FixMessage):
             sequence_number=sequence_number,
             msg_type=values.FixValue.MsgType_Logon,
         )
-        msg.append_pair(tags.FixTag.ResetSeqNumFlag, 'Y')
         msg.append_pair(tags.FixTag.EncryptMethod, config.encrypt_method)
         msg.append_pair(tags.FixTag.HeartBtInt, config.heartbeat_interval)
+        msg.append_pair(tags.FixTag.ResetSeqNumFlag, 'Y')
         return msg
 
     @classmethod

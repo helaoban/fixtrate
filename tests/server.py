@@ -187,7 +187,7 @@ class MockFixServer(object):
                 elapsed = now - self._last_message_time
 
                 if elapsed.total_seconds() >= self.config.heartbeat_interval:
-                    self.send_heartbeat()
+                    await self.send_heartbeat()
 
         except asyncio.CancelledError:
             pass
