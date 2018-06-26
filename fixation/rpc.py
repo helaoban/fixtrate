@@ -5,7 +5,6 @@ import jsonschema as js
 import logging
 import os
 import socket
-import struct
 
 from fixation import exceptions, utils
 

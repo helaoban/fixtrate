@@ -1,7 +1,7 @@
 import pytest
 
-from fixation import config, version, parse, store
-from . import utils
+from fixation import config, version, parse, store, session
+from tests.server import MockFixServer
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def server_config():
 @pytest.fixture
 @pytest.mark.asyncio
 async def test_server(event_loop, server_store, server_config):
-    server = utils.MockFixServer(
+    server = MockFixServer(
         config=server_config,
         loop=event_loop,
         store=server_store
@@ -52,3 +52,9 @@ def client_config(server_config):
 @pytest.fixture
 def parser(client_config):
     return parse.FixParser(client_config)
+
+
+@pytest.fixture
+async def fix_session(client_config, client_store, test_server):
+    return session.FixSession(client_config, store=client_store)
+

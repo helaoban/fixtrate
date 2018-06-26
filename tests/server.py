@@ -5,7 +5,8 @@ import logging
 from fixation import (
     tags, values, message,
     exceptions, parse,
-    version, store as fix_store
+    version, store as fix_store,
+    utils
 )
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ class MockFixServer(object):
         self.send_message(msg)
 
     def check_sequence_integrity(self, message):
+        # utils.print_to_console(message.pairs)
         seq_num = message.get(tags.FixTag.MsgSeqNum)
         recorded_seq_num = self.store.get_remote_sequence_number()
         seq_diff = int(seq_num) - int(recorded_seq_num)
@@ -86,7 +88,6 @@ class MockFixServer(object):
             raise exceptions.SequenceGap
 
     def handle_message(self, message):
-
         self._last_message_time = dt.datetime.utcnow()
 
         try:

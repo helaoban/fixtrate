@@ -3,20 +3,14 @@ import pytest
 from fixation import session, parse, values, tags
 
 
-@pytest.fixture
-async def fix_session(client_config, client_store):
-    return session.FixSession(client_config, store=client_store)
-
-
 @pytest.mark.asyncio
 async def test_login(
     fix_session,
     client_config,
     client_store,
-    test_server,
 ):
     async with fix_session.connect():
-        fix_session.login()
+        await fix_session.login()
         await asyncio.sleep(0.5)
 
     first_sent = client_store.get_sent_message_by_index(0)
@@ -40,7 +34,7 @@ async def test_login(
 
 
 @pytest.mark.asyncio
-async def test_iterate_messages(fix_session, test_server):
+async def test_iterate_messages(fix_session):
 
     messages = []
 
@@ -93,7 +87,7 @@ async def test_heartbeat(fix_session, test_server, client_store, client_config):
 
 
 @pytest.mark.asyncio
-async def test_test_request(fix_session, test_server):
+async def test_test_request(fix_session):
 
     messages = []
 

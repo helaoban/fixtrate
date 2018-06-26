@@ -62,3 +62,7 @@ def pack_rpc_message(message):
     message = json.dumps(message).encode()
     mlen = struct.pack('i', len(message))
     return mlen + message
+
+
+def print_to_console(val):
+    print('\n{}'.format(val))

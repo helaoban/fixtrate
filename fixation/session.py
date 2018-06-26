@@ -288,7 +288,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             )
 
         encoded = msg.encode()
-        print(encoded)
         await self._connection.write(encoded)
         self.store.store_sent_message(int(seq_num), encoded)
 
@@ -304,6 +303,7 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         login_msg = message.Message.create_login_message(
             sequence_number, self.config
         )
+        # utils.print_to_console(login_msg)
         await self.send_message(login_msg)
 
     def logoff(self):
@@ -522,7 +522,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
                     return
                 parser.append_buffer(data)
                 msg = parser.get_message()
-                print(msg)
 
                 if msg is not None:
                     await self.handle_message(msg)
