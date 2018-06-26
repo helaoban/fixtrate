@@ -80,7 +80,6 @@ class MockFixServer(object):
         self.send_message(msg)
 
     def check_sequence_integrity(self, message):
-        # utils.print_to_console(message.pairs)
         seq_num = message.get(tags.FixTag.MsgSeqNum)
         recorded_seq_num = self.store.get_remote_sequence_number()
         seq_diff = int(seq_num) - int(recorded_seq_num)

@@ -1,10 +1,18 @@
 import simplefix
+import sys
 
-from . import utils, tags, values
+from fixation import utils, tags, values
 
 
 @utils.monkeypatch_module(simplefix.message)
 def fix_val(value):
+
+    # Enum support
+    try:
+        value = value.value
+    except AttributeError:
+        pass
+
     if isinstance(value, (bytes, str,)):
         if len(value) < 1:
             raise ValueError('FIX value cannot be empty!')
@@ -15,6 +23,26 @@ def fix_val(value):
         return value
     else:
         return bytes(str(value), 'ASCII')
+
+
+@utils.monkeypatch_module(simplefix.message)
+def fix_tag(value):
+    """Make a FIX tag value from string, bytes, integer, or Enum"""
+
+    # Enum support
+    try:
+        value = value.value
+    except AttributeError:
+        pass
+
+    if sys.version_info[0] == 2:
+        return bytes(value)
+    else:
+        if type(value) == bytes:
+            return value
+        elif type(value) == str:
+            return value.encode('ASCII')
+        return str(value).encode('ASCII')
 
 
 class Message(simplefix.FixMessage):
@@ -32,13 +60,6 @@ class Message(simplefix.FixMessage):
                     header=True
                 )
         return super().encode(raw=raw)
-
-    def append_pair(self, tag, value, header=False):
-        try:
-            value = value.value
-        except AttributeError:
-            pass
-        super().append_pair(tag.value, value, header)
 
     def append_standard_headers(
         self,

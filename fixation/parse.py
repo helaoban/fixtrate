@@ -8,20 +8,17 @@ class FixParser(simplefix.FixParser):
         super().__init__()
         self.config = config
 
-    def get_message(self):
-        msg = super().get_message()
-
-        if msg is not None:
-            print(msg.pairs)
-        return msg
-        # if msg is None:
-        #     return
-        # new_msg = message.Message(config=self.config)
-        # new_msg.begin_string = msg.begin_string
-        # new_msg.message_type = msg.message_type
-        # new_msg.pairs = msg.pairs
-        # new_msg.header_index = msg.header_index
-        # return new_msg
+    # def get_message(self):
+    #     msg = super().get_message()
+    #     return msg
+    #     # if msg is None:
+    #     #     return
+    #     # new_msg = message.Message(config=self.config)
+    #     # new_msg.begin_string = msg.begin_string
+    #     # new_msg.message_type = msg.message_type
+    #     # new_msg.pairs = msg.pairs
+    #     # new_msg.header_index = msg.header_index
+    #     # return new_msg
 
     @classmethod
     def parse(cls, raw_message, config=None, base=False):

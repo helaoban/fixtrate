@@ -1,7 +1,7 @@
 import enum
 
 
-class FixTag(enum.Enum):
+class FixTag(enum.IntEnum):
     AvgPx = 6
     BeginSeqNo = 7
     BeginString = 8
