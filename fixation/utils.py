@@ -3,6 +3,25 @@ import ipaddress
 import struct
 import uuid
 
+
+class MixedClass(type):
+    def __new__(mcs, name, bases, classdict):
+        classinit = classdict.get('__init__')  # Possibly None.
+
+        # define an __init__ function for the new class
+        def __init__(self, *args, **kwargs):
+            # call the __init__ functions of all the bases
+            for base in type(self).__bases__:
+                base.__init__(self, *args, **kwargs)
+            # also call any __init__ function that was in the new class
+            if classinit:
+                classinit(self, *args, **kwargs)
+
+        # add the local function to the new class
+        classdict['__init__'] = __init__
+        return type.__new__(mcs, name, bases, classdict)
+
+
 def validate_ip_address(address):
     ipaddress.ip_address(address)
 
