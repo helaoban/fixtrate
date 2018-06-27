@@ -1,5 +1,6 @@
 import asyncio
 import collections
+from collections.abc import Coroutine
 import datetime as dt
 import logging
 import sys
@@ -163,62 +164,22 @@ class FixConnection(object):
 
     def __init__(
         self,
-        config,
+        reader,
+        writer,
         on_connect=None,
         on_disconnect=None,
         loop=None
     ):
-        self.config = config
+        self.reader = reader
+        self.writer = writer
 
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
 
-        self._writer = None
-        self._reader = None
-
         self.loop = loop or asyncio.get_event_loop()
 
-    async def __aenter__(self):
-        try:
-            await self.connect()
-        except Exception:
-            if await self.__aexit__(*sys.exc_info()):
-                pass
-            else:
-                raise
-
-    async def __aexit__(self, exc_type, exc, tb):
-        await self.disconnect()
-
-    async def connect(self, retries=5, retry_wait=1):
-        tries = 0
-        while tries <= retries:
-            try:
-                self._reader, self._writer = await asyncio.open_connection(
-                    host=self.config.host,
-                    port=self.config.port,
-                    loop=self.loop
-                )
-            except OSError as error:
-                logger.error(error)
-                logger.info('Connection failed, retrying in 5 seconds...')
-                tries += 1
-                await asyncio.sleep(retry_wait)
-                continue
-            else:
-                if self.on_connect is not None:
-                    if utils.is_coro(self.on_connect):
-                        await self.on_connect()
-                    else:
-                        self.on_connect()
-                break
-
-        if tries > retries:
-            logger.info('Retries ({}) exhausted, shutting down.'
-                        ''.format(retries))
-
-    async def disconnect(self):
-        self._writer.close()
+    async def close(self):
+        self.writer.close()
         if self.on_disconnect is not None:
             if utils.is_coro(self.on_disconnect):
                 await self.on_disconnect()
@@ -226,20 +187,40 @@ class FixConnection(object):
                 self.on_disconnect()
 
     async def read(self, *args, **kwargs):
-        return await self._reader.read(*args, **kwargs)
+        return await self.reader.read(*args, **kwargs)
 
     async def write(self, *args, **kwargs):
-        self._writer.write(*args, **kwargs)
-        await self._writer.drain()
+        self.writer.write(*args, **kwargs)
+        await self.writer.drain()
+
+
+class FixConnectContextManager(Coroutine):
+
+    def __init__(self, coro):
+        self._coro = coro
+
+    def send(self, arg):
+        self._coro.send(arg)
+
+    def throw(self, typ, val=None, tb=None):
+        self._coro.throw(typ, val, tb)
+
+    def close(self):
+        self._coro.close()
+
+    def __await__(self):
+        return self._coro.__await__()
+
+    async def __aenter__(self):
+        self._conn = await self._coro
+        return self._conn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self._conn.close()
 
 
 class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass=MixedClass):
-    def __init__(
-            self,
-            config,
-            store=None,
-            loop=None,
-    ):
+    def __init__(self, config, store=None, loop=None):
         config.validate()
         self.config = config
         self.config_path = '~/.fixation'
@@ -273,6 +254,41 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
 
     def close(self):
         pass
+
+    async def _connect(self, retries=5, retry_wait=1):
+        tries = 0
+        while tries <= retries:
+            try:
+                reader, writer = await asyncio.open_connection(
+                    host=self.config.host,
+                    port=self.config.port,
+                    loop=self.loop
+                )
+            except OSError as error:
+                logger.error(error)
+                logger.info('Connection failed, retrying in 5 seconds...')
+                tries += 1
+                await asyncio.sleep(retry_wait)
+                continue
+            else:
+                self.on_connect()
+                self._connection = FixConnection(reader, writer, self.on_disconnect)
+                return self._connection
+
+        if tries > retries:
+            logger.info('Retries ({}) exhausted, shutting down.'
+                        ''.format(retries))
+
+    def connect(self):
+        return FixConnectContextManager(self._connect())
+
+    def on_connect(self):
+        self._connected = True
+        self._listener = asyncio.ensure_future(self.listen())
+
+    def on_disconnect(self):
+        self._connected = False
+        self.shutdown()
 
     async def send_message(self, msg):
         seq_num = msg.get(tags.FixTag.MsgSeqNum)
@@ -487,22 +503,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
 
     def decode_entry(self, message):
         pass
-
-    def connect(self):
-        self._connection = FixConnection(
-            self.config,
-            on_connect=self.on_connected,
-            on_disconnect=self.on_disconnected
-        )
-        return self._connection
-
-    def on_connected(self):
-        self._connected = True
-        self._listener = asyncio.ensure_future(self.listen())
-
-    def on_disconnected(self):
-        self._connected = False
-        self.shutdown()
 
     async def listen(self):
         parser = parse.FixParser(self.config)

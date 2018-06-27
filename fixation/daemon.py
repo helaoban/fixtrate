@@ -31,12 +31,12 @@ class FixDaemon(object):
             loop=self.loop
         )
 
-        try:
-            async with self.session.connect() as conn:
-                await self.session.login()
-                await self.rpc_server.start()
-        except asyncio.CancelledError:
-            print('DONE YO')
+        conn = await self.session.connect()
+        print(conn)
+        await self.session.login()
+        await self.rpc_server.start()
+        await asyncio.sleep(10)
+        await conn.close()
 
     def __call__(self):
         task = self.loop.create_task(self.main())
