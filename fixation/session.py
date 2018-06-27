@@ -166,17 +166,20 @@ class FixConnection(object):
         self,
         reader,
         writer,
+        config,
         on_connect=None,
         on_disconnect=None,
         loop=None
     ):
         self.reader = reader
         self.writer = writer
-
+        self.config = config
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
 
         self.loop = loop or asyncio.get_event_loop()
+
+        self._connected = True
 
     async def close(self):
         self.writer.close()
@@ -186,8 +189,10 @@ class FixConnection(object):
             else:
                 self.on_disconnect()
 
-    async def read(self, *args, **kwargs):
-        return await self.reader.read(*args, **kwargs)
+        self._connected = False
+
+    async def read(self):
+        return await self.reader.read(4096)
 
     async def write(self, *args, **kwargs):
         self.writer.write(*args, **kwargs)
@@ -246,6 +251,8 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
 
         self.register_handlers(handlers)
 
+        self.parser = parse.FixParser(self.config)
+
     def __enter__(self):
         return self
 
@@ -284,13 +291,14 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
 
     def on_connect(self):
         self._connected = True
-        self._listener = asyncio.ensure_future(self.listen())
+        # self._listener = asyncio.ensure_future(self.listen())
 
     def on_disconnect(self):
         self._connected = False
         self.shutdown()
 
     async def send_message(self, msg):
+        msg_type = constants.FixMsgType(msg.get(tags.FixTag.MsgType))
         seq_num = msg.get(tags.FixTag.MsgSeqNum)
         send_time = msg.get(tags.FixTag.SendingTime)
 
@@ -301,8 +309,10 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
                 precision=6,
                 header=True
             )
+            send_time = msg.get(tags.FixTag.SendingTime)
 
         encoded = msg.encode()
+        print('{}: --> {}'.format(send_time, msg_type))
         await self._connection.write(encoded)
         self.store.store_sent_message(int(seq_num), encoded)
 
@@ -370,9 +380,42 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         for seq in sequence_range:
             await self.send_message(sent_messages[seq])
 
+    def check_sequence_integrity(self, message):
+        seq_num = message.get(tags.FixTag.MsgSeqNum)
+        recorded_seq_num = self.store.get_remote_sequence_number()
+        seq_diff = int(seq_num) - int(recorded_seq_num)
+        if seq_diff != 1:
+            raise exceptions.SequenceGap
+
+    def handle_sequence_gap(self, message):
+        logger.error('Sequence GAP, resetting...')
+
+    async def dispatch(self, message):
+        msg_type = message.get(tags.FixTag.MsgType)
+        try:
+            msg_type = constants.FixMsgType(msg_type)
+        except ValueError:
+            logger.error('Unrecognized FIX message type: {}.'.format(msg_type))
+            return
+
+        handler = self._handlers.get(msg_type)
+        if handler is not None:
+            if utils.is_coro(handler):
+                await handler(message)
+            else:
+                handler(message)
+
+        # adapter = self._adapters.get(msg_type, self._default_adapter)
+        # converted = adapter.dispatch(message)
+        # self._out_queue.put_nowait(converted)
+
     async def handle_message(self, msg):
-        msg_type = constants.FixMsgType(msg.get(tags.FixTag.MsgType))
-        seq_num = int(msg.get(tags.FixTag.MsgSeqNum.value))
+        msg_type = msg.get(tags.FixTag.MsgType)
+        msg_type = constants.FixMsgType(msg_type)
+        seq_num = int(msg.get(tags.FixTag.MsgSeqNum))
+        send_time = msg.get(tags.FixTag.SendingTime)
+
+        print('{}: <-- {}'.format(send_time, msg_type))
 
         if msg_type not in [
             constants.FixMsgType.Logon,
@@ -382,7 +425,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             try:
                 self.check_sequence_integrity(msg)
             except exceptions.SequenceGap:
-                logger.error('Sequence GAP, resetting...')
                 self.handle_sequence_gap(msg)
                 return
 
@@ -391,50 +433,15 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         self.store.store_received_message(seq_num, msg.encode())
         await self.dispatch(msg)
 
-    def check_sequence_integrity(self, message):
-        seq_num = message.get(tags.FixTag.MsgSeqNum)
-        recorded_seq_num = self.store.get_remote_sequence_number()
-        seq_diff = int(seq_num) - int(recorded_seq_num)
-        if seq_diff != 1:
-            raise exceptions.SequenceGap
-
-    def handle_sequence_gap(self, message):
-        pass
-
-    async def dispatch(self, message):
-
-        msg_type = message.get(tags.FixTag.MsgType)
-        logger.debug('Fix message received: {}'.format(
-            constants.FixMsgType(msg_type).name
-        ))
-
-        try:
-            msg_type = constants.FixMsgType(msg_type)
-        except ValueError:
-            logger.error('Unrecognized FIX value {}.'.format(msg_type))
-            return
-
-        handler = self._handlers.get(msg_type)
-        if handler is not None:
-
-            if utils.is_coro(handler):
-                await handler(message)
-            else:
-                handler(message)
-
-        adapter = self._adapters.get(msg_type, self._default_adapter)
-        converted = adapter.dispatch(message)
-        self._out_queue.put_nowait(converted)
-
     async def handle_logon(self, message):
         if self.config.reset_sequence:
             seq_num = int(message.get(tags.FixTag.MsgSeqNum))
             self.store.set_remote_sequence_number(seq_num)
-        await self.send_heartbeat()
+        # await self.send_heartbeat()
         logger.debug('Login successful!')
 
     async def handle_heartbeat(self, message):
-        pass
+        await self.send_heartbeat()
 
     async def handle_resend_request(self, message):
         start_sequence_number = message.get(tags.FixTag.BeginSeqNo)
@@ -504,35 +511,59 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def decode_entry(self, message):
         pass
 
-    async def listen(self):
-        parser = parse.FixParser(self.config)
+    # async def listen(self):
+    #     parser = parse.FixParser(self.config)
+    #
+    #     try:
+    #
+    #         while self._connected:
+    #             try:
+    #                 data = await self._connection.read()
+    #             except ConnectionError as error:
+    #                 logger.error(error)
+    #                 self.on_disconnect()
+    #                 return
+    #             if data == b'':
+    #                 logger.error('Server closed the connection!')
+    #                 self.on_disconnect()
+    #                 return
+    #             parser.append_buffer(data)
+    #             msg = parser.get_message()
+    #
+    #             if msg is not None:
+    #                 await self.handle_message(msg)
+    #
+    #     except asyncio.CancelledError:
+    #         pass
 
-        try:
+    async def recv_msg(self):
+        msg = self.parser.get_message()
+        if msg:
+            return msg
 
-            while self._connected:
-                try:
-                    data = await self._connection.read(100)
-                except ConnectionError as error:
-                    logger.error(error)
-                    self.on_disconnected()
-                if len(data) == 0:
-                    logger.error('Server closed the connection!')
-                    self.on_disconnected()
-                    return
-                parser.append_buffer(data)
-                msg = parser.get_message()
+        while self._connected:
+            try:
+                data = await self._connection.read()
+            except ConnectionError as error:
+                logger.error(error)
+                self.on_disconnect()
+                return
+            if data == b'':
+                logger.error('Server closed the connection!')
+                self.on_disconnect()
+                return
+            self.parser.append_buffer(data)
+            msg = self.parser.get_message()
 
-                if msg is not None:
-                    await self.handle_message(msg)
-
-        except asyncio.CancelledError:
-            pass
+            if msg is not None:
+                await self.handle_message(msg)
+                return msg
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        msg = await self._out_queue.get()
+        msg = await self.recv_msg()
         if msg is None:
             raise StopAsyncIteration
         return msg

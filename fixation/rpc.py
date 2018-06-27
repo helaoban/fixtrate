@@ -63,7 +63,7 @@ class RPCServer(object):
     def dispatch_socket_command(self, data):
         return {
             'place_order': self.session.place_order,
-            'send_test_request': self.session.mock_send_test_request
+            'send_test_request': self.session.send_test_request
         }.get(data['method'])
 
     async def handle_rpc_request(self, message):
@@ -82,7 +82,10 @@ class RPCServer(object):
             raise exceptions.RPCMethodNotFound
 
         try:
-            result = handler(**data['params'])
+            if utils.is_coro(handler):
+                result = await handler(**data['params'])
+            else:
+                result = handler(**data['params'])
         # TODO need to inspect method members, or else we swallow
         # actual TypeErrors in method call.
         except TypeError:

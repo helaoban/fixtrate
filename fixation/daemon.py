@@ -1,6 +1,10 @@
 import asyncio
 
-from fixation import session, config, version, store, rpc
+from fixation import (
+    config, constants,
+    session, version,
+    store, rpc, tags
+)
 
 
 class FixDaemon(object):
@@ -32,11 +36,15 @@ class FixDaemon(object):
         )
 
         conn = await self.session.connect()
-        print(conn)
         await self.session.login()
         await self.rpc_server.start()
-        await asyncio.sleep(10)
-        await conn.close()
+
+        try:
+            async for msg in self.session:
+                pass
+        except asyncio.CancelledError:
+            print('Closing...')
+            await conn.close()
 
     def __call__(self):
         task = self.loop.create_task(self.main())
