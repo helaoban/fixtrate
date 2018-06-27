@@ -120,15 +120,15 @@ class RPCServer(object):
             response = utils.pack_rpc_message(response)
             writer.write(response)
 
-    def shutdown(self):
+    async def stop(self):
         logger.info('Shutting down...')
-        self._socket_server.cancel()
+        self._socket_server.close()
+        await self._socket_server.wait_close()
 
-    def start(self):
+    async def start(self):
         socket_path = self.make_socket_file()
-        socket_coro = asyncio.start_unix_server(
+        self._socket_server = asyncio.start_unix_server(
             self.handle_socket_client,
             path=socket_path,
             loop=self.loop
         )
-        self._socket_server = self.loop.create_task(socket_coro)

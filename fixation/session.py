@@ -488,9 +488,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def decode_entry(self, message):
         pass
 
-    def mock_send_test_request(self, **kwargs):
-        return {'response': 'test request successful BITCH'}
-
     def connect(self):
         self._connection = FixConnection(
             self.config,
@@ -502,8 +499,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     def on_connected(self):
         self._connected = True
         self._listener = asyncio.ensure_future(self.listen())
-        self._socket_server = rpc.RPCServer(self, loop=self.loop)
-        self._socket_server.start()
 
     def on_disconnected(self):
         self._connected = False
@@ -548,8 +543,3 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             self.logoff()
         self._out_queue.put_nowait(None)
         self._listener.cancel()
-        self._socket_server.shutdown()
-
-    # def __call__(self, *args, **kwargs):
-    #     self.loop.run_until_complete(self.connect())
-    #     self.loop.run_until_complete(self.listen())
