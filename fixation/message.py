@@ -1,7 +1,8 @@
 import simplefix
 import sys
 
-from fixation import utils, tags, constants
+import fixation.constants
+from fixation import utils, constants
 
 
 @utils.monkeypatch_module(simplefix.message)
@@ -53,9 +54,9 @@ class Message(simplefix.FixMessage):
 
     def encode(self, raw=False):
         if not raw:
-            if not self.get(tags.FixTag.SendingTime):
+            if not self.get(fixation.constants.FixTag.SendingTime):
                 self.append_utc_timestamp(
-                    tags.FixTag.SendingTime,
+                    fixation.constants.FixTag.SendingTime,
                     precision=6,
                     header=True
                 )
@@ -75,16 +76,16 @@ class Message(simplefix.FixMessage):
         :param msg_type:
         :return:
         """
-        self.append_pair(tags.FixTag.BeginString, self.config.version, header=True)
-        self.append_pair(tags.FixTag.MsgType, msg_type, header=True)
-        self.append_pair(tags.FixTag.SenderCompID, self.config.sender_comp_id, header=True)
-        self.append_pair(tags.FixTag.TargetCompID, self.config.target_comp_id, header=True)
-        self.append_pair(tags.FixTag.MsgSeqNum, sequence_number, header=True)
+        self.append_pair(fixation.constants.FixTag.BeginString, self.config.version, header=True)
+        self.append_pair(fixation.constants.FixTag.MsgType, msg_type, header=True)
+        self.append_pair(fixation.constants.FixTag.SenderCompID, self.config.sender_comp_id, header=True)
+        self.append_pair(fixation.constants.FixTag.TargetCompID, self.config.target_comp_id, header=True)
+        self.append_pair(fixation.constants.FixTag.MsgSeqNum, sequence_number, header=True)
 
         if timestamp is not None:
 
             self.append_utc_timestamp(
-                tags.FixTag.SendingTime,
+                fixation.constants.FixTag.SendingTime,
                 timestamp=timestamp,
                 precision=6,
                 header=True
@@ -110,7 +111,7 @@ class Message(simplefix.FixMessage):
             constants.FixMsgType.Heartbeat,
         )
         if test_request_id:
-            msg.append_pair(tags.FixTag.TestReqID, test_request_id)
+            msg.append_pair(fixation.constants.FixTag.TestReqID, test_request_id)
         return msg
 
     @classmethod
@@ -125,7 +126,7 @@ class Message(simplefix.FixMessage):
             constants.FixMsgType.TestRequest,
         )
         test_request_id = utils.gen_uuid()
-        msg.append_pair(tags.FixTag.TestReqID, test_request_id)
+        msg.append_pair(fixation.constants.FixTag.TestReqID, test_request_id)
         return msg
 
     @classmethod
@@ -144,9 +145,9 @@ class Message(simplefix.FixMessage):
             sequence_number=sequence_number,
             msg_type=constants.FixMsgType.Logon,
         )
-        msg.append_pair(tags.FixTag.EncryptMethod, config.encrypt_method)
-        msg.append_pair(tags.FixTag.HeartBtInt, config.heartbeat_interval)
-        msg.append_pair(tags.FixTag.ResetSeqNumFlag, 'Y')
+        msg.append_pair(fixation.constants.FixTag.EncryptMethod, config.encrypt_method)
+        msg.append_pair(fixation.constants.FixTag.HeartBtInt, config.heartbeat_interval)
+        msg.append_pair(fixation.constants.FixTag.ResetSeqNumFlag, 'Y')
         return msg
 
     @classmethod
@@ -157,8 +158,8 @@ class Message(simplefix.FixMessage):
             constants.FixMsgType.SecurityListRequest
         )
         uid = utils.gen_uuid()
-        msg.append_pair(tags.FixTag.SecurityReqID, uid)
-        msg.append_pair(tags.FixTag.SecurityListRequestType, b'0')
+        msg.append_pair(fixation.constants.FixTag.SecurityReqID, uid)
+        msg.append_pair(fixation.constants.FixTag.SecurityListRequestType, b'0')
         return msg
 
     @classmethod
@@ -178,7 +179,7 @@ class Message(simplefix.FixMessage):
             sequence_number,
             constants.FixMsgType.MarketDataRequest,
         )
-        msg.append_pair(tags.FixTag.MDReqID, utils.gen_uuid())
+        msg.append_pair(fixation.constants.FixTag.MDReqID, utils.gen_uuid())
 
         subscription_types = {
             'snapshot': constants.SubscriptionRequestType.SNAPSHOT,
@@ -191,7 +192,7 @@ class Message(simplefix.FixMessage):
             'Subscription Type',
         )
         msg.append_pair(
-            tags.FixTag.SubscriptionRequestType,
+            fixation.constants.FixTag.SubscriptionRequestType,
             subscription_type
         )
 
@@ -206,7 +207,7 @@ class Message(simplefix.FixMessage):
         )
 
         msg.append_pair(
-            tags.FixTag.MarketDepth,
+            fixation.constants.FixTag.MarketDepth,
             market_depth_type
         )
 
@@ -222,24 +223,24 @@ class Message(simplefix.FixMessage):
                 'Update Type'
             )
             msg.append_pair(
-                tags.FixTag.MDUpdateType,
+                fixation.constants.FixTag.MDUpdateType,
                 update_type
             )
 
         msg.append_pair(
-            tags.FixTag.NoMDEntries,
+            fixation.constants.FixTag.NoMDEntries,
             len(entry_types)
         )
         for entry_type in entry_types:
             msg.append_pair(
-                tags.FixTag.MDEntryType,
+                fixation.constants.FixTag.MDEntryType,
                 entry_type
             )
 
-        msg.append_pair(tags.FixTag.NoRelatedSym, len(symbols))
+        msg.append_pair(fixation.constants.FixTag.NoRelatedSym, len(symbols))
         for symbol in symbols:
             msg.append_pair(
-                tags.FixTag.Symbol,
+                fixation.constants.FixTag.Symbol,
                 symbol
             )
 
@@ -258,8 +259,8 @@ class Message(simplefix.FixMessage):
             sequence_number,
             constants.FixMsgType.ResendRequest
         )
-        msg.append_pair(tags.FixTag.BeginSeqNo, start_sequence)
-        msg.append_pair(tags.FixTag.EndSeqNo, end_sequence)
+        msg.append_pair(fixation.constants.FixTag.BeginSeqNo, start_sequence)
+        msg.append_pair(fixation.constants.FixTag.EndSeqNo, end_sequence)
         return msg
 
     @classmethod
@@ -275,8 +276,8 @@ class Message(simplefix.FixMessage):
             sequence_number,
             constants.FixMsgType.ResendRequest
         )
-        msg.append_pair(tags.FixTag.NewSeqNo, new_sequence_number)
-        msg.append_pair(tags.FixTag.GapFillFlag, gap_fill)
+        msg.append_pair(fixation.constants.FixTag.NewSeqNo, new_sequence_number)
+        msg.append_pair(fixation.constants.FixTag.GapFillFlag, gap_fill)
         return msg
 
     @classmethod
@@ -302,27 +303,27 @@ class Message(simplefix.FixMessage):
         )
 
         order_id = utils.gen_uuid()
-        msg.append_pair(tags.FixTag.ClOrdID, order_id)
+        msg.append_pair(fixation.constants.FixTag.ClOrdID, order_id)
 
         if ioi_id is not None:
-            msg.append_pair(tags.FixTag.IOIID, ioi_id)
+            msg.append_pair(fixation.constants.FixTag.IOIID, ioi_id)
 
-        msg.append_pair(tags.FixTag.OrderQty, quantity)
+        msg.append_pair(fixation.constants.FixTag.OrderQty, quantity)
 
         if (
             exec_inst is not None
             and exec_inst == constants.ExecInst.SINGLE_EXECUTION_REQUESTED_FOR_BLOCK_TRADE
             and time_in_force == constants.TimeInForce.GOOD_TILL_CANCEL
         ):
-            msg.append_pair(tags.FixTag.MinQty, min_fill_qty)
+            msg.append_pair(fixation.constants.FixTag.MinQty, min_fill_qty)
 
-        msg.append_pair(tags.FixTag.OrdType, order_type)
+        msg.append_pair(fixation.constants.FixTag.OrdType, order_type)
         if order_type == constants.OrdType.LIMIT:
-            msg.append_pair(tags.FixTag.Price, price)
+            msg.append_pair(fixation.constants.FixTag.Price, price)
 
-        msg.append_pair(tags.FixTag.Side, side)
-        msg.append_pair(tags.FixTag.Symbol, symbol)
-        msg.append_pair(tags.FixTag.TimeInForce, time_in_force)
+        msg.append_pair(fixation.constants.FixTag.Side, side)
+        msg.append_pair(fixation.constants.FixTag.Symbol, symbol)
+        msg.append_pair(fixation.constants.FixTag.TimeInForce, time_in_force)
 
         return msg
 
@@ -354,8 +355,8 @@ class Message(simplefix.FixMessage):
             sequence_number,
             constants.FixMsgType.Reject
         )
-        msg.append_pair(tags.FixTag.RefSeqNum, ref_sequence_number)
-        msg.append_pair(tags.FixTag.Text, reject_reason)
-        msg.append_pair(tags.FixTag.RefTagID, ref_tag)
-        msg.append_pair(tags.FixTag.RefMsgType, ref_message_type)
-        msg.append_pair(tags.FixTag.SessionRejectReason, rejection_type)
+        msg.append_pair(fixation.constants.FixTag.RefSeqNum, ref_sequence_number)
+        msg.append_pair(fixation.constants.FixTag.Text, reject_reason)
+        msg.append_pair(fixation.constants.FixTag.RefTagID, ref_tag)
+        msg.append_pair(fixation.constants.FixTag.RefMsgType, ref_message_type)
+        msg.append_pair(fixation.constants.FixTag.SessionRejectReason, rejection_type)

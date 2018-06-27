@@ -1,6 +1,7 @@
 import asyncio
 import pytest
-from fixation import session, parse, constants, tags
+
+from fixation import parse, constants
 
 
 @pytest.mark.asyncio
@@ -15,19 +16,23 @@ async def test_login(
 
     first_sent = client_store.get_sent_message_by_index(0)
     first_sent = parse.FixParser.parse(first_sent, client_config)
-    msg_type = constants.FixMsgType(first_sent.get(tags.FixTag.MsgType))
+    msg_type = constants.FixMsgType(first_sent.get(
+        constants.FixTag.MsgType))
     assert msg_type == constants.FixMsgType.MsgType_Logon
 
     first_received = client_store.get_received_message_by_index(0)
     first_received = parse.FixParser.parse(first_received, client_config)
-    msg_type = constants.FixMsgType(first_received.get(tags.FixTag.MsgType))
+    msg_type = constants.FixMsgType(first_received.get(
+        constants.FixTag.MsgType))
     assert msg_type == constants.FixMsgType.MsgType_Logon
 
-    server_sequence_number = int(first_received.get(tags.FixTag.MsgSeqNum))
+    server_sequence_number = int(first_received.get(
+        constants.FixTag.MsgSeqNum))
 
     second_sent = client_store.get_sent_message_by_index(1)
     second_sent = parse.FixParser.parse(second_sent, client_config)
-    msg_type = constants.FixMsgType(second_sent.get(tags.FixTag.MsgType))
+    msg_type = constants.FixMsgType(second_sent.get(
+        constants.FixTag.MsgType))
     assert msg_type == constants.FixMsgType.MsgType_Heartbeat
 
     assert int(fix_session.store.get_remote_sequence_number()) == server_sequence_number
@@ -106,5 +111,5 @@ async def test_test_request(fix_session):
         if constants.FixMsgType(m.message_type) == constants.FixMsgType.MsgType_Heartbeat
     ]
 
-    test_request_id = heartbeats[0].get(tags.FixTag.TestReqID)
+    test_request_id = heartbeats[0].get(constants.FixTag.TestReqID)
     assert test_request_id is not None

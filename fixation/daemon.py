@@ -1,9 +1,9 @@
 import asyncio
 
+import fixation.constants
 from fixation import (
-    config, constants,
-    session, version,
-    store, rpc, tags
+    config, session,
+    store, rpc
 )
 
 
@@ -19,7 +19,7 @@ class FixDaemon(object):
             port=4000,
             sender_comp_id='qafa001',
             target_comp_id='IB',
-            version=version.FixVersion.FIX42,
+            version=fixation.constants.FixVersion.FIX42,
             heartbeat_interval=30,
 
         )

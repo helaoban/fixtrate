@@ -2,11 +2,11 @@ import asyncio
 import datetime as dt
 import logging
 
+import fixation.constants
 from fixation import (
-    tags, constants, message,
+    constants, message,
     exceptions, parse,
-    version, store as fix_store,
-    utils
+    store as fix_store,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class MockFixServer(object):
             host='localhost',
             port=8686,
             sender_comp_id='FIXTEST',
-            version=version.FixVersion.FIX42,
+            version=fixation.constants.FixVersion.FIX42,
             target_comp_id='TESTCLIENT'
         )
         self.loop = loop or asyncio.get_event_loop()
@@ -56,8 +56,8 @@ class MockFixServer(object):
 
     def send_reject(self, message, tag, rejection_type, reason):
         sequence_number = self.store.increment_local_sequence_number()
-        ref_sequence_number = message.get(tags.FixTag.RefSeqNum)
-        ref_message_type = message.get(tags.FixTag.MsgType)
+        ref_sequence_number = message.get(fixation.constants.FixTag.RefSeqNum)
+        ref_message_type = message.get(fixation.constants.FixTag.MsgType)
         msg = message.Message.create_reject_message(
             sequence_number=sequence_number,
             config=self.config,
@@ -80,7 +80,7 @@ class MockFixServer(object):
         self.send_message(msg)
 
     def check_sequence_integrity(self, message):
-        seq_num = message.get(tags.FixTag.MsgSeqNum)
+        seq_num = message.get(fixation.constants.FixTag.MsgSeqNum)
         recorded_seq_num = self.store.get_remote_sequence_number()
         seq_diff = int(seq_num) - int(recorded_seq_num)
         if seq_diff != 1:
@@ -100,7 +100,7 @@ class MockFixServer(object):
         self.dispatch(message)
 
     def dispatch(self, message):
-        msg_type = message.get(tags.FixTag.MsgType)
+        msg_type = message.get(fixation.constants.FixTag.MsgType)
 
         try:
             msg_type = constants.FixMsgType(msg_type)
@@ -121,36 +121,39 @@ class MockFixServer(object):
         pass
 
     def handle_test_request(self, message):
-        test_request_id = message.get(tags.FixTag.TestReqID)
+        test_request_id = message.get(fixation.constants.FixTag.TestReqID)
         self.send_heartbeat(test_request_id=test_request_id)
 
     def handle_sequence_gap(self, message):
         pass
 
     def handle_login(self, message):
-        sequence_number = int(message.get(tags.FixTag.MsgSeqNum))
+        sequence_number = int(message.get(fixation.constants.FixTag.MsgSeqNum))
 
-        heartbeat_interval = int(message.get(tags.FixTag.HeartBtInt))
+        heartbeat_interval = int(message.get(
+            fixation.constants.FixTag.HeartBtInt))
         if heartbeat_interval != self.config.heartbeat_interval:
             self.send_reject(
                 message=message,
-                tag=tags.FixTag.HeartBtInt,
+                tag=fixation.constants.FixTag.HeartBtInt,
                 rejection_type=constants.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='HeartBtInt must be {}'.format(self.config.heartbeat_interval)
             )
             return
 
-        target_comp_id = message.get(tags.FixTag.TargetCompID).decode()
+        target_comp_id = message.get(
+            fixation.constants.FixTag.TargetCompID).decode()
         if target_comp_id != self.config.sender_comp_id:
             self.send_reject(
                 message=message,
-                tag=tags.FixTag.TargetCompID,
+                tag=fixation.constants.FixTag.TargetCompID,
                 rejection_type=constants.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='Target Comp ID is incorrect.'
             )
             return
 
-        reset_seq_number = constants.ResetSeqNumFlag(message.get(tags.FixTag.ResetSeqNumFlag))
+        reset_seq_number = constants.ResetSeqNumFlag(message.get(
+            fixation.constants.FixTag.ResetSeqNumFlag))
         if reset_seq_number == constants.ResetSeqNumFlag.YES:
             self.reset_sequence_numbers(sequence_number)
             self.send_login()

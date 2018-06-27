@@ -2,10 +2,11 @@ import asyncio
 import collections
 import logging
 
+import fixation.constants
 from fixation import (
     constants, session,
-    config, version, message,
-    tags, store
+    config, message,
+    store
 )
 
 
@@ -22,7 +23,7 @@ class FixClient(object):
             port=4000,
             sender_comp_id='qafa001',
             target_comp_id='IB',
-            version=version.FixVersion.FIX42,
+            version=fixation.constants.FixVersion.FIX42,
             heartbeat_interval=30,
 
         )
@@ -66,7 +67,7 @@ class FixClient(object):
         msg = message.Message.create_market_data_request_message(
             sequence_number, self.config, symbols, entry_types
         )
-        request_id = msg.get(tags.FixTag.MDReqID)
+        request_id = msg.get(fixation.constants.FixTag.MDReqID)
 
         self.session.store.register_symbol_request_mapping(symbols, request_id)
         await self.session.send_message(msg)
@@ -81,15 +82,15 @@ class FixClient(object):
         book = collections.defaultdict(list)
         trades = []
         for i in range(number_of_entries):
-            entry_type = msg.get(tags.FixTag.MDEntryType)
-            price = msg.get(tags.FixTag.MDEntryPx)
-            size = msg.get(tags.FixTag.MDEntrySize)
+            entry_type = msg.get(fixation.constants.FixTag.MDEntryType)
+            price = msg.get(fixation.constants.FixTag.MDEntryPx)
+            size = msg.get(fixation.constants.FixTag.MDEntrySize)
 
             if entry_type in [
                 constants.MDEntryType.OFFER,
                 constants.MDEntryType.BID
             ]:
-                book[tags.FixTag.MDEntryType] = {
+                book[fixation.constants.FixTag.MDEntryType] = {
                     'price': price,
                     'size': size
                 }
@@ -157,10 +158,11 @@ class FixClient(object):
         pass
 
     def handle_business_message_reject(self, msg):
-        sequence_number = msg.get(tags.FixTag.RefSeqNum)
-        reject_explanation = msg.get(tags.FixTag.Text)
-        ref_msg_type = msg.get(tags.FixTag.RefMsgType)
-        business_reject_reason = msg.get(tags.FixTag.BusinessRejectReason)
+        sequence_number = msg.get(fixation.constants.FixTag.RefSeqNum)
+        reject_explanation = msg.get(fixation.constants.FixTag.Text)
+        ref_msg_type = msg.get(fixation.constants.FixTag.RefMsgType)
+        business_reject_reason = msg.get(
+            fixation.constants.FixTag.BusinessRejectReason)
 
         handler = {
             constants.BusinessRejectReason.UNKNOWN_SECURITY: self.handle_unknown_security,

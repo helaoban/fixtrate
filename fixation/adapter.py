@@ -1,4 +1,4 @@
-from . import tags
+from fixation import constants
 
 
 class FixAdapter(object):
@@ -7,7 +7,7 @@ class FixAdapter(object):
         self._handlers = {}
 
     def dispatch(self, message):
-        msg_type = message.get(tags.FixTag.MsgType)
+        msg_type = message.get(constants.FixTag.MsgType)
         handler = self._handlers.get(msg_type)
         if handler is not None:
             return handler(message)
