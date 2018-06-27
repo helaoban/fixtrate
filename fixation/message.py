@@ -1,7 +1,7 @@
 import simplefix
 import sys
 
-from fixation import utils, tags, values
+from fixation import utils, tags, constants
 
 
 @utils.monkeypatch_module(simplefix.message)
@@ -107,7 +107,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_Heartbeat,
+            constants.FixMsgType.Heartbeat,
         )
         if test_request_id:
             msg.append_pair(tags.FixTag.TestReqID, test_request_id)
@@ -122,7 +122,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_TestRequest,
+            constants.FixMsgType.TestRequest,
         )
         test_request_id = utils.gen_uuid()
         msg.append_pair(tags.FixTag.TestReqID, test_request_id)
@@ -133,7 +133,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_Logout
+            constants.FixMsgType.Logout
         )
         return msg
 
@@ -142,7 +142,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number=sequence_number,
-            msg_type=values.FixValue.MsgType_Logon,
+            msg_type=constants.FixMsgType.Logon,
         )
         msg.append_pair(tags.FixTag.EncryptMethod, config.encrypt_method)
         msg.append_pair(tags.FixTag.HeartBtInt, config.heartbeat_interval)
@@ -154,7 +154,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_SecurityListRequest
+            constants.FixMsgType.SecurityListRequest
         )
         uid = utils.gen_uuid()
         msg.append_pair(tags.FixTag.SecurityReqID, uid)
@@ -176,14 +176,14 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_MarketDataRequest,
+            constants.FixMsgType.MarketDataRequest,
         )
         msg.append_pair(tags.FixTag.MDReqID, utils.gen_uuid())
 
         subscription_types = {
-            'snapshot': values.FixValue.SubscriptionRequestType_SNAPSHOT,
-            'subscribe': values.FixValue.SubscriptionRequestType_SNAPSHOT_PLUS_UPDATES,
-            'unsubscribe': values.FixValue.SubscriptionRequestType_DISABLE_PREVIOUS_SNAPSHOT_PLUS_UPDATE_REQUEST,
+            'snapshot': constants.SubscriptionRequestType.SNAPSHOT,
+            'subscribe': constants.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES,
+            'unsubscribe': constants.SubscriptionRequestType.DISABLE_PREVIOUS_SNAPSHOT_PLUS_UPDATE_REQUEST,
         }
         subscription_type = utils.validate_option(
             subscription_type,
@@ -196,8 +196,8 @@ class Message(simplefix.FixMessage):
         )
 
         market_depth_types = {
-            'top': values.FixValue.MarketDepth_TOP_OF_BOOK,
-            'full': values.FixValue.MarketDepth_FULL_BOOK,
+            'top': constants.MarketDepth.TOP_OF_BOOK,
+            'full': constants.MarketDepth.FULL_BOOK,
         }
         market_depth_type = utils.validate_option(
             market_depth,
@@ -210,11 +210,11 @@ class Message(simplefix.FixMessage):
             market_depth_type
         )
 
-        if subscription_type == values.FixValue.SubscriptionRequestType_SNAPSHOT_PLUS_UPDATES:
+        if subscription_type == constants.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES:
 
             update_types = {
-                'full': values.FixValue.MDUpdateType_FULL_REFRESH,
-                'incremental': values.FixValue.MDUpdateType_INCREMENTAL_REFRESH,
+                'full': constants.MDUpdateType.FULL_REFRESH,
+                'incremental': constants.MDUpdateType.INCREMENTAL_REFRESH,
             }
             update_type = utils.validate_option(
                 update_type,
@@ -256,7 +256,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_ResendRequest
+            constants.FixMsgType.ResendRequest
         )
         msg.append_pair(tags.FixTag.BeginSeqNo, start_sequence)
         msg.append_pair(tags.FixTag.EndSeqNo, end_sequence)
@@ -268,12 +268,12 @@ class Message(simplefix.FixMessage):
         sequence_number,
         config,
         new_sequence_number,
-        gap_fill=values.FixValue.GapFillFlag_YES
+        gap_fill=constants.GapFillFlag.YES
     ):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_ResendRequest
+            constants.FixMsgType.ResendRequest
         )
         msg.append_pair(tags.FixTag.NewSeqNo, new_sequence_number)
         msg.append_pair(tags.FixTag.GapFillFlag, gap_fill)
@@ -288,7 +288,7 @@ class Message(simplefix.FixMessage):
         quantity,
         order_type,
         side,
-        time_in_force=values.FixValue.TimeInForce_GOOD_TILL_CANCEL,
+        time_in_force=constants.TimeInForce.GOOD_TILL_CANCEL,
         ioi_id=None,
         exec_inst=None,
         price=None,
@@ -298,7 +298,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_NewOrderSingle
+            constants.FixMsgType.NewOrderSingle
         )
 
         order_id = utils.gen_uuid()
@@ -311,13 +311,13 @@ class Message(simplefix.FixMessage):
 
         if (
             exec_inst is not None
-            and exec_inst == values.FixValue.ExecInst_SINGLE_EXECUTION_REQUESTED_FOR_BLOCK_TRADE
-            and time_in_force == values.FixValue.TimeInForce_GOOD_TILL_CANCEL
+            and exec_inst == constants.ExecInst.SINGLE_EXECUTION_REQUESTED_FOR_BLOCK_TRADE
+            and time_in_force == constants.TimeInForce.GOOD_TILL_CANCEL
         ):
             msg.append_pair(tags.FixTag.MinQty, min_fill_qty)
 
         msg.append_pair(tags.FixTag.OrdType, order_type)
-        if order_type == values.FixValue.OrdType_LIMIT:
+        if order_type == constants.OrdType.LIMIT:
             msg.append_pair(tags.FixTag.Price, price)
 
         msg.append_pair(tags.FixTag.Side, side)
@@ -352,7 +352,7 @@ class Message(simplefix.FixMessage):
         msg = cls(config)
         msg.append_standard_headers(
             sequence_number,
-            values.FixValue.MsgType_Reject
+            constants.FixMsgType.Reject
         )
         msg.append_pair(tags.FixTag.RefSeqNum, ref_sequence_number)
         msg.append_pair(tags.FixTag.Text, reject_reason)

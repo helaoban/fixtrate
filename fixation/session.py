@@ -2,17 +2,16 @@ import asyncio
 import collections
 import datetime as dt
 import logging
-import os
 import sys
 
 from . import (
-    adapter, values, message,
+    adapter, constants, message,
     utils, tags, exceptions,
     parse, store as fix_store,
     rpc
 )
 
-
+logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -56,8 +55,8 @@ class FixMarketDataMixin(object):
     def __init__(self, *args, **kwargs):
 
         handlers = {
-            values.FixValue.MsgType_MarketDataSnapshotFullRefresh: self.handle_market_data_full_refresh,
-            values.FixValue.MsgType_MarketDataIncrementalRefresh: self.handle_market_data_incremental_refresh,
+            constants.FixMsgType.MarketDataSnapshotFullRefresh: self.handle_market_data_full_refresh,
+            constants.FixMsgType.MarketDataIncrementalRefresh: self.handle_market_data_incremental_refresh,
         }
 
         self.register_handlers(handlers)
@@ -71,9 +70,9 @@ class FixMarketDataMixin(object):
         :return:
         """
         entry_types = [
-            values.FixValue.MDEntryType_BID,
-            values.FixValue.MDEntryType_OFFER,
-            values.FixValue.MDEntryType_TRADE
+            constants.MDEntryType.BID,
+            constants.MDEntryType.OFFER,
+            constants.MDEntryType.TRADE
         ]
         sequence_number = self.store.increment_local_sequence_number()
         msg = message.Message.create_market_data_request_message(
@@ -99,15 +98,15 @@ class FixMarketDataMixin(object):
             size = message.get(tags.FixTag.MDEntrySize)
 
             if entry_type in [
-                values.FixValue.MDEntryType_OFFER,
-                values.FixValue.MDEntryType_BID
+                constants.MDEntryType.OFFER,
+                constants.MDEntryType.BID
             ]:
                 book[tags.FixTag.MDEntryType] = {
                     'price': price,
                     'size': size
                 }
 
-            if entry_type == values.FixValue.MDEntryType_TRADE:
+            if entry_type == constants.MDEntryType.TRADE:
                 trades.append({'price': price, 'size': size})
 
         return symbol, book, trades
@@ -257,11 +256,11 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         self._out_queue = asyncio.Queue()
 
         handlers = {
-            values.FixValue.MsgType_Logon: self.handle_login,
-            values.FixValue.MsgType_Heartbeat: self.handle_heartbeat,
-            values.FixValue.MsgType_TestRequest: self.handle_test_request,
-            values.FixValue.MsgType_Reject: self.handle_reject,
-            values.FixValue.MsgType_BusinessMessageReject: self.handle_business_message_reject,
+            constants.FixMsgType.Logon: self.handle_logon,
+            constants.FixMsgType.Heartbeat: self.handle_heartbeat,
+            constants.FixMsgType.TestRequest: self.handle_test_request,
+            constants.FixMsgType.Reject: self.handle_reject,
+            constants.FixMsgType.BusinessMessageReject: self.handle_business_message_reject,
         }
 
         self.register_handlers(handlers)
@@ -356,12 +355,12 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
             await self.send_message(sent_messages[seq])
 
     async def handle_message(self, msg):
-        msg_type = values.FixValue(msg.get(tags.FixTag.MsgType))
+        msg_type = constants.FixMsgType(msg.get(tags.FixTag.MsgType))
         seq_num = int(msg.get(tags.FixTag.MsgSeqNum.value))
 
         if msg_type not in [
-            values.FixValue.MsgType_Logon,
-            values.FixValue.MsgType_ResendRequest
+            constants.FixMsgType.Logon,
+            constants.FixMsgType.ResendRequest
         ]:
 
             try:
@@ -389,10 +388,12 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
     async def dispatch(self, message):
 
         msg_type = message.get(tags.FixTag.MsgType)
-        logger.debug('Fix message received: {}'.format(msg_type))
+        logger.debug('Fix message received: {}'.format(
+            constants.FixMsgType(msg_type).name
+        ))
 
         try:
-            msg_type = values.FixValue(msg_type)
+            msg_type = constants.FixMsgType(msg_type)
         except ValueError:
             logger.error('Unrecognized FIX value {}.'.format(msg_type))
             return
@@ -409,11 +410,10 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         converted = adapter.dispatch(message)
         self._out_queue.put_nowait(converted)
 
-    async def handle_login(self, message):
+    async def handle_logon(self, message):
         if self.config.reset_sequence:
             seq_num = int(message.get(tags.FixTag.MsgSeqNum))
             self.store.set_remote_sequence_number(seq_num)
-
         await self.send_heartbeat()
         logger.debug('Login successful!')
 
@@ -440,15 +440,15 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
         business_reject_reason = message.get(tags.FixTag.BusinessRejectReason)
 
         handler = {
-            values.FixValue.BusinessRejectReason_UNKNOWN_SECURITY: self.handle_unknown_security,
-            values.FixValue.BusinessRejectReason_UNSUPPORTED_MESSAGE_TYPE: self.handle_unknown_security,
-            values.FixValue.BusinessRejectReason_APPLICATION_NOT_AVAILABLE: self.handle_application_not_available,
-            values.FixValue.BusinessRejectReason_CONDITIONALLY_REQUIRED_FIELD_MISSING: self.handle_missing_conditionally_required_field,
-            values.FixValue.BusinessRejectReason_DELIVERTO_FIRM_NOT_AVAILABLE_AT_THIS_TIME: self.handle_deliverto_firm_not_available,
-            values.FixValue.BusinessRejectReason_NOT_AUTHORIZED: self.handle_not_authorized,
-            values.FixValue.BusinessRejectReason_UNKNOWN_ID: self.handle_unknown_id,
-            values.FixValue.BusinessRejectReason_UNKNOWN_MESSAGE_TYPE: self.handle_unknown_message_type,
-            values.FixValue.BusinessRejectReason_INVALID_PRICE_INCREMENT: self.handle_invalid_price_increment,
+            constants.BusinessRejectReason.UNKNOWN_SECURITY: self.handle_unknown_security,
+            constants.BusinessRejectReason.UNSUPPORTED_MESSAGE_TYPE: self.handle_unknown_security,
+            constants.BusinessRejectReason.APPLICATION_NOT_AVAILABLE: self.handle_application_not_available,
+            constants.BusinessRejectReason.CONDITIONALLY_REQUIRED_FIELD_MISSING: self.handle_missing_conditionally_required_field,
+            constants.BusinessRejectReason.DELIVERTO_FIRM_NOT_AVAILABLE_AT_THIS_TIME: self.handle_deliverto_firm_not_available,
+            constants.BusinessRejectReason.NOT_AUTHORIZED: self.handle_not_authorized,
+            constants.BusinessRejectReason.UNKNOWN_ID: self.handle_unknown_id,
+            constants.BusinessRejectReason.UNKNOWN_MESSAGE_TYPE: self.handle_unknown_message_type,
+            constants.BusinessRejectReason.INVALID_PRICE_INCREMENT: self.handle_invalid_price_increment,
         }.get(business_reject_reason)
 
         if handler is None:
@@ -528,7 +528,6 @@ class FixSession(FixBaseMixin, FixMarketDataMixin, FixOrderEntryMixin, metaclass
                 msg = parser.get_message()
 
                 if msg is not None:
-                    # print(msg)
                     await self.handle_message(msg)
 
         except asyncio.CancelledError:

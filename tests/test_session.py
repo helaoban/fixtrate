@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from fixation import session, parse, values, tags
+from fixation import session, parse, constants, tags
 
 
 @pytest.mark.asyncio
@@ -15,20 +15,20 @@ async def test_login(
 
     first_sent = client_store.get_sent_message_by_index(0)
     first_sent = parse.FixParser.parse(first_sent, client_config)
-    msg_type = values.FixValue(first_sent.get(tags.FixTag.MsgType))
-    assert msg_type == values.FixValue.MsgType_Logon
+    msg_type = constants.FixMsgType(first_sent.get(tags.FixTag.MsgType))
+    assert msg_type == constants.FixMsgType.MsgType_Logon
 
     first_received = client_store.get_received_message_by_index(0)
     first_received = parse.FixParser.parse(first_received, client_config)
-    msg_type = values.FixValue(first_received.get(tags.FixTag.MsgType))
-    assert msg_type == values.FixValue.MsgType_Logon
+    msg_type = constants.FixMsgType(first_received.get(tags.FixTag.MsgType))
+    assert msg_type == constants.FixMsgType.MsgType_Logon
 
     server_sequence_number = int(first_received.get(tags.FixTag.MsgSeqNum))
 
     second_sent = client_store.get_sent_message_by_index(1)
     second_sent = parse.FixParser.parse(second_sent, client_config)
-    msg_type = values.FixValue(second_sent.get(tags.FixTag.MsgType))
-    assert msg_type == values.FixValue.MsgType_Heartbeat
+    msg_type = constants.FixMsgType(second_sent.get(tags.FixTag.MsgType))
+    assert msg_type == constants.FixMsgType.MsgType_Heartbeat
 
     assert int(fix_session.store.get_remote_sequence_number()) == server_sequence_number
 
@@ -68,7 +68,7 @@ async def test_heartbeat(fix_session, test_server, client_store, client_config):
 
     received_heartbeats = [
         m for m in messages
-        if values.FixValue(m.message_type) == values.FixValue.MsgType_Heartbeat
+        if constants.FixMsgType(m.message_type) == constants.FixMsgType.MsgType_Heartbeat
     ]
 
     assert len(received_heartbeats) > 0
@@ -80,7 +80,7 @@ async def test_heartbeat(fix_session, test_server, client_store, client_config):
 
     sent_heartbeats = [
         m for m in sent_messages
-        if values.FixValue(m.message_type) == values.FixValue.MsgType_Heartbeat
+        if constants.FixMsgType(m.message_type) == constants.FixMsgType.MsgType_Heartbeat
     ]
 
     assert len(sent_heartbeats) > 0
@@ -103,7 +103,7 @@ async def test_test_request(fix_session):
 
     heartbeats = [
         m for m in messages
-        if values.FixValue(m.message_type) == values.FixValue.MsgType_Heartbeat
+        if constants.FixMsgType(m.message_type) == constants.FixMsgType.MsgType_Heartbeat
     ]
 
     test_request_id = heartbeats[0].get(tags.FixTag.TestReqID)

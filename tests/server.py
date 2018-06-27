@@ -3,7 +3,7 @@ import datetime as dt
 import logging
 
 from fixation import (
-    tags, values, message,
+    tags, constants, message,
     exceptions, parse,
     version, store as fix_store,
     utils
@@ -103,15 +103,15 @@ class MockFixServer(object):
         msg_type = message.get(tags.FixTag.MsgType)
 
         try:
-            msg_type = values.FixValue(msg_type)
+            msg_type = constants.FixMsgType(msg_type)
         except ValueError:
             logger.error('Unrecognized FIX value {}.'.format(msg_type))
             return
 
         handler = {
-            values.FixValue.MsgType_Heartbeat: self.handle_heartbeat,
-            values.FixValue.MsgType_Logon: self.handle_login,
-            values.FixValue.MsgType_TestRequest: self.handle_test_request,
+            constants.FixMsgType.MsgType_Heartbeat: self.handle_heartbeat,
+            constants.FixMsgType.MsgType_Logon: self.handle_login,
+            constants.FixMsgType.MsgType_TestRequest: self.handle_test_request,
         }.get(msg_type)
 
         if handler is not None:
@@ -135,7 +135,7 @@ class MockFixServer(object):
             self.send_reject(
                 message=message,
                 tag=tags.FixTag.HeartBtInt,
-                rejection_type=values.FixValue.SessionRejectReason_VALUE_IS_INCORRECT,
+                rejection_type=constants.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='HeartBtInt must be {}'.format(self.config.heartbeat_interval)
             )
             return
@@ -145,13 +145,13 @@ class MockFixServer(object):
             self.send_reject(
                 message=message,
                 tag=tags.FixTag.TargetCompID,
-                rejection_type=values.FixValue.SessionRejectReason_VALUE_IS_INCORRECT,
+                rejection_type=constants.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='Target Comp ID is incorrect.'
             )
             return
 
-        reset_seq_number = values.FixValue(message.get(tags.FixTag.ResetSeqNumFlag))
-        if reset_seq_number == values.FixValue.ResetSeqNumFlag_YES:
+        reset_seq_number = constants.ResetSeqNumFlag(message.get(tags.FixTag.ResetSeqNumFlag))
+        if reset_seq_number == constants.ResetSeqNumFlag.YES:
             self.reset_sequence_numbers(sequence_number)
             self.send_login()
         else:

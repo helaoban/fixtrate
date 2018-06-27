@@ -1,6 +1,6 @@
 import os
 
-from fixation import version as fix_version, utils, values
+from fixation import version as fix_version, utils, constants
 
 
 class FixConfig(object):
@@ -13,7 +13,7 @@ class FixConfig(object):
         target_comp_id,
         heartbeat_interval=30,
         reset_sequence=True,
-        encrypt_method=values.FixValue.EncryptMethod_NONE,
+        encrypt_method=constants.EncryptMethod.NONE,
     ):
         self.version = version
         self.sender_comp_id = sender_comp_id
