@@ -1,75 +1,77 @@
+from distutils.util import strtobool
 import os
 
-import fixation.constants
 from fixation import utils, constants
 
+REQUIRED = [
+    ('FIX_VERSION', constants.FixVersion),
+    ('FIX_HOST', str),
+    ('FIX_PORT', int),
+    ('FIX_SENDER_COMP_ID', str),
+    ('FIX_TARGET_COMP_ID', str),
+    ('FIX_ACCOUNT', str),
+    ('FIX_HEARTBEAT_INTERVAL', int),
+    ('FIX_RESET_SEQUENCE', bool),
+]
 
-class FixConfig(object):
-    def __init__(
-        self,
-        version,
-        host,
-        port,
-        sender_comp_id,
-        target_comp_id,
-        heartbeat_interval=30,
-        reset_sequence=True,
-        encrypt_method=constants.EncryptMethod.NONE,
-    ):
-        self.version = version
-        self.sender_comp_id = sender_comp_id
-        self.target_comp_id = target_comp_id
-        self.heartbeat_interval = heartbeat_interval
-        self.reset_sequence = reset_sequence
-        self.host = host
-        self.port = port
 
-        self.encrypt_method = encrypt_method
+def validate_config(config):
+    for name, _type in REQUIRED:
+        if name not in config:
+            raise ValueError(
+                'Missing required config variable: {}'
+                ''.format(name))
 
-    def validate(self):
-        errors = {}
+        if not isinstance(config[name], _type):
+            print(_type)
+            raise TypeError(
+                'Expected {} to be {}, but instead was {}'
+                ''.format(name, _type, type(config[name]))
+            )
 
-        try:
-            self.version = constants.FixVersion(self.version)
-        except ValueError:
-            errors['version'] = '{} is not a valid FIX version'.format(self.version)
+    try:
+        config['FIX_VERSION'] = constants.FixVersion(config['FIX_VERSION'])
+    except ValueError:
+        raise ValueError(
+            '{} is not a valid FIX version'
+            ''.format(config['FIX_VERSION']))
 
-        try:
-            utils.validate_ip_address(self.host)
-        except ValueError:
-            errors['host']: '{} is not a valid IP address'.format(self.host)
+    try:
+        utils.validate_ip_address(config['FIX_HOST'])
+    except ValueError:
+        raise ValueError(
+            '{} is not a valid IP address'
+            ''.format(config['FIX_HOST']))
 
-        try:
-            utils.validate_port(self.port)
-        except ValueError:
-            errors['port']: '{} is not a valid port number'.format(self.port)
+    try:
+        utils.validate_port(config['FIX_PORT'])
+    except ValueError:
+        raise ValueError(
+            '{} is not a valid port number'
+            ''.format(config['FIX_PORT']))
 
 
 def get_config_from_env():
 
-    required = [
-        'FIX_VERSION',
-        'FIX_HOST',
-        'FIX_PORT',
-        'FIX_SENDER_COMP_ID',
-        'FIX_TARGET_COMP_ID'
-    ]
-
     missing = []
-    for var in required:
-        if var not in os.environ:
-            missing.append(var)
+    config = {}
+    for name, _type in REQUIRED:
+        try:
+            val = os.environ[name]
+        except KeyError:
+            missing.append(name)
+            continue
+
+        if _type == bool:
+            val = bool(strtobool(val))
+        else:
+            val = _type(val)
+
+        config[name] = val
 
     if missing:
         raise ValueError('The following env vars are not set: {}'
                          ''.format(missing))
 
-    values = {var: os.environ.get(var) for var in required}
-
-    FixConfig(
-        version=constants.FixVersion(values['FIX_VERSION']),
-        host=values['FIX_HOST'],
-        port=values['FIX_PORT'],
-        sender_comp_id=values['FIX_SENDER_COMP_ID'],
-        target_comp_id=values['FIX_TARGET_COMP_ID']
-    )
+    validate_config(config)
+    return config

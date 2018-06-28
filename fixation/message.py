@@ -48,8 +48,8 @@ def fix_tag(value):
 
 class Message(simplefix.FixMessage):
 
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, conf):
+        self.config = conf
         super().__init__()
 
     def encode(self, raw=False):
@@ -76,10 +76,10 @@ class Message(simplefix.FixMessage):
         :param msg_type:
         :return:
         """
-        self.append_pair(fixation.constants.FixTag.BeginString, self.config.version, header=True)
+        self.append_pair(fixation.constants.FixTag.BeginString, self.config.get('FIX_VERSION'), header=True)
         self.append_pair(fixation.constants.FixTag.MsgType, msg_type, header=True)
-        self.append_pair(fixation.constants.FixTag.SenderCompID, self.config.sender_comp_id, header=True)
-        self.append_pair(fixation.constants.FixTag.TargetCompID, self.config.target_comp_id, header=True)
+        self.append_pair(fixation.constants.FixTag.SenderCompID, self.config.get('FIX_SENDER_COMP_ID'), header=True)
+        self.append_pair(fixation.constants.FixTag.TargetCompID, self.config.get('FIX_TARGET_COMP_ID'), header=True)
         self.append_pair(fixation.constants.FixTag.MsgSeqNum, sequence_number, header=True)
 
         if timestamp is not None:
@@ -145,9 +145,11 @@ class Message(simplefix.FixMessage):
             sequence_number=sequence_number,
             msg_type=constants.FixMsgType.Logon,
         )
-        msg.append_pair(fixation.constants.FixTag.EncryptMethod, config.encrypt_method)
-        msg.append_pair(fixation.constants.FixTag.HeartBtInt, config.heartbeat_interval)
-        msg.append_pair(fixation.constants.FixTag.ResetSeqNumFlag, 'Y')
+        msg.append_pair(fixation.constants.FixTag.EncryptMethod, config.get('FIX_ENCRYPT_METHOD', constants.EncryptMethod.NONE.value))
+        msg.append_pair(fixation.constants.FixTag.HeartBtInt, config.get('FIX_HEARTBEAT_INTERVAL'))
+
+        if config.get('FIX_RESET_SEQUENCE'):
+            msg.append_pair(fixation.constants.FixTag.ResetSeqNumFlag, 'Y')
         return msg
 
     @classmethod

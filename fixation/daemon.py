@@ -1,6 +1,5 @@
 import asyncio
 
-import fixation.constants
 from fixation import (
     config, session,
     store, rpc
@@ -9,24 +8,21 @@ from fixation import (
 
 class FixDaemon(object):
 
-    def __init__(self):
+    def __init__(self, conf=None):
         self.session = None
         self.rpc_server = None
         self.loop = asyncio.get_event_loop()
 
-        self.config = config.FixConfig(
-            host='127.0.0.1',
-            port=4000,
-            sender_comp_id='qafa001',
-            target_comp_id='IB',
-            version=fixation.constants.FixVersion.FIX42,
-            heartbeat_interval=30,
+        if conf is None:
+            conf = config.get_config_from_env()
+        else:
+            config.validate_config(conf)
 
-        )
+        self.config = conf
 
     async def main(self):
         self.session = session.FixSession(
-            config=self.config,
+            conf=self.config,
             loop=self.loop,
             store=store.FixMemoryStore()
         )

@@ -3,11 +3,10 @@ from collections.abc import Coroutine
 import datetime as dt
 import logging
 
-import fixation.constants
-from . import (
+from fixation import (
     constants, message,
     utils, exceptions, parse,
-    store as fix_store
+    store as fix_store, config
 )
 
 logging.basicConfig()
@@ -80,10 +79,14 @@ class FixConnectionContextManager(Coroutine):
 
 
 class FixSession:
-    def __init__(self, config, store=None, loop=None):
-        config.validate()
-        self.config = config
-        self.config_path = '~/.fixation'
+    def __init__(self, conf=None, store=None, loop=None):
+
+        if conf is None:
+            conf = config.get_config_from_env()
+        else:
+            config.validate_config(conf)
+        self.config = conf
+
         self.loop = loop or asyncio.get_event_loop()
         self.store = store or fix_store.FixRedisStore()
         self.reader = None
@@ -111,8 +114,8 @@ class FixSession:
         while tries <= retries:
             try:
                 reader, writer = await asyncio.open_connection(
-                    host=self.config.host,
-                    port=self.config.port,
+                    host=self.config.get('FIX_HOST', '127.0.0.1'),
+                    port=self.config.get('FIX_PORT', 4000),
                     loop=self.loop
                 )
             except OSError as error:

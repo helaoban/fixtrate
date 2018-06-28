@@ -16,17 +16,14 @@ logger.setLevel(logging.DEBUG)
 
 class FixClient(object):
 
-    def __init__(self):
+    def __init__(self, conf=None):
         self.session = None
-        self.config = config.FixConfig(
-            host='127.0.0.1',
-            port=4000,
-            sender_comp_id='qafa001',
-            target_comp_id='IB',
-            version=fixation.constants.FixVersion.FIX42,
-            heartbeat_interval=30,
 
-        )
+        if conf is None:
+            conf = config.get_config_from_env()
+        else:
+            config.validate_config(conf)
+        self.config = conf
 
         self.loop = asyncio.get_event_loop()
         self._handlers = {}
@@ -105,7 +102,8 @@ class FixClient(object):
 
     async def listen(self):
         self.session = session.FixSession(
-            config=self.config, loop=self.loop,
+            conf=self.config,
+            loop=self.loop,
             store=store.FixMemoryStore()
         )
 

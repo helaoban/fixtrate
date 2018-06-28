@@ -17,12 +17,12 @@ def server_store():
 
 @pytest.fixture
 def server_config():
-    return config.FixConfig(
-        host='localhost',
-        port=8686,
-        sender_comp_id='FIXTEST',
-        version=fixation.constants.FixVersion.FIX42,
-        target_comp_id='TESTCLIENT'
+    return dict(
+        FIX_HOST='localhost',
+        FIX_PORT=8686,
+        FIX_SENDER_COMP_ID='FIXTEST',
+        FIX_VERSION=fixation.constants.FixVersion.FIX42,
+        FIX_TARGET_COMP_ID='TESTCLIENT'
     )
 
 
@@ -41,12 +41,10 @@ async def test_server(event_loop, server_store, server_config):
 
 @pytest.fixture
 def client_config(server_config):
-    return config.FixConfig(
-        host=server_config.host,
-        port=server_config.port,
-        target_comp_id=server_config.sender_comp_id,
-        version=server_config.version,
-        sender_comp_id='TESTCLIENT'
+    return dict(
+        **server_config,
+        FIX_TARGET_COMP_ID=server_config['FIX_SENDER_COMP_ID'],
+        FIX_SENDER_COMP_ID='TESTCLIENT'
     )
 
 
