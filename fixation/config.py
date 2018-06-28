@@ -30,7 +30,7 @@ class FixConfig(object):
         errors = {}
 
         try:
-            self.version = fixation.constants.FixVersion(self.version)
+            self.version = constants.FixVersion(self.version)
         except ValueError:
             errors['version'] = '{} is not a valid FIX version'.format(self.version)
 
@@ -67,7 +67,7 @@ def get_config_from_env():
     values = {var: os.environ.get(var) for var in required}
 
     FixConfig(
-        version=fixation.constants.FixVersion(values['FIX_VERSION']),
+        version=constants.FixVersion(values['FIX_VERSION']),
         host=values['FIX_HOST'],
         port=values['FIX_PORT'],
         sender_comp_id=values['FIX_SENDER_COMP_ID'],
