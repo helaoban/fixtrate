@@ -16,6 +16,14 @@ class UnknownCommand(Exception):
     pass
 
 
+class UnsupportedVersion(Exception):
+    pass
+
+
+class InvalidFixDictTag(Exception):
+    pass
+
+
 RPC_ERRORS = {}
 
 
