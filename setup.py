@@ -11,8 +11,10 @@ EMAIL = 'carloholl@gmail.com'
 REQUIRES_PYTHON = '>=3.6.5'
 
 REQUIRES = [
+    'jsonschema',
+    'redis',
     'simplefix',
-    'redis'
+    'untangle',
 ]
 
 EXTRAS_REQUIRE = {
