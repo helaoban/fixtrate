@@ -20,30 +20,24 @@ class FixConnection(object):
         self,
         reader,
         writer,
-        config,
-        on_connect=None,
         on_disconnect=None,
         loop=None
     ):
         self.reader = reader
         self.writer = writer
-        self.config = config
-        self.on_connect = on_connect
         self.on_disconnect = on_disconnect
-
         self.loop = loop or asyncio.get_event_loop()
-
-        self._connected = True
+        self.connected = True
 
     async def close(self):
         self.writer.close()
+        self.connected = False
+
         if self.on_disconnect is not None:
             if utils.is_coro(self.on_disconnect):
                 await self.on_disconnect()
             else:
                 self.on_disconnect()
-
-        self._connected = False
 
     async def read(self):
         return await self.reader.read(4096)
@@ -93,11 +87,8 @@ class FixSession:
         self.writer = None
         self._connected = True
         self._connection = None
-        self._listener = None
-        self._socket_server = None
         self._closing = False
 
-        self._out_queue = asyncio.Queue()
         self.parser = parse.FixParser(self.config)
 
     def __enter__(self):
@@ -138,11 +129,10 @@ class FixSession:
         return FixConnectionContextManager(self._connect())
 
     def on_connect(self):
-        self._connected = True
+        pass
 
-    def on_disconnect(self):
-        self._connected = False
-        self.shutdown()
+    async def on_disconnect(self):
+        await self.shutdown()
 
     def append_standard_headers(
         self,
@@ -172,7 +162,6 @@ class FixSession:
             self.config['FIX_TARGET_COMP_ID'],
             header=True
         )
-
         msg.append_pair(
             constants.FixTag.MsgSeqNum,
             self.store.increment_local_sequence_number()
@@ -217,8 +206,8 @@ class FixSession:
 
     async def request_resend(self, start_sequence, end_sequence):
         msg = fm.FixMessage.create_resend_request_message(
-            start_sequence=start_sequence,
-            end_sequence=end_sequence
+            start_sequence,
+            end_sequence
         )
         await self.send_message(msg)
 
@@ -318,16 +307,16 @@ class FixSession:
         if msg:
             return msg
 
-        while self._connected:
+        while self._connection.connected:
             try:
                 data = await self._connection.read()
             except ConnectionError as error:
                 logger.error(error)
-                self.on_disconnect()
+                await self.on_disconnect()
                 return
             if data == b'':
                 logger.error('Server closed the connection!')
-                self.on_disconnect()
+                await self.on_disconnect()
                 return
             self.parser.append_buffer(data)
             msg = self.parser.get_message()
@@ -345,9 +334,7 @@ class FixSession:
             raise StopAsyncIteration
         return msg
 
-    def shutdown(self):
+    async def shutdown(self):
         logger.info('Shutting down...')
-        if self._connected:
-            self.logoff()
-        self._out_queue.put_nowait(None)
-        self._listener.cancel()
+        if self._connection.connected:
+            await self.logoff()
