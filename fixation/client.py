@@ -2,7 +2,6 @@ import asyncio
 import collections
 import logging
 
-import fixation.constants
 from fixation import (
     constants, session,
     config, message,
@@ -64,7 +63,7 @@ class FixClient(object):
         msg = message.ManagedMessage.create_market_data_request_message(
             sequence_number, self.config, symbols, entry_types
         )
-        request_id = msg.get(fixation.constants.FixTag.MDReqID)
+        request_id = msg.get(constants.FixTag.MDReqID)
 
         self.session.store.register_symbol_request_mapping(symbols, request_id)
         await self.session.send_message(msg)
@@ -79,15 +78,15 @@ class FixClient(object):
         book = collections.defaultdict(list)
         trades = []
         for i in range(number_of_entries):
-            entry_type = msg.get(fixation.constants.FixTag.MDEntryType)
-            price = msg.get(fixation.constants.FixTag.MDEntryPx)
-            size = msg.get(fixation.constants.FixTag.MDEntrySize)
+            entry_type = msg.get(constants.FixTag.MDEntryType)
+            price = msg.get(constants.FixTag.MDEntryPx)
+            size = msg.get(constants.FixTag.MDEntrySize)
 
             if entry_type in [
                 constants.MDEntryType.OFFER,
                 constants.MDEntryType.BID
             ]:
-                book[fixation.constants.FixTag.MDEntryType] = {
+                book[constants.FixTag.MDEntryType] = {
                     'price': price,
                     'size': size
                 }
@@ -156,11 +155,11 @@ class FixClient(object):
         pass
 
     def handle_business_message_reject(self, msg):
-        sequence_number = msg.get(fixation.constants.FixTag.RefSeqNum)
-        reject_explanation = msg.get(fixation.constants.FixTag.Text)
-        ref_msg_type = msg.get(fixation.constants.FixTag.RefMsgType)
+        sequence_number = msg.get(constants.FixTag.RefSeqNum)
+        reject_explanation = msg.get(constants.FixTag.Text)
+        ref_msg_type = msg.get(constants.FixTag.RefMsgType)
         business_reject_reason = msg.get(
-            fixation.constants.FixTag.BusinessRejectReason)
+            constants.FixTag.BusinessRejectReason)
 
         handler = {
             constants.BusinessRejectReason.UNKNOWN_SECURITY: self.handle_unknown_security,
