@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 
 from fixation import (
-    constants, message,
+    constants, message as fm,
     utils, exceptions, parse,
     store as fix_store, config
 )
@@ -126,7 +126,8 @@ class FixSession:
                 continue
             else:
                 self.on_connect()
-                self._connection = FixConnection(reader, writer, self.on_disconnect)
+                self._connection = FixConnection(
+                    reader, writer, self.on_disconnect)
                 return self._connection
 
         if tries > retries:
@@ -143,73 +144,87 @@ class FixSession:
         self._connected = False
         self.shutdown()
 
+    def append_standard_headers(
+        self,
+        msg,
+        timestamp=None
+    ):
+        """
+        Create a base message with standard headers set.
+        BodyLength and Checksum are handled by SimpleFix
+
+        :param msg:
+        :param timestamp:
+        :return:
+        """
+        msg.append_pair(
+            constants.FixTag.BeginString,
+            self.config['FIX_VERSION'],
+            header=True
+        )
+        msg.append_pair(
+            constants.FixTag.SenderCompID,
+            self.config['FIX_SENDER_COMP_ID'],
+            header=True
+        )
+        msg.append_pair(
+            constants.FixTag.TargetCompID,
+            self.config['FIX_TARGET_COMP_ID'],
+            header=True
+        )
+
+        msg.append_pair(
+            constants.FixTag.MsgSeqNum,
+            self.store.increment_local_sequence_number()
+        )
+
+        if timestamp is None:
+            timestamp = dt.datetime.utcnow()
+
+        msg.append_utc_timestamp(
+            constants.FixTag.SendingTime,
+            timestamp=timestamp,
+            precision=6,
+            header=True
+        )
+
     async def send_message(self, msg):
+        self.append_standard_headers(msg)
         msg_type = constants.FixMsgType(msg.get(
             constants.FixTag.MsgType))
         seq_num = msg.get(constants.FixTag.MsgSeqNum)
         send_time = msg.get(constants.FixTag.SendingTime)
-
-        if send_time is None:
-            msg.append_utc_timestamp(
-                constants.FixTag.SendingTime,
-                timestamp=dt.datetime.utcnow(),
-                precision=6,
-                header=True
-            )
-            send_time = msg.get(constants.FixTag.SendingTime)
-
         encoded = msg.encode()
         print('{}: --> {}'.format(send_time, msg_type))
         await self._connection.write(encoded)
         self.store.store_sent_message(int(seq_num), encoded)
 
     async def send_heartbeat(self, test_request_id=None):
-        sequence_number = self.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_heartbeat_message(
-            sequence_number, self.config, test_request_id
-        )
+        msg = fm.FixMessage.create_heartbeat_message(test_request_id)
         await self.send_message(msg)
 
     async def login(self):
-        sequence_number = self.store.increment_local_sequence_number()
-        login_msg = message.ManagedMessage.create_login_message(
-            sequence_number, self.config
-        )
+        login_msg = fm.FixMessage.create_login_message()
         await self.send_message(login_msg)
 
     async def logoff(self):
-        sequence_number = self.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_logoff_message(
-            sequence_number, self.config
-        )
+        msg = fm.FixMessage.create_logoff_message()
         await self.send_message(msg)
 
     async def send_test_request(self):
-        sequence_number = self.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_test_request_message(
-            sequence_number,
-            self.config
-        )
+        msg = fm.FixMessage.create_test_request_message()
         await self.send_message(msg)
 
     async def request_resend(self, start_sequence, end_sequence):
-        sequence_number = self.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_resend_request_message(
-            sequence_number=sequence_number,
-            config=self.config,
+        msg = fm.FixMessage.create_resend_request_message(
             start_sequence=start_sequence,
             end_sequence=end_sequence
         )
         await self.send_message(msg)
 
     async def reset_sequence(self, new_sequence_number):
-        sequence_number = self.store.increment_local_sequence_number()
         self.store.set_remote_sequence_number(new_sequence_number - 1)
-        msg = message.ManagedMessage.create_sequence_reset_message(
-            sequence_number,
-            self.config,
-            new_sequence_number
-        )
+        msg = fm.FixMessage.create_sequence_reset_message(new_sequence_number)
         await self.send_message(msg)
 
     async def resend_messages(self, start, end):

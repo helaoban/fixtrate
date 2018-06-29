@@ -85,3 +85,15 @@ def pack_rpc_message(message):
 
 def print_to_console(val):
     print('\n{}'.format(val))
+
+
+def raise_invalid_option(name, valid_options):
+    raise ValueError(
+        '{} must be one of: {}'
+        ''.format(name, list_members(valid_options))
+    )
+
+
+def list_members(interable):
+    return '|'.join(o for o in interable)
+

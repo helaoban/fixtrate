@@ -40,7 +40,7 @@ class MockFixServer(object):
 
     def send_heartbeat(self, test_request_id=None):
         sequence_number = self.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_heartbeat_message(
+        msg = message.FixMessage.create_heartbeat_message(
             sequence_number,
             self.config,
             test_request_id=test_request_id
@@ -49,7 +49,7 @@ class MockFixServer(object):
 
     def send_login(self):
         sequence_number = self.store.increment_local_sequence_number()
-        login_msg = message.ManagedMessage.create_login_message(
+        login_msg = message.FixMessage.create_login_message(
             sequence_number, self.config
         )
         self.send_message(login_msg)
@@ -71,7 +71,7 @@ class MockFixServer(object):
 
     def request_resend(self, start, end):
         sequence_number = self.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_resend_request_message(
+        msg = message.FixMessage.create_resend_request_message(
             sequence_number=sequence_number,
             config=self.config,
             start_sequence=start,

@@ -1,7 +1,7 @@
 import simplefix
 import sys
 
-from fixation import utils, constants
+from fixation import utils, constants as fc
 
 
 @utils.monkeypatch_module(simplefix.message)
@@ -45,50 +45,17 @@ def fix_tag(value):
         return str(value).encode('ASCII')
 
 
-class ManagedMessage(simplefix.FixMessage):
-
-    def __init__(self, conf):
-        self.config = conf
-        super().__init__()
+class FixMessage(simplefix.FixMessage):
 
     def encode(self, raw=False):
         if not raw:
-            if not self.get(constants.FixTag.SendingTime):
+            if not self.get(fc.FixTag.SendingTime):
                 self.append_utc_timestamp(
-                    constants.FixTag.SendingTime,
+                    fc.FixTag.SendingTime,
                     precision=6,
                     header=True
                 )
         return super().encode(raw=raw)
-
-    def append_standard_headers(
-        self,
-        sequence_number,
-        msg_type,
-        timestamp=None
-    ):
-        """
-        Create a base message with standard headers set.
-        BodyLength and Checksum are handled by SimpleFix
-
-        :param sequence_number:
-        :param msg_type:
-        :return:
-        """
-        self.append_pair(constants.FixTag.BeginString, self.config.get('FIX_VERSION'), header=True)
-        self.append_pair(constants.FixTag.MsgType, msg_type, header=True)
-        self.append_pair(constants.FixTag.SenderCompID, self.config.get('FIX_SENDER_COMP_ID'), header=True)
-        self.append_pair(constants.FixTag.TargetCompID, self.config.get('FIX_TARGET_COMP_ID'), header=True)
-        self.append_pair(constants.FixTag.MsgSeqNum, sequence_number, header=True)
-
-        if timestamp is not None:
-
-            self.append_utc_timestamp(
-                constants.FixTag.SendingTime,
-                timestamp=timestamp,
-                precision=6,
-                header=True
-            )
 
     def get(self, tag, *args, **kwargs):
         try:
@@ -100,239 +67,214 @@ class ManagedMessage(simplefix.FixMessage):
     @classmethod
     def create_heartbeat_message(
         cls,
-        sequence_number,
-        config,
         test_request_id=None
     ):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.Heartbeat,
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.Heartbeat
         )
         if test_request_id:
-            msg.append_pair(constants.FixTag.TestReqID, test_request_id)
+            msg.append_pair(fc.FixTag.TestReqID, test_request_id)
         return msg
 
     @classmethod
     def create_test_request_message(
         cls,
-        sequence_number,
-        config,
+        test_request_id=None,
     ):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.TestRequest,
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.TestRequest
         )
-        test_request_id = utils.gen_uuid()
-        msg.append_pair(constants.FixTag.TestReqID, test_request_id)
+        if test_request_id is None:
+            test_request_id = utils.gen_uuid()
+        msg.append_pair(fc.FixTag.TestReqID, test_request_id)
         return msg
 
     @classmethod
-    def create_logoff_message(cls, sequence_number, config):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.Logout
+    def create_logoff_message(cls):
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.Logout,
+            header=True
         )
         return msg
 
     @classmethod
-    def create_login_message(cls, sequence_number, config):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number=sequence_number,
-            msg_type=constants.FixMsgType.Logon,
+    def create_login_message(
+        cls,
+        encrypt_method=fc.EncryptMethod.NONE,
+        heartbeat_interval=30,
+        reset_sequence=False
+    ):
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.Logon,
         )
-        msg.append_pair(constants.FixTag.EncryptMethod, config.get('FIX_ENCRYPT_METHOD', constants.EncryptMethod.NONE.value))
-        msg.append_pair(constants.FixTag.HeartBtInt, config.get('FIX_HEARTBEAT_INTERVAL'))
-
-        if config.get('FIX_RESET_SEQUENCE'):
-            msg.append_pair(constants.FixTag.ResetSeqNumFlag, 'Y')
+        msg.append_pair(
+            fc.FixTag.EncryptMethod,
+            encrypt_method,
+            fc.EncryptMethod.NONE.value
+        )
+        msg.append_pair(
+            fc.FixTag.HeartBtInt,
+            heartbeat_interval
+        )
+        if reset_sequence:
+            msg.append_pair(fc.FixTag.ResetSeqNumFlag, 'Y')
         return msg
 
     @classmethod
-    def create_security_list_request(cls, sequence_number, config):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.SecurityListRequest
+    def create_resend_request_message(
+        cls,
+        start_sequence,
+        end_sequence
+    ):
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.ResendRequest
         )
+        msg.append_pair(fc.FixTag.BeginSeqNo, start_sequence)
+        msg.append_pair(fc.FixTag.EndSeqNo, end_sequence)
+        return msg
+
+    @classmethod
+    def create_sequence_reset_message(
+        cls,
+        new_sequence_number,
+        gap_fill=fc.GapFillFlag.YES
+    ):
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.ResendRequest
+        )
+        msg.append_pair(fc.FixTag.NewSeqNo, new_sequence_number)
+        msg.append_pair(fc.FixTag.GapFillFlag, gap_fill)
+        return msg
+
+    @classmethod
+    def create_security_list_request(cls):
+        msg = cls()
         uid = utils.gen_uuid()
-        msg.append_pair(constants.FixTag.SecurityReqID, uid)
-        msg.append_pair(constants.FixTag.SecurityListRequestType, b'0')
+        msg.append_pair(fc.FixTag.SecurityReqID, uid)
+        msg.append_pair(
+            fc.FixTag.SecurityListRequestType,
+            b'0'
+        )
         return msg
 
     @classmethod
     def create_market_data_request_message(
         cls,
-        sequence_number,
-        config,
         symbols,
         entry_types,
-        subscription_type='subscribe',
-        update_type='full',
-        market_depth='top',
+        subscription_type=fc.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES,
+        market_depth=fc.MarketDepth.TOP_OF_BOOK,
+        update_type=fc.MDUpdateType.FULL_REFRESH,
     ):
 
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.MarketDataRequest,
-        )
-        msg.append_pair(constants.FixTag.MDReqID, utils.gen_uuid())
+        msg = cls()
+        msg.append_pair(fc.FixTag.MDReqID, utils.gen_uuid())
 
-        subscription_types = {
-            'snapshot': constants.SubscriptionRequestType.SNAPSHOT,
-            'subscribe': constants.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES,
-            'unsubscribe': constants.SubscriptionRequestType.DISABLE_PREVIOUS_SNAPSHOT_PLUS_UPDATE_REQUEST,
-        }
-        subscription_type = utils.validate_option(
-            subscription_type,
-            subscription_types,
-            'Subscription Type',
-        )
+        if subscription_type not in fc.SubscriptionRequestType:
+            utils.raise_invalid_option(
+                'subscription_type', fc.SubscriptionRequestType)
+
         msg.append_pair(
-            constants.FixTag.SubscriptionRequestType,
+            fc.FixTag.SubscriptionRequestType,
             subscription_type
         )
 
-        market_depth_types = {
-            'top': constants.MarketDepth.TOP_OF_BOOK,
-            'full': constants.MarketDepth.FULL_BOOK,
-        }
-        market_depth_type = utils.validate_option(
-            market_depth,
-            market_depth_types,
-            'Market Depth'
-        )
+        if market_depth not in fc.MarketDepth:
+            utils.raise_invalid_option(
+                'market_depth', fc.MarketDepth)
 
         msg.append_pair(
-            constants.FixTag.MarketDepth,
-            market_depth_type
+            fc.FixTag.MarketDepth,
+            market_depth
         )
 
-        if subscription_type == constants.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES:
+        if subscription_type == fc.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES:
+            if update_type not in fc.MDUpdateType:
+                utils.raise_invalid_option(
+                    'update_type', fc.MDUpdateType)
 
-            update_types = {
-                'full': constants.MDUpdateType.FULL_REFRESH,
-                'incremental': constants.MDUpdateType.INCREMENTAL_REFRESH,
-            }
-            update_type = utils.validate_option(
-                update_type,
-                update_types,
-                'Update Type'
-            )
             msg.append_pair(
-                constants.FixTag.MDUpdateType,
+                fc.FixTag.MDUpdateType,
                 update_type
             )
 
         msg.append_pair(
-            constants.FixTag.NoMDEntries,
+            fc.FixTag.NoMDEntries,
             len(entry_types)
         )
+
         for entry_type in entry_types:
             msg.append_pair(
-                constants.FixTag.MDEntryType,
+                fc.FixTag.MDEntryType,
                 entry_type
             )
 
-        msg.append_pair(constants.FixTag.NoRelatedSym, len(symbols))
+        msg.append_pair(fc.FixTag.NoRelatedSym, len(symbols))
         for symbol in symbols:
             msg.append_pair(
-                constants.FixTag.Symbol,
+                fc.FixTag.Symbol,
                 symbol
             )
 
         return msg
 
     @classmethod
-    def create_resend_request_message(
-        cls,
-        sequence_number,
-        config,
-        start_sequence,
-        end_sequence
-    ):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.ResendRequest
-        )
-        msg.append_pair(constants.FixTag.BeginSeqNo, start_sequence)
-        msg.append_pair(constants.FixTag.EndSeqNo, end_sequence)
-        return msg
-
-    @classmethod
-    def create_sequence_reset_message(
-        cls,
-        sequence_number,
-        config,
-        new_sequence_number,
-        gap_fill=constants.GapFillFlag.YES
-    ):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.ResendRequest
-        )
-        msg.append_pair(constants.FixTag.NewSeqNo, new_sequence_number)
-        msg.append_pair(constants.FixTag.GapFillFlag, gap_fill)
-        return msg
-
-    @classmethod
     def create_new_order_message(
         cls,
-        sequence_number,
-        config,
         symbol,
         quantity,
-        order_type,
         side,
-        time_in_force=constants.TimeInForce.GOOD_TILL_CANCEL,
+        order_type,
+        time_in_force=fc.TimeInForce.GOOD_TILL_CANCEL,
         ioi_id=None,
         exec_inst=None,
         price=None,
         min_fill_qty=None
 
     ):
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.NewOrderSingle
-        )
+        msg = cls()
 
         order_id = utils.gen_uuid()
-        msg.append_pair(constants.FixTag.ClOrdID, order_id)
+        msg.append_pair(fc.FixTag.ClOrdID, order_id)
 
         if ioi_id is not None:
-            msg.append_pair(constants.FixTag.IOIID, ioi_id)
+            msg.append_pair(fc.FixTag.IOIID, ioi_id)
 
-        msg.append_pair(constants.FixTag.OrderQty, quantity)
+        msg.append_pair(fc.FixTag.OrderQty, quantity)
 
         if (
             exec_inst is not None
-            and exec_inst == constants.ExecInst.SINGLE_EXECUTION_REQUESTED_FOR_BLOCK_TRADE
-            and time_in_force == constants.TimeInForce.GOOD_TILL_CANCEL
+            and exec_inst == fc.ExecInst.SINGLE_EXECUTION_REQUESTED_FOR_BLOCK_TRADE
+            and time_in_force == fc.TimeInForce.GOOD_TILL_CANCEL
         ):
-            msg.append_pair(constants.FixTag.MinQty, min_fill_qty)
+            msg.append_pair(fc.FixTag.MinQty, min_fill_qty)
 
-        msg.append_pair(constants.FixTag.OrdType, order_type)
-        if order_type == constants.OrdType.LIMIT:
-            msg.append_pair(constants.FixTag.Price, price)
+        msg.append_pair(fc.FixTag.OrdType, order_type)
 
-        msg.append_pair(constants.FixTag.Side, side)
-        msg.append_pair(constants.FixTag.Symbol, symbol)
-        msg.append_pair(constants.FixTag.TimeInForce, time_in_force)
+        if order_type == fc.OrdType.LIMIT:
+            msg.append_pair(fc.FixTag.Price, price)
+
+        msg.append_pair(fc.FixTag.Side, side)
+        msg.append_pair(fc.FixTag.Symbol, symbol)
+        msg.append_pair(fc.FixTag.TimeInForce, time_in_force)
 
         return msg
 
     @classmethod
     def create_reject_message(
         cls,
-        sequence_number,
-        config,
         ref_sequence_number,
         ref_tag,
         ref_message_type,
@@ -340,9 +282,6 @@ class ManagedMessage(simplefix.FixMessage):
         reject_reason
     ):
         """
-
-        :param sequence_number: sequence number of this message
-        :param config: FixConfig object
         :param ref_sequence_number: sequence number of message being referred to
         :param ref_tag: Tag number of field being referred to
         :param ref_message_type: Message type of message being rejected
@@ -351,13 +290,14 @@ class ManagedMessage(simplefix.FixMessage):
         :return:
         """
 
-        msg = cls(config)
-        msg.append_standard_headers(
-            sequence_number,
-            constants.FixMsgType.Reject
+        msg = cls()
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            fc.FixMsgType.Reject
         )
-        msg.append_pair(constants.FixTag.RefSeqNum, ref_sequence_number)
-        msg.append_pair(constants.FixTag.Text, reject_reason)
-        msg.append_pair(constants.FixTag.RefTagID, ref_tag)
-        msg.append_pair(constants.FixTag.RefMsgType, ref_message_type)
-        msg.append_pair(constants.FixTag.SessionRejectReason, rejection_type)
+        msg.append_pair(fc.FixTag.RefSeqNum, ref_sequence_number)
+        msg.append_pair(fc.FixTag.Text, reject_reason)
+        msg.append_pair(fc.FixTag.RefTagID, ref_tag)
+        msg.append_pair(fc.FixTag.RefMsgType, ref_message_type)
+        msg.append_pair(fc.FixTag.SessionRejectReason, rejection_type)
+

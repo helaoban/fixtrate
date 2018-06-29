@@ -3,8 +3,8 @@ import collections
 import logging
 
 from fixation import (
-    constants, session,
-    config, message,
+    constants as fc, session,
+    config, message as fm,
     store
 )
 
@@ -28,8 +28,8 @@ class FixClient(object):
         self._handlers = {}
 
         handlers = {
-            constants.FixMsgType.MarketDataSnapshotFullRefresh: self.handle_market_data_full_refresh,
-            constants.FixMsgType.MarketDataIncrementalRefresh: self.handle_market_data_incremental_refresh,
+            fc.FixMsgType.MarketDataSnapshotFullRefresh: self.handle_market_data_full_refresh,
+            fc.FixMsgType.MarketDataIncrementalRefresh: self.handle_market_data_incremental_refresh,
         }
 
         self.register_handlers(handlers)
@@ -38,12 +38,57 @@ class FixClient(object):
         for msg_type, handler in handlers.items():
             self._handlers[msg_type] = handler
 
-    async def get_security_list(self):
-        sequence_number = self.session.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_security_list_request(
-            sequence_number=sequence_number,
-            config=self.config
+    async def send_message(self, msg):
+        self.append_standard_headers(msg)
+        await self.session.send_message(msg)
+
+    def append_standard_headers(
+        self,
+        msg,
+        timestamp=None
+    ):
+        """
+        Create a base message with standard headers set.
+        BodyLength and Checksum are handled by SimpleFix
+
+        :param msg:
+        :param timestamp:
+        :return:
+        """
+
+        msg_type = msg.get(fc.FixTag.MsgType)
+
+        msg.append_pair(
+            fc.FixTag.BeginString,
+            self.config['FIX_VERSION'],
+            header=True
         )
+        msg.append_pair(
+            fc.FixTag.MsgType,
+            msg_type,
+            header=True
+        )
+        msg.append_pair(
+            fc.FixTag.SenderCompID,
+            self.config['FIX_SENDER_COMP_ID'],
+            header=True
+        )
+        msg.append_pair(
+            fc.FixTag.TargetCompID,
+            self.config['FIX_TARGET_COMP_ID'],
+            header=True
+        )
+
+        if timestamp is not None:
+            msg.append_utc_timestamp(
+                fc.FixTag.SendingTime,
+                timestamp=timestamp,
+                precision=6,
+                header=True
+            )
+
+    async def get_security_list(self):
+        msg = fm.FixMessage.create_security_list_request()
         await self.session.send_message(msg)
 
     async def request_market_data(self, symbols):
@@ -55,17 +100,14 @@ class FixClient(object):
         :return:
         """
         entry_types = [
-            constants.MDEntryType.BID,
-            constants.MDEntryType.OFFER,
-            constants.MDEntryType.TRADE
+            fc.MDEntryType.BID,
+            fc.MDEntryType.OFFER,
+            fc.MDEntryType.TRADE
         ]
-        sequence_number = self.session.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_market_data_request_message(
-            sequence_number, self.config, symbols, entry_types
-        )
-        request_id = msg.get(constants.FixTag.MDReqID)
 
-        self.session.store.register_symbol_request_mapping(symbols, request_id)
+        msg = fm.FixMessage.create_market_data_request_message(
+            symbols, entry_types
+        )
         await self.session.send_message(msg)
 
     def handle_market_data_full_refresh(self, msg):
@@ -78,20 +120,20 @@ class FixClient(object):
         book = collections.defaultdict(list)
         trades = []
         for i in range(number_of_entries):
-            entry_type = msg.get(constants.FixTag.MDEntryType)
-            price = msg.get(constants.FixTag.MDEntryPx)
-            size = msg.get(constants.FixTag.MDEntrySize)
+            entry_type = msg.get(fc.FixTag.MDEntryType)
+            price = msg.get(fc.FixTag.MDEntryPx)
+            size = msg.get(fc.FixTag.MDEntrySize)
 
             if entry_type in [
-                constants.MDEntryType.OFFER,
-                constants.MDEntryType.BID
+                fc.MDEntryType.OFFER,
+                fc.MDEntryType.BID
             ]:
-                book[constants.FixTag.MDEntryType] = {
+                book[fc.FixTag.MDEntryType] = {
                     'price': price,
                     'size': size
                 }
 
-            if entry_type == constants.MDEntryType.TRADE:
+            if entry_type == fc.MDEntryType.TRADE:
                 trades.append({'price': price, 'size': size})
 
         return symbol, book, trades
@@ -125,23 +167,18 @@ class FixClient(object):
         price=None
     ):
 
-        order_types = ['limit']
-        if order_type not in order_types:
-            raise ValueError("Invalid order type '{}'".format(order_type))
+        if order_type not in fc.OrdType:
+            self.raise_invalid_option('order_type', fc.OrdType)
 
-        order_sides = ['buy, sell']
-        if side not in order_sides:
-            raise ValueError("Invalid order side '{}'".format(side))
+        if side not in fc.Side:
+            self.raise_invalid_option('side', fc.Side)
 
-        if order_type == 'limit':
+        if order_type is fc.OrdType.LIMIT:
             if price is None:
                 raise ValueError('Price must be specified for {} orders'
                                  ''.format(order_type))
 
-        sequence_number = self.session.store.increment_local_sequence_number()
-        msg = message.ManagedMessage.create_new_order_message(
-            sequence_number=sequence_number,
-            config=self.config,
+        msg = fm.FixMessage.create_new_order_message(
             symbol=symbol,
             order_type=order_type,
             side=side,
@@ -155,22 +192,22 @@ class FixClient(object):
         pass
 
     def handle_business_message_reject(self, msg):
-        sequence_number = msg.get(constants.FixTag.RefSeqNum)
-        reject_explanation = msg.get(constants.FixTag.Text)
-        ref_msg_type = msg.get(constants.FixTag.RefMsgType)
+        sequence_number = msg.get(fc.FixTag.RefSeqNum)
+        reject_explanation = msg.get(fc.FixTag.Text)
+        ref_msg_type = msg.get(fc.FixTag.RefMsgType)
         business_reject_reason = msg.get(
-            constants.FixTag.BusinessRejectReason)
+            fc.FixTag.BusinessRejectReason)
 
         handler = {
-            constants.BusinessRejectReason.UNKNOWN_SECURITY: self.handle_unknown_security,
-            constants.BusinessRejectReason.UNSUPPORTED_MESSAGE_TYPE: self.handle_unknown_security,
-            constants.BusinessRejectReason.APPLICATION_NOT_AVAILABLE: self.handle_application_not_available,
-            constants.BusinessRejectReason.CONDITIONALLY_REQUIRED_FIELD_MISSING: self.handle_missing_conditionally_required_field,
-            constants.BusinessRejectReason.DELIVERTO_FIRM_NOT_AVAILABLE_AT_THIS_TIME: self.handle_deliverto_firm_not_available,
-            constants.BusinessRejectReason.NOT_AUTHORIZED: self.handle_not_authorized,
-            constants.BusinessRejectReason.UNKNOWN_ID: self.handle_unknown_id,
-            constants.BusinessRejectReason.UNKNOWN_MESSAGE_TYPE: self.handle_unknown_message_type,
-            constants.BusinessRejectReason.INVALID_PRICE_INCREMENT: self.handle_invalid_price_increment,
+            fc.BusinessRejectReason.UNKNOWN_SECURITY: self.handle_unknown_security,
+            fc.BusinessRejectReason.UNSUPPORTED_MESSAGE_TYPE: self.handle_unknown_security,
+            fc.BusinessRejectReason.APPLICATION_NOT_AVAILABLE: self.handle_application_not_available,
+            fc.BusinessRejectReason.CONDITIONALLY_REQUIRED_FIELD_MISSING: self.handle_missing_conditionally_required_field,
+            fc.BusinessRejectReason.DELIVERTO_FIRM_NOT_AVAILABLE_AT_THIS_TIME: self.handle_deliverto_firm_not_available,
+            fc.BusinessRejectReason.NOT_AUTHORIZED: self.handle_not_authorized,
+            fc.BusinessRejectReason.UNKNOWN_ID: self.handle_unknown_id,
+            fc.BusinessRejectReason.UNKNOWN_MESSAGE_TYPE: self.handle_unknown_message_type,
+            fc.BusinessRejectReason.INVALID_PRICE_INCREMENT: self.handle_invalid_price_increment,
         }.get(business_reject_reason)
 
         if handler is None:
@@ -214,3 +251,13 @@ class FixClient(object):
         except (SystemExit, KeyboardInterrupt):
             listener.cancel()
             self.loop.run_until_complete(listener)
+
+    def raise_invalid_option(self, name, valid_options):
+        raise ValueError(
+            '{} must be one of: {}'
+            ''.format(name, self.list_options(valid_options))
+        )
+
+    @staticmethod
+    def list_options(options):
+        return '|'.join(o for o in options)
