@@ -165,28 +165,28 @@ class FixSession:
 
     async def send_heartbeat(self, test_request_id=None):
         sequence_number = self.store.increment_local_sequence_number()
-        msg = message.Message.create_heartbeat_message(
+        msg = message.ManagedMessage.create_heartbeat_message(
             sequence_number, self.config, test_request_id
         )
         await self.send_message(msg)
 
     async def login(self):
         sequence_number = self.store.increment_local_sequence_number()
-        login_msg = message.Message.create_login_message(
+        login_msg = message.ManagedMessage.create_login_message(
             sequence_number, self.config
         )
         await self.send_message(login_msg)
 
     async def logoff(self):
         sequence_number = self.store.increment_local_sequence_number()
-        msg = message.Message.create_logoff_message(
+        msg = message.ManagedMessage.create_logoff_message(
             sequence_number, self.config
         )
         await self.send_message(msg)
 
     async def send_test_request(self):
         sequence_number = self.store.increment_local_sequence_number()
-        msg = message.Message.create_test_request_message(
+        msg = message.ManagedMessage.create_test_request_message(
             sequence_number,
             self.config
         )
@@ -194,7 +194,7 @@ class FixSession:
 
     async def request_resend(self, start_sequence, end_sequence):
         sequence_number = self.store.increment_local_sequence_number()
-        msg = message.Message.create_resend_request_message(
+        msg = message.ManagedMessage.create_resend_request_message(
             sequence_number=sequence_number,
             config=self.config,
             start_sequence=start_sequence,
@@ -205,7 +205,7 @@ class FixSession:
     async def reset_sequence(self, new_sequence_number):
         sequence_number = self.store.increment_local_sequence_number()
         self.store.set_remote_sequence_number(new_sequence_number - 1)
-        msg = message.Message.create_sequence_reset_message(
+        msg = message.ManagedMessage.create_sequence_reset_message(
             sequence_number,
             self.config,
             new_sequence_number

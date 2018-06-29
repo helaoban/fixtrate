@@ -41,7 +41,7 @@ class FixClient(object):
 
     async def get_security_list(self):
         sequence_number = self.session.store.increment_local_sequence_number()
-        msg = message.Message.create_security_list_request(
+        msg = message.ManagedMessage.create_security_list_request(
             sequence_number=sequence_number,
             config=self.config
         )
@@ -61,7 +61,7 @@ class FixClient(object):
             constants.MDEntryType.TRADE
         ]
         sequence_number = self.session.store.increment_local_sequence_number()
-        msg = message.Message.create_market_data_request_message(
+        msg = message.ManagedMessage.create_market_data_request_message(
             sequence_number, self.config, symbols, entry_types
         )
         request_id = msg.get(fixation.constants.FixTag.MDReqID)
@@ -140,7 +140,7 @@ class FixClient(object):
                                  ''.format(order_type))
 
         sequence_number = self.session.store.increment_local_sequence_number()
-        msg = message.Message.create_new_order_message(
+        msg = message.ManagedMessage.create_new_order_message(
             sequence_number=sequence_number,
             config=self.config,
             symbol=symbol,

@@ -32,7 +32,7 @@ class FixParser(simplefix.FixParser):
         if config is None:
             raise ValueError('Config muse be provided unless base=True')
 
-        new_msg = message.Message(config=config)
+        new_msg = message.ManagedMessage(config=config)
         new_msg.begin_string = base_msg.begin_string
         new_msg.message_type = base_msg.message_type
         new_msg.pairs = base_msg.pairs

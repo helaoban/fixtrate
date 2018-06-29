@@ -45,7 +45,7 @@ def fix_tag(value):
         return str(value).encode('ASCII')
 
 
-class Message(simplefix.FixMessage):
+class ManagedMessage(simplefix.FixMessage):
 
     def __init__(self, conf):
         self.config = conf
