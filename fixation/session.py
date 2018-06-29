@@ -145,18 +145,18 @@ class FixSession:
 
     async def send_message(self, msg):
         msg_type = constants.FixMsgType(msg.get(
-            fixation.constants.FixTag.MsgType))
-        seq_num = msg.get(fixation.constants.FixTag.MsgSeqNum)
-        send_time = msg.get(fixation.constants.FixTag.SendingTime)
+            constants.FixTag.MsgType))
+        seq_num = msg.get(constants.FixTag.MsgSeqNum)
+        send_time = msg.get(constants.FixTag.SendingTime)
 
         if send_time is None:
             msg.append_utc_timestamp(
-                fixation.constants.FixTag.SendingTime,
+                constants.FixTag.SendingTime,
                 timestamp=dt.datetime.utcnow(),
                 precision=6,
                 header=True
             )
-            send_time = msg.get(fixation.constants.FixTag.SendingTime)
+            send_time = msg.get(constants.FixTag.SendingTime)
 
         encoded = msg.encode()
         print('{}: --> {}'.format(send_time, msg_type))
@@ -219,7 +219,7 @@ class FixSession:
             await self.send_message(sent_messages[seq])
 
     def check_sequence_integrity(self, msg):
-        seq_num = msg.get(fixation.constants.FixTag.MsgSeqNum)
+        seq_num = msg.get(constants.FixTag.MsgSeqNum)
         recorded_seq_num = self.store.get_remote_sequence_number()
         seq_diff = int(seq_num) - int(recorded_seq_num)
         if seq_diff != 1:
@@ -229,7 +229,7 @@ class FixSession:
         logger.error('Sequence GAP, resetting...')
 
     async def dispatch(self, msg):
-        msg_type = msg.get(fixation.constants.FixTag.MsgType)
+        msg_type = msg.get(constants.FixTag.MsgType)
         try:
             msg_type = constants.FixMsgType(msg_type)
         except ValueError:
@@ -250,23 +250,23 @@ class FixSession:
                 handler(msg)
 
     async def handle_message(self, msg):
-        msg_type = msg.get(fixation.constants.FixTag.MsgType)
+        msg_type = msg.get(constants.FixTag.MsgType)
         msg_type = constants.FixMsgType(msg_type)
-        seq_num = int(msg.get(fixation.constants.FixTag.MsgSeqNum))
-        send_time = msg.get(fixation.constants.FixTag.SendingTime)
+        seq_num = int(msg.get(constants.FixTag.MsgSeqNum))
+        send_time = msg.get(constants.FixTag.SendingTime)
 
         print('{}: <-- {}'.format(send_time, msg_type))
 
         if msg_type not in [
             constants.FixMsgType.Logon,
-            constants.FixMsgType.ResendRequest
+            constants.FixMsgType.ResendRequest,
+            constants.FixMsgType.Reject
         ]:
 
             try:
                 self.check_sequence_integrity(msg)
             except exceptions.SequenceGap:
                 self.handle_sequence_gap(msg)
-                return
 
             self.store.increment_remote_sequence_number()
 
@@ -274,8 +274,8 @@ class FixSession:
         await self.dispatch(msg)
 
     async def handle_logon(self, msg):
-        if self.config.reset_sequence:
-            seq_num = int(msg.get(fixation.constants.FixTag.MsgSeqNum))
+        if self.config.get('FIX_RESET_SEQUENCE'):
+            seq_num = int(msg.get(constants.FixTag.MsgSeqNum))
             self.store.set_remote_sequence_number(seq_num)
         logger.debug('Login successful!')
 
@@ -283,16 +283,16 @@ class FixSession:
         await self.send_heartbeat()
 
     async def handle_resend_request(self, msg):
-        start_sequence_number = msg.get(fixation.constants.FixTag.BeginSeqNo)
-        end_sequence_number = msg.get(fixation.constants.FixTag.EndSeqNo)
+        start_sequence_number = msg.get(constants.FixTag.BeginSeqNo)
+        end_sequence_number = msg.get(constants.FixTag.EndSeqNo)
         await self.resend_messages(start_sequence_number, end_sequence_number)
 
     async def handle_test_request(self, msg):
-        test_request_id = msg.get(fixation.constants.FixTag.TestReqID)
+        test_request_id = msg.get(constants.FixTag.TestReqID)
         await self.send_heartbeat(test_request_id=test_request_id)
 
     async def handle_reject(self, msg):
-        reject_reason = msg.get(fixation.constants.FixTag.Text)
+        reject_reason = msg.get(constants.FixTag.Text)
         raise exceptions.FixRejection(reason=reject_reason)
 
     def decode_entry(self, msg):
