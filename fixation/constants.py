@@ -441,6 +441,6 @@ class FixTag(enum.IntEnum):
 
 
 @enum.unique
-class FixVersion(enum.Enum):
+class FixVersion(str, enum.Enum):
     FIX42 = 'FIX.4.2'
     FIX44 = 'FIX.4.4'
