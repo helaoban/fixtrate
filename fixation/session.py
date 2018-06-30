@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 
 from fixation import (
-    constants, message as fm,
+    constants as fc, message as fm,
     utils, exceptions, parse,
     store as fix_store, config
 )
@@ -148,22 +148,22 @@ class FixSession:
         :return:
         """
         msg.append_pair(
-            constants.FixTag.BeginString,
+            fc.FixTag.BeginString,
             self.config['FIX_VERSION'],
             header=True
         )
         msg.append_pair(
-            constants.FixTag.SenderCompID,
+            fc.FixTag.SenderCompID,
             self.config['FIX_SENDER_COMP_ID'],
             header=True
         )
         msg.append_pair(
-            constants.FixTag.TargetCompID,
+            fc.FixTag.TargetCompID,
             self.config['FIX_TARGET_COMP_ID'],
             header=True
         )
         msg.append_pair(
-            constants.FixTag.MsgSeqNum,
+            fc.FixTag.MsgSeqNum,
             self.store.increment_local_sequence_number()
         )
 
@@ -171,7 +171,7 @@ class FixSession:
             timestamp = dt.datetime.utcnow()
 
         msg.append_utc_timestamp(
-            constants.FixTag.SendingTime,
+            fc.FixTag.SendingTime,
             timestamp=timestamp,
             precision=6,
             header=True
@@ -179,10 +179,10 @@ class FixSession:
 
     async def send_message(self, msg):
         self.append_standard_headers(msg)
-        msg_type = constants.FixMsgType(msg.get(
-            constants.FixTag.MsgType))
-        seq_num = msg.get(constants.FixTag.MsgSeqNum)
-        send_time = msg.get(constants.FixTag.SendingTime)
+        msg_type = fc.FixMsgType(msg.get(
+            fc.FixTag.MsgType))
+        seq_num = msg.get(fc.FixTag.MsgSeqNum)
+        send_time = msg.get(fc.FixTag.SendingTime)
         encoded = msg.encode()
         print('{}: --> {}'.format(send_time, msg_type))
         await self._connection.write(encoded)
@@ -223,7 +223,7 @@ class FixSession:
             await self.send_message(sent_messages[seq])
 
     def check_sequence_integrity(self, msg):
-        seq_num = msg.get(constants.FixTag.MsgSeqNum)
+        seq_num = msg.get(fc.FixTag.MsgSeqNum)
         recorded_seq_num = self.store.get_remote_sequence_number()
         seq_diff = int(seq_num) - int(recorded_seq_num)
         if seq_diff != 1:
@@ -233,18 +233,18 @@ class FixSession:
         logger.error('Sequence GAP, resetting...')
 
     async def dispatch(self, msg):
-        msg_type = msg.get(constants.FixTag.MsgType)
+        msg_type = msg.get(fc.FixTag.MsgType)
         try:
-            msg_type = constants.FixMsgType(msg_type)
+            msg_type = fc.FixMsgType(msg_type)
         except ValueError:
             logger.error('Unrecognized FIX message type: {}.'.format(msg_type))
             return
 
         handler = {
-            constants.FixMsgType.Logon: self.handle_logon,
-            constants.FixMsgType.Heartbeat: self.handle_heartbeat,
-            constants.FixMsgType.TestRequest: self.handle_test_request,
-            constants.FixMsgType.Reject: self.handle_reject,
+            fc.FixMsgType.Logon: self.handle_logon,
+            fc.FixMsgType.Heartbeat: self.handle_heartbeat,
+            fc.FixMsgType.TestRequest: self.handle_test_request,
+            fc.FixMsgType.Reject: self.handle_reject,
         }.get(msg_type)
 
         if handler is not None:
@@ -254,17 +254,17 @@ class FixSession:
                 handler(msg)
 
     async def handle_message(self, msg):
-        msg_type = msg.get(constants.FixTag.MsgType)
-        msg_type = constants.FixMsgType(msg_type)
-        seq_num = int(msg.get(constants.FixTag.MsgSeqNum))
-        send_time = msg.get(constants.FixTag.SendingTime)
+        msg_type = msg.get(fc.FixTag.MsgType)
+        msg_type = fc.FixMsgType(msg_type)
+        seq_num = int(msg.get(fc.FixTag.MsgSeqNum))
+        send_time = msg.get(fc.FixTag.SendingTime)
 
         print('{}: <-- {}'.format(send_time, msg_type))
 
         if msg_type not in [
-            constants.FixMsgType.Logon,
-            constants.FixMsgType.ResendRequest,
-            constants.FixMsgType.Reject
+            fc.FixMsgType.Logon,
+            fc.FixMsgType.ResendRequest,
+            fc.FixMsgType.Reject
         ]:
 
             try:
@@ -279,7 +279,7 @@ class FixSession:
 
     async def handle_logon(self, msg):
         if self.config.get('FIX_RESET_SEQUENCE'):
-            seq_num = int(msg.get(constants.FixTag.MsgSeqNum))
+            seq_num = int(msg.get(fc.FixTag.MsgSeqNum))
             self.store.set_remote_sequence_number(seq_num)
         logger.debug('Login successful!')
 
@@ -287,16 +287,16 @@ class FixSession:
         await self.send_heartbeat()
 
     async def handle_resend_request(self, msg):
-        start_sequence_number = msg.get(constants.FixTag.BeginSeqNo)
-        end_sequence_number = msg.get(constants.FixTag.EndSeqNo)
+        start_sequence_number = msg.get(fc.FixTag.BeginSeqNo)
+        end_sequence_number = msg.get(fc.FixTag.EndSeqNo)
         await self.resend_messages(start_sequence_number, end_sequence_number)
 
     async def handle_test_request(self, msg):
-        test_request_id = msg.get(constants.FixTag.TestReqID)
+        test_request_id = msg.get(fc.FixTag.TestReqID)
         await self.send_heartbeat(test_request_id=test_request_id)
 
     async def handle_reject(self, msg):
-        reject_reason = msg.get(constants.FixTag.Text)
+        reject_reason = msg.get(fc.FixTag.Text)
         raise exceptions.FixRejection(reason=reject_reason)
 
     def decode_entry(self, msg):
