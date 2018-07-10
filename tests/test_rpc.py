@@ -12,7 +12,7 @@ def rpc_request():
     return {
         'jsonrpc': '2.0',
         'method': 'send_test_request',
-        'id': uuid.uuid4(),
+        'id': str(uuid.uuid4()),
     }
 
 

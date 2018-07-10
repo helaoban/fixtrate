@@ -4,9 +4,9 @@ import logging
 
 from fixation import (
     constants as fc, session,
-    config, message as fm,
-    store
+    config, store
 )
+from fixation.factories import fix42
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,8 @@ class FixClient(object):
 
         self.register_handlers(handlers)
 
+        self.TAGS = self.TAGS.FIX42
+
     def register_handlers(self, handlers):
         for msg_type, handler in handlers.items():
             self._handlers[msg_type] = handler
@@ -56,39 +58,39 @@ class FixClient(object):
         :return:
         """
 
-        msg_type = msg.get(fc.FixTag.MsgType)
+        msg_type = msg.get(self.TAGS.MsgType)
 
         msg.append_pair(
-            fc.FixTag.BeginString,
+            self.TAGS.BeginString,
             self.config['FIX_VERSION'],
             header=True
         )
         msg.append_pair(
-            fc.FixTag.MsgType,
+            self.TAGS.MsgType,
             msg_type,
             header=True
         )
         msg.append_pair(
-            fc.FixTag.SenderCompID,
+            self.TAGS.SenderCompID,
             self.config['FIX_SENDER_COMP_ID'],
             header=True
         )
         msg.append_pair(
-            fc.FixTag.TargetCompID,
+            self.TAGS.TargetCompID,
             self.config['FIX_TARGET_COMP_ID'],
             header=True
         )
 
         if timestamp is not None:
             msg.append_utc_timestamp(
-                fc.FixTag.SendingTime,
+                self.TAGS.SendingTime,
                 timestamp=timestamp,
                 precision=6,
                 header=True
             )
 
     async def get_security_list(self):
-        msg = fm.FixMessage.create_security_list_request()
+        msg = fix42.security_list()
         await self.session.send_message(msg)
 
     async def request_market_data(self, symbols):
@@ -105,7 +107,7 @@ class FixClient(object):
             fc.MDEntryType.TRADE
         ]
 
-        msg = fm.FixMessage.create_market_data_request_message(
+        msg = fix42.market_data_request(
             symbols, entry_types
         )
         await self.session.send_message(msg)
@@ -120,15 +122,15 @@ class FixClient(object):
         book = collections.defaultdict(list)
         trades = []
         for i in range(number_of_entries):
-            entry_type = msg.get(fc.FixTag.MDEntryType)
-            price = msg.get(fc.FixTag.MDEntryPx)
-            size = msg.get(fc.FixTag.MDEntrySize)
+            entry_type = msg.get(self.TAGS.MDEntryType)
+            price = msg.get(self.TAGS.MDEntryPx)
+            size = msg.get(self.TAGS.MDEntrySize)
 
             if entry_type in [
                 fc.MDEntryType.OFFER,
                 fc.MDEntryType.BID
             ]:
-                book[fc.FixTag.MDEntryType] = {
+                book[self.TAGS.MDEntryType] = {
                     'price': price,
                     'size': size
                 }
@@ -151,7 +153,7 @@ class FixClient(object):
         try:
 
             async with self.session.connect() as conn:
-                await self.session.login()
+                await self.session.logon()
                 async for msg in self.session:
                     print(msg)
 
@@ -178,7 +180,7 @@ class FixClient(object):
                 raise ValueError('Price must be specified for {} orders'
                                  ''.format(order_type))
 
-        msg = fm.FixMessage.create_new_order_message(
+        msg = fix42.new_order(
             symbol=symbol,
             order_type=order_type,
             side=side,
@@ -192,11 +194,11 @@ class FixClient(object):
         pass
 
     def handle_business_message_reject(self, msg):
-        sequence_number = msg.get(fc.FixTag.RefSeqNum)
-        reject_explanation = msg.get(fc.FixTag.Text)
-        ref_msg_type = msg.get(fc.FixTag.RefMsgType)
+        sequence_number = msg.get(self.TAGS.RefSeqNum)
+        reject_explanation = msg.get(self.TAGS.Text)
+        ref_msg_type = msg.get(self.TAGS.RefMsgType)
         business_reject_reason = msg.get(
-            fc.FixTag.BusinessRejectReason)
+            self.TAGS.BusinessRejectReason)
 
         handler = {
             fc.BusinessRejectReason.UNKNOWN_SECURITY: self.handle_unknown_security,

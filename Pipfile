@@ -9,10 +9,13 @@ simplefix = "*"
 jsonschema = "*"
 untangle = "*"
 redis = "*"
+aenum = "*"
 
 [dev-packages]
 ipython = "*"
 pytest = "*"
+pytest-profiling = "*"
+snakeviz = "*"
 
 [requires]
 python_version = "3.6"

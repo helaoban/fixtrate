@@ -1,10 +1,9 @@
 import pytest
 
-import fixation.constants
-from fixation import message
+from fixation import constants as fc, message
 
 
-def test_reject_empty_value(client_config):
-    msg = message.FixMessage(config=client_config)
+def test_reject_empty_value():
+    msg = message.FixMessage()
     with pytest.raises(ValueError):
-        msg.append_pair(fixation.constants.FixTag.Text, b'')
+        msg.append_pair(fc.FixTag.FIX44.Text, b'')

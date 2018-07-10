@@ -11,6 +11,7 @@ EMAIL = 'carloholl@gmail.com'
 REQUIRES_PYTHON = '>=3.6.5'
 
 REQUIRES = [
+    'aenum',
     'jsonschema',
     'redis',
     'simplefix',

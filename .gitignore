@@ -109,3 +109,6 @@ venv.bak/
 
 # macOS
 .DS_Store
+
+# profiling
+prof

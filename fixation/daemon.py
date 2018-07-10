@@ -2,7 +2,7 @@ import asyncio
 
 from fixation import (
     config, session,
-    store, rpc
+    rpc
 )
 
 
@@ -24,7 +24,6 @@ class FixDaemon(object):
         self.session = session.FixSession(
             conf=self.config,
             loop=self.loop,
-            store=store.FixMemoryStore()
         )
         self.rpc_server = rpc.RPCServer(
             self.session,
@@ -32,7 +31,7 @@ class FixDaemon(object):
         )
 
         conn = await self.session.connect()
-        await self.session.login()
+        await self.session.logon()
         await self.rpc_server.start()
 
         try:
