@@ -1,5 +1,5 @@
 import simplefix
-from fixation import message as fm
+from fixation import message as fm, config
 
 
 def _convert(msg):
@@ -13,9 +13,9 @@ def _convert(msg):
 
 class FixParser(simplefix.FixParser):
 
-    def __init__(self, config):
+    def __init__(self, conf=None):
         super().__init__()
-        self.config = config
+        self.config = conf or config.get_config_from_env()
 
     def get_message(self):
         msg = super().get_message()
