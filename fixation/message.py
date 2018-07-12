@@ -1,6 +1,8 @@
-import simplefix
+
+import json
 import sys
 
+import simplefix
 from fixation import utils, constants as fc
 
 
@@ -55,10 +57,18 @@ class FixMessage(simplefix.FixMessage):
             return val.decode()
         return val
 
-    # def index(self, tag):
-    #     try:
-    #         tag = tag.value
-    #     except AttributeError:
-    #         pass
-    #     return super().get(tag, *args, **kwargs)
-    #
+    def to_decoded_pairs(self):
+        return [(fc.FixTag.FIX42(tag).name, val.decode()) for tag, val in self]
+
+    def to_json(self):
+
+        msg_type = self.get(fc.FixTag.FIX42.MsgType)
+        msg_type = fc.FixMsgType(msg_type).name
+        seq_num = int(self.get(fc.FixTag.FIX42.MsgSeqNum))
+
+        return {
+            'seqNum': seq_num,
+            'msgType': msg_type,
+            'pairs': self.to_decoded_pairs(),
+            'raw': self.__str__()
+        }
