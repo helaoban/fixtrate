@@ -165,40 +165,43 @@ def market_data_request(
 
 
 def new_order(
+        account,
         symbol,
         quantity,
         side,
-        order_type,
-        time_in_force=fc.TimeInForce.GOOD_TILL_CANCEL,
-        ioi_id=None,
-        exec_inst=None,
+        order_type=fc.OrdType.LIMIT,
+        handl_inst=2,
+        cl_order_id=None,
         price=None,
-        min_fill_qty=None
-
+        currency=None,
+        security_exchange=None,
+        ex_destination=None
 ):
     msg = fm.FixMessage()
-    order_id = utils.gen_uuid()
-    msg.append_pair(TAGS.ClOrdID, order_id)
+    msg.append_pair(TAGS.Account, account)
 
-    if ioi_id is not None:
-        msg.append_pair(TAGS.IOIID, ioi_id)
+    if cl_order_id is None:
+        cl_order_id = utils.gen_uuid()
+    msg.append_pair(TAGS.ClOrdID, cl_order_id)
 
+    if currency is not None:
+        msg.append_pair(TAGS.Currency, currency)
+
+    msg.append_pair(TAGS.Symbol, symbol)
+    msg.append_pair(TAGS.HandlInst, handl_inst)
+    msg.append_pair(TAGS.Side, side)
     msg.append_pair(TAGS.OrderQty, quantity)
-
-    if (
-        exec_inst is not None
-        and exec_inst == fc.ExecInst.SINGLE_EXECUTION_REQUESTED_FOR_BLOCK_TRADE
-        and time_in_force == fc.TimeInForce.GOOD_TILL_CANCEL
-    ):
-        msg.append_pair(TAGS.MinQty, min_fill_qty)
-
     msg.append_pair(TAGS.OrdType, order_type)
+
     if order_type == fc.OrdType.LIMIT:
         msg.append_pair(TAGS.Price, price)
 
-    msg.append_pair(TAGS.Side, side)
-    msg.append_pair(TAGS.Symbol, symbol)
-    msg.append_pair(TAGS.TimeInForce, time_in_force)
+    if security_exchange is not None:
+        msg.append_pair(TAGS.SecurityExchange, security_exchange)
+
+    if ex_destination is not None:
+        msg.append_pair(TAGS.ExDestination, ex_destination)
+
     return msg
 
 
