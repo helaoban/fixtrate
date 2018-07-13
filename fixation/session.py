@@ -101,6 +101,8 @@ class FixSession:
 
         self.TAGS = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
 
+        self._is_resetting = False
+
     def __enter__(self):
         return self
 
@@ -203,8 +205,20 @@ class FixSession:
         await self.send_message(msg)
 
     async def logon(self):
+        """
+        Send a Logon <A> message. Note: setting reset_sequence=True will
+        set the ResetSeqNumFlag to 'Y', which for most counter-parties
+        means opening new FIX session, and so we clear the store.
+
+        :return:
+        """
+        self._is_resetting = self.config['FIX_RESET_SEQUENCE']
+        if self._is_resetting:
+            self.store.new_session()
+
         login_msg = fix42.logon(
-            heartbeat_interval=self.config['FIX_HEARTBEAT_INTERVAL']
+            heartbeat_interval=self.config['FIX_HEARTBEAT_INTERVAL'],
+            reset_sequence=self._is_resetting
         )
         await self.send_message(login_msg)
 
@@ -286,9 +300,21 @@ class FixSession:
         await self.dispatch(msg)
 
     async def handle_logon(self, msg):
-        if self.config.get('FIX_RESET_SEQUENCE'):
+        """
+        Handle a Logon <A> message sent from server. The only
+        action that needs to be taken is when we have set
+        ResetSeqNumFlag <141> to 'Y' in our own Logon <A> message.
+        In that case, we have initiated a new session,
+        the server has reset it's own sequence
+        numbers and we need reflect that change in the store.
+
+        :param msg:
+        :return:
+        """
+        if self._is_resetting:
             seq_num = int(msg.get(self.TAGS.MsgSeqNum))
-            self.store.set_remote_sequence_number(seq_num)
+            self.store.set_seq_num(seq_num, remote=True)
+            self._is_resetting = False
         logger.debug('Login successful!')
 
     async def handle_heartbeat(self, msg):
