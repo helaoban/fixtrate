@@ -4,7 +4,7 @@ import datetime as dt
 import logging
 
 from fixation import (
-    constants as fc, message as fm,
+    constants as fc,
     utils, exceptions, parse,
     store as fix_store, config
 )
@@ -193,7 +193,6 @@ class FixSession:
         self.append_standard_header(msg)
         msg_type = fc.FixMsgType(msg.get(
             self.TAGS.MsgType))
-        seq_num = msg.get(self.TAGS.MsgSeqNum)
         send_time = msg.get(self.TAGS.SendingTime)
         encoded = msg.encode()
         print('{}: {} -->'.format(send_time, msg_type))
@@ -278,7 +277,6 @@ class FixSession:
     async def handle_message(self, msg):
         msg_type = msg.get(self.TAGS.MsgType)
         msg_type = fc.FixMsgType(msg_type)
-        seq_num = int(msg.get(self.TAGS.MsgSeqNum))
         send_time = msg.get(self.TAGS.SendingTime)
 
         print('{}: {} <--'.format(send_time, msg_type))
