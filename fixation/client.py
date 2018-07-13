@@ -3,7 +3,8 @@ import collections
 
 from fixation import (
     config, session,
-    rpc, constants as fc
+    rpc, constants as fc,
+    utils
 )
 from fixation.factories import fix42
 
@@ -154,9 +155,33 @@ class FixClient(object):
     def handle_market_data_incremental_refresh(self, msg):
         pass
 
-    async def send_test_request(self):
-        msg = fix42.test_request()
-        await self.session.send_message(msg)
+    def handle_market_data_reject(self, msg):
+        pass
+
+    def handle_execution_report(self, msg):
+        pass
+
+    def handle_order_cancel_reject(self):
+        pass
+
+    def dispatch_message(self, msg_type):
+        handler = {
+            fc.FixMsgType.MarketDataIncrementalRefresh: self.handle_market_data_incremental_refresh,
+            fc.FixMsgType.MarketDataSnapshotFullRefresh: self.handle_market_data_full_refresh,
+            fc.FixMsgType.MarketDataRequestReject: self.handle_market_data_reject,
+            fc.FixMsgType.ExecutionReport: self.handle_execution_report,
+            fc.FixMsgType.OrderCancelReject: self.handle_order_cancel_reject,
+        }.get(msg_type)
+        return handler
+
+    async def handle_message(self, msg):
+        msg_type = fc.FixMsgType(msg.get(self.TAGS.MsgType))
+        handler = self.dispatch_message(msg_type)
+        if handler:
+            if utils.is_coro(handler):
+                await handler(msg)
+            else:
+                handler(msg)
 
     async def main(self):
         self.session = session.FixSession(
@@ -175,7 +200,7 @@ class FixClient(object):
                     await self.rpc_server.start()
 
                     async for msg in self.session:
-                        pass
+                        await self.handle_message(msg)
 
             except ConnectionError:
                 continue
