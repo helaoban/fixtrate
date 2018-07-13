@@ -1,6 +1,5 @@
-
-import json
 import sys
+import uuid
 
 import simplefix
 from fixation import utils, constants as fc
@@ -49,6 +48,10 @@ def fix_tag(value):
 
 class FixMessage(simplefix.FixMessage):
 
+    def __init__(self, uid=None):
+        super().__init__()
+        self.uid = uid or str(uuid.uuid4())
+
     def get(self, tag, nth=1, raw=False):
         val = super().get(tag, nth=nth)
         if not val:
@@ -67,6 +70,7 @@ class FixMessage(simplefix.FixMessage):
         seq_num = int(self.get(fc.FixTag.FIX42.MsgSeqNum))
 
         return {
+            'uid': self.uid,
             'seqNum': seq_num,
             'msgType': msg_type,
             'pairs': self.to_decoded_pairs(),

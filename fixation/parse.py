@@ -2,8 +2,8 @@ import simplefix
 from fixation import message as fm, config
 
 
-def _convert(msg):
-    new_msg = fm.FixMessage()
+def _convert(msg, uid=None):
+    new_msg = fm.FixMessage(uid)
     new_msg.begin_string = msg.begin_string
     new_msg.message_type = msg.message_type
     new_msg.pairs = msg.pairs
@@ -17,12 +17,12 @@ class FixParser(simplefix.FixParser):
         super().__init__()
         self.config = conf or config.get_config_from_env()
 
-    def get_message(self):
+    def get_message(self, uid=None):
         msg = super().get_message()
         # return msg
         if msg is None:
             return
-        return _convert(msg)
+        return _convert(msg, uid)
 
     @classmethod
     def parse(cls, raw_message, config=None, base=False):
