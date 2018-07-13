@@ -205,6 +205,54 @@ def new_order(
     return msg
 
 
+def cancel_replace(
+    account,
+    orig_cl_order_id,
+    symbol,
+    side,
+    quantity,
+    order_type,
+    new_cl_order_id=None,
+    price=None,
+    handle_inst=2,
+):
+    msg = fm.FixMessage()
+    msg.append_pair(TAGS.Account, account)
+    msg.append_pair(TAGS.HandlInst, handle_inst)
+    msg.append_pair(TAGS.OrigClOrdID, orig_cl_order_id)
+    if new_cl_order_id is None:
+        new_cl_order_id = utils.gen_uuid()
+    msg.append_pair(TAGS.ClOrdID, new_cl_order_id)
+    msg.append_pair(TAGS.Symbol, symbol)
+    msg.append_pair(TAGS.Side, side)
+    msg.append_pair(TAGS.OrderQty, quantity)
+    msg.append_pair(TAGS.OrdType, order_type)
+
+    if price is not None:
+        msg.append_pair(TAGS.OrdType, price)
+
+    return msg
+
+
+def cancel(
+    account,
+    orig_cl_order_id,
+    symbol,
+    side,
+    cl_order_id=None,
+):
+    msg = fm.FixMessage()
+    msg.append_pair(TAGS.Account, account)
+    if cl_order_id is None:
+        cl_order_id = utils.gen_uuid()
+    msg.append_pair(TAGS.ClOrdID, cl_order_id)
+    msg.append_pair(TAGS.OrigClOrdID, orig_cl_order_id)
+    msg.append_pair(TAGS.Symbol, symbol)
+    msg.append_pair(TAGS.Side, side)
+
+    return msg
+
+
 def reject(
         ref_sequence_number,
         ref_tag,
