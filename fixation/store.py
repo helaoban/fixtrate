@@ -1,212 +1,180 @@
+import json
+import time
+
 import redis
-from simplefix import FixParser
+from sortedcontainers import SortedDict
+
+from fixation import parse as fp, config
 
 
 class FixStore(object):
 
-    def increment_local_sequence_number(self):
+    def incr_seq_num(self, remote=False):
         raise NotImplementedError
 
-    def increment_remote_sequence_number(self):
+    def get_seq_num(self, remote=False):
         raise NotImplementedError
 
-    def get_local_sequence_number(self):
+    def set_seq_num(self, seq_num, remote=False):
         raise NotImplementedError
 
-    def get_remote_sequence_number(self):
+    def store_message(self, msg, remote=False):
         raise NotImplementedError
 
-    def set_local_sequence_number(self, new_sequence_number):
+    def get_message(self, uid):
         raise NotImplementedError
 
-    def set_remote_sequence_number(self, new_sequence_number):
+    def get_messages(self, keys=None):
         raise NotImplementedError
 
-    def reset_local_sequence_number(self):
-        raise NotImplementedError
+    def get_messages_by_seq_num(self, remote=False):
+        pass
 
-    def reset_remote_sequence_number(self):
-        raise NotImplementedError
+    def new_session(self):
+        pass
 
-    def store_sent_message(self, sequence_number, message):
-        raise NotImplementedError
-
-    def store_received_message(self, sequence_number, message):
-        raise NotImplementedError
-
-    def get_sent_message_by_sequence(self, sequence_number):
-        raise NotImplementedError
-
-    def get_sent_message_by_index(self, sequence_number):
-        raise NotImplementedError
-
-    def get_sent_messages(self):
-        raise NotImplementedError
-
-    def get_received_message_by_sequence(self, sequence_number):
-        raise NotImplementedError
-
-    def get_received_message_by_index(self, sequence_number):
-        raise NotImplementedError
-
-    def get_received_messages(self):
-        raise NotImplementedError
-
-    def add_order(self, order_id, order):
-        raise NotImplementedError
-
-    def remove_order(self, order_id):
-        raise NotImplementedError
+    def store_config(self, conf):
+        pass
 
 
 class FixMemoryStore(FixStore):
 
     def __init__(self):
-        self._local_sequence_number = 0
-        self._remote_sequence_number = 0
-        self._sent_messages = {}
-        self._received_messages = {}
-        self._orders = {}
+        self._local_seq_num = 0
+        self._remote_seq_num = 0
+        self._messages = {}
+        self._local = SortedDict()
+        self._remote = SortedDict()
+        self._config = None
 
-    def increment_local_sequence_number(self):
-        self._local_sequence_number += 1
-        return self._local_sequence_number
+    def incr_seq_num(self, remote=False):
+        if remote:
+            self._remote_seq_num += 1
+            return self._remote_seq_num
+        else:
+            self._local_seq_num += 1
+            return self._local_seq_num
 
-    def increment_remote_sequence_number(self):
-        self._remote_sequence_number += 1
-        return self._remote_sequence_number
+    def get_seq_num(self, remote=False):
+        if remote:
+            return self._remote_seq_num
+        else:
+            return self._local_seq_num
 
-    def get_local_sequence_number(self):
-        return self._local_sequence_number
+    def set_seq_num(self, seq_num, remote=False):
+        if remote:
+            self._remote_seq_num = seq_num
+        else:
+            self._local_seq_num = seq_num
 
-    def get_remote_sequence_number(self):
-        return self._remote_sequence_number
+    def store_message(self, msg, remote=False):
+        seq_num = msg.get(34)
+        self._messages[msg.uid] = msg.encode()
+        if remote:
+            self._remote[seq_num] = msg.uid
+        else:
+            self._local[seq_num] = msg.uid
 
-    def set_local_sequence_number(self, new_sequence_number):
-        self._local_sequence_number = new_sequence_number
+    def get_message(self, uid):
+        return self._messages.get(uid)
 
-    def set_remote_sequence_number(self, new_sequence_number):
-        self._remote_sequence_number = new_sequence_number
+    def get_messages(self, keys=None):
+        if keys:
+            return {k: self._messages[k] for k in keys}
+        else:
+            return self._messages
 
-    def reset_local_sequence_number(self):
-        self._local_sequence_number = 0
+    def get_messages_by_seq_num(self, remote=False):
+        uids_by_seq = self._local
+        if remote:
+            uids_by_seq = self._remote
+        return SortedDict({
+            seq_num: self._messages[uid]
+            for seq_num, uid
+            in uids_by_seq
+        })
 
-    def reset_remote_sequence_number(self):
-        self._remote_sequence_number = 0
+    def new_session(self):
+        self._messages = {}
+        self._local = SortedDict()
+        self._remote = SortedDict()
+        self._config = None
 
-    def store_sent_message(self, sequence_number, message):
-        self._sent_messages[sequence_number] = message
-
-    def store_received_message(self, sequence_number, message):
-        self._received_messages[sequence_number] = message
-
-    def get_sent_message_by_sequence(self, sequence_number):
-        return self._sent_messages.get(sequence_number)
-
-    def get_sent_message_by_index(self, index):
-        messages = [v for _, v in sorted(self._sent_messages.items())]
-        return messages[index]
-
-    def get_sent_messages(self):
-        return [(int(k), v) for k, v in sorted(self._sent_messages.items())]
-
-    def get_received_message_by_sequence(self, sequence_number):
-        return self._received_messages.get(sequence_number)
-
-    def get_received_message_by_index(self, index):
-        messages = [v for _, v in sorted(self._received_messages.items())]
-        return messages[index]
-
-    def get_received_messages(self):
-        return [(int(k), v) for k, v in sorted(self._received_messages.items())]
-
-    def add_order(self, order_id, order):
-        self._orders[order_id] = order
-
-    def remove_order(self, order_id):
-        del self._orders[order_id]
+    def store_config(self, conf):
+        self._config = conf
 
 
 class FixRedisStore(FixStore):
     def __init__(self, **options):
-        self.redis = redis.StrictRedis(host='127.0.0.1', port=6379, db=0, socket_timeout=5)
+        self.redis = redis.StrictRedis(
+            host='127.0.0.1', port=6379, db=0, socket_timeout=5)
+        self.conf = options.get('conf',  config.get_config_from_env())
+
+    def get(self, key):
+        res = self.redis.get(key)
+        if res is not None:
+            return res.decode()
+        return None
 
     @staticmethod
-    def decode_message(message, parser=None):
-        parser = parser or FixParser()
-        parser.append_buffer(message)
-        return parser.get_message()
+    def decode_message(msg, uid=None):
+        parser = fp.FixParser()
+        parser.append_buffer(msg)
+        return parser.get_message(uid)
 
-    def decode_messages(self, messages):
-        parser = FixParser()
-        decoded_messages = []
-        for m in messages:
-            decoded = self.decode_message(m, parser=parser)
-            decoded_messages.append(decoded)
-        return decoded_messages
+    def incr_seq_num(self, remote=False):
+        key = 'seq_num_local'
+        if remote:
+            key = 'seq_num_remote'
+        return self.redis.incr(key)
 
-    def increment_local_sequence_number(self):
-        return self.redis.incr('local_sequence_number')
+    def set_seq_num(self, seq_num, remote=False):
+        key = 'seq_num_local'
+        if remote:
+            key = 'seq_num_remote'
+        self.redis.set(key, str(seq_num))
 
-    def increment_remote_sequence_number(self):
-        return self.redis.incr('remote_sequence_number')
+    def get_seq_num(self, remote=False):
+        key = 'seq_num_local'
+        if remote:
+            key = 'seq_num_remote'
+        return self.redis.get(key)
 
-    def set_local_sequence_number(self, new_sequence_number):
-        self.redis.set('local_sequence_number', str(new_sequence_number))
+    def store_message(self, msg, remote=False):
+        direction = 'remote' if remote else 'local'
+        seq_num = msg.get(34)
+        self.redis.hset('messages', msg.uid, msg.encode())
+        self.redis.zadd(direction, int(seq_num), msg.uid)
+        self.redis.zadd('messages_by_time', time.time(), msg.uid)
 
-    def set_remote_sequence_number(self, new_sequence_number):
-        self.redis.set('remote_sequence_number', str(new_sequence_number))
+    def get_message(self, uid):
+        msg = self.redis.hget('messages', uid)
+        return self.decode_message(msg, uid)
 
-    def reset_local_sequence_number(self):
-        return self.redis.set('local_sequence_number', '0')
+    def get_messages(self, keys=None):
+        if keys:
+            msgs = self.redis.hmget('messages', *keys)
+            msgs = dict(zip(keys, msgs))
+        else:
+            msgs = self.redis.hgetall('messages')
+        return [self.decode_message(msg, uid.decode()) for uid, msg in msgs.items()]
 
-    def reset_remote_sequence_number(self):
-        return self.redis.set('remote_sequence_number', '0')
+    def get_messages_by_seq_num(self, remote=False):
+        direction = 'remote' if remote else 'local'
+        uids_by_seq_num = self.redis.zrange(
+            direction, start=0, end=-1, withscores=True)
+        msgs = self.get_messages(keys=[uid for uid, _ in uids_by_seq_num])
+        return SortedDict({
+            seq_num: msgs[uid]
+            for uid, seq_num
+            in uids_by_seq_num
+        })
 
-    def store_sent_message(self, sequence_number, message):
-        self.redis.zadd('sent_messages', sequence_number, message)
+    def store_config(self, conf):
+        jsoned = json.dumps(conf)
+        self.redis.set('config', jsoned)
 
-    def store_received_message(self, sequence_number, message):
-        self.redis.zadd('received_messages', sequence_number, message)
-
-    def get_sent_message(self, sequence_number):
-        msg = self.redis.zrangebyscore(
-            name='sent_messages',
-            min=sequence_number,
-            max=sequence_number,
-            withscores=True
-        )
-        return self.decode_message(msg)
-
-    def get_sent_messages(self):
-        messages = self.redis.zrange(name='received_messages', start=0, end=-1)
-        return dict(zip(messages.keys(), self.decode_messages(messages)))
-
-    def get_received_message(self, sequence_number):
-        msg = self.redis.zrangebyscore(
-            name='received_messages',
-            min=sequence_number,
-            max=sequence_number,
-            withscores=True
-        )
-        return self.decode_message(msg)
-
-    def get_received_messages(self):
-        messages = self.redis.zrange(name='received_messages', start=0, end=-1)
-        return dict(zip(messages.keys(), self.decode_messages(messages)))
-
-    def get_local_sequence_number(self):
-        sequence_number = self.redis.get('local_sequence_number')
-        if sequence_number is None:
-            self.reset_local_sequence_number()
-            return self.get_local_sequence_number()
-        return sequence_number
-
-    def get_remote_sequence_number(self):
-        return int(self.redis.get('remote_sequence_number'))
-
-    def add_order(self, order_id, order):
-        self.redis.hset(name='orders', key=order_id, value=order)
-
-    def remove_order(self, order_id):
-        self.redis.hdel('orders', order_id)
+    def new_session(self):
+        for key in ['messages', 'received', 'sent']:
+            self.redis.delete(key)
+        self.set_seq_num(0)

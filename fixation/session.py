@@ -139,7 +139,7 @@ class FixSession:
         return FixConnectionContextManager(self._connect())
 
     def on_connect(self):
-        pass
+        self.store.store_config(self.config)
 
     async def on_disconnect(self):
         await self.shutdown()
@@ -174,7 +174,7 @@ class FixSession:
         )
         msg.append_pair(
             self.TAGS.MsgSeqNum,
-            self.store.increment_local_sequence_number()
+            self.store.incr_seq_num()
         )
 
         if timestamp is None:
@@ -230,13 +230,13 @@ class FixSession:
 
     async def resend_messages(self, start, end):
         sequence_range = range(start, end + 1)
-        sent_messages = self.store.get_sent_messages()
-        for seq in sequence_range:
-            await self.send_message(sent_messages[seq])
+        sent_messages = self.store.get_messages_by_seq_num(remote=False)
+        for i in sequence_range:
+            await self.send_message(sent_messages[i])
 
     def check_sequence_integrity(self, msg):
         seq_num = msg.get(self.TAGS.MsgSeqNum)
-        recorded_seq_num = self.store.get_remote_sequence_number()
+        recorded_seq_num = self.store.get_seq_num(remote=True)
         seq_diff = int(seq_num) - int(recorded_seq_num)
         if seq_diff != 1:
             raise exceptions.SequenceGap

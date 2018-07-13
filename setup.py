@@ -15,6 +15,7 @@ REQUIRES = [
     'jsonschema',
     'redis',
     'simplefix',
+    'sortedcontainers',
     'untangle',
 ]
 
