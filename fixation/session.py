@@ -212,10 +212,6 @@ class FixSession:
         msg = fix42.logoff()
         await self.send_message(msg)
 
-    async def send_test_request(self):
-        msg = fix42.test_request()
-        await self.send_message(msg)
-
     async def request_resend(self, start_sequence, end_sequence):
         msg = fix42.resend_request(
             start_sequence,
