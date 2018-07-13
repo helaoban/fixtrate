@@ -6,7 +6,7 @@ import socket
 import sys
 import uuid
 
-from fixation import utils, daemon
+from fixation import utils, client
 
 
 logger = logging.getLogger(__name__)
@@ -202,8 +202,8 @@ def test(args):
 
 @command
 def start(argv):
-    client = daemon.FixDaemon()
-    client()
+    _client = client.FixClient()
+    _client()
 
 
 def usage(argv):
