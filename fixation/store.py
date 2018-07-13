@@ -36,6 +36,9 @@ class FixStore(object):
     def store_config(self, conf):
         pass
 
+    def get_config(self):
+        raise NotImplementedError
+
 
 class FixMemoryStore(FixStore):
 
@@ -102,6 +105,9 @@ class FixMemoryStore(FixStore):
 
     def store_config(self, conf):
         self._config = conf
+
+    def get_config(self):
+        return self._config
 
 
 class FixRedisStore(FixStore):
@@ -173,6 +179,10 @@ class FixRedisStore(FixStore):
     def store_config(self, conf):
         jsoned = json.dumps(conf)
         self.redis.set('config', jsoned)
+
+    def get_config(self):
+        conf = self.redis.get('config')
+        return json.loads(conf.decode())
 
     def new_session(self):
         for key in ['messages', 'received', 'sent']:
