@@ -196,7 +196,7 @@ class FixSession:
         encoded = msg.encode()
         print('{}: {} -->'.format(send_time, msg_type))
         await self._connection.write(encoded)
-        self.store.store_sent_message(int(seq_num), encoded)
+        self.store.store_message(msg)
 
     async def send_heartbeat(self, test_request_id=None):
         msg = fix42.heartbeat(test_request_id)
@@ -280,9 +280,9 @@ class FixSession:
             except exceptions.SequenceGap:
                 self.handle_sequence_gap(msg)
 
-            self.store.increment_remote_sequence_number()
+            self.store.incr_seq_num(remote=True)
 
-        self.store.store_received_message(seq_num, msg.encode())
+        self.store.store_message(msg, remote=True)
         await self.dispatch(msg)
 
     async def handle_logon(self, msg):
