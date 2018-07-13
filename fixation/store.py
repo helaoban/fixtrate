@@ -28,13 +28,13 @@ class FixStore(object):
         raise NotImplementedError
 
     def get_messages_by_seq_num(self, remote=False):
-        pass
+        raise NotImplementedError
 
     def new_session(self):
-        pass
+        raise NotImplementedError
 
     def store_config(self, conf):
-        pass
+        raise NotImplementedError
 
     def get_config(self):
         raise NotImplementedError
