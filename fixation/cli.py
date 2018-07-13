@@ -85,7 +85,7 @@ class FixationCommand(object):
 
     def send_command(self, name, timeout=30, **args):
 
-        uid = uuid.uuid4()
+        uid = str(uuid.uuid4())
         message = {
             'jsonrpc': '2.0',
             'method': name,
