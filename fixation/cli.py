@@ -57,15 +57,12 @@ class FixationCommand(object):
             socket.SOCK_STREAM
         )
         self.s.settimeout(timeout)
+        socket_path = os.path.expanduser(
+            '~/.fixation/command_socket')
         try:
-            self.s.connect(
-                os.path.expanduser(
-                    '~/.fixation/command_socket'
-                )
-            )
+            self.s.connect(socket_path)
         except socket.error as error:
-            print(error)
-            raise self.CouldNotConnectError
+            raise self.CouldNotConnectError from error
         self.f = self.s.makefile('rwb', 4096)
 
     def close(self):
