@@ -100,8 +100,8 @@ class RPCServer(object):
                 logger.info('client disconnected')
                 writer.close()
                 return
-            message, buf = utils.parse_rpc_message(buf)
-            if message is None:
+            msg, buf = utils.parse_rpc_message(buf)
+            if msg is None:
                 continue
 
             try:
@@ -113,9 +113,13 @@ class RPCServer(object):
                 response = await self.handle_rpc_request(msg)
             except exceptions.RPCError as error:
                 response = {
-                    'code': error.code,
-                    'message': error.message,
-                    'data': error.meaning
+                    'jsonrpc': '2.0',
+                    'id': msg['id'],
+                    'error': {
+                        'code': error.code,
+                        'message': error.message,
+                        'data': error.meaning
+                    }
                 }
 
             response = utils.pack_rpc_message(response)
