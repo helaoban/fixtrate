@@ -94,7 +94,7 @@ class RPCServer(object):
 
     async def handle_socket_client(self, reader, writer, timeout=10):
         buf = b''
-        while True:
+        while not writer.transport.is_closing():
             try:
                 buf += await asyncio.wait_for(reader.read(4096), timeout)
             except asyncio.TimeoutError as error:
