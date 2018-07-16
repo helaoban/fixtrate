@@ -145,6 +145,11 @@ class RPCClient:
     class CommandError(Exception): pass
 
     def __init__(self, timeout=5):
+        self.socket = None
+        self.reader = None
+        self.writer = None
+
+    async def connect(self, timeout=5):
         self.socket = socket.socket(
             socket.AF_UNIX,
             socket.SOCK_STREAM
@@ -158,24 +163,24 @@ class RPCClient:
             )
         except socket.error:
             raise self.CouldNotConnectError
-        self.socket_file = self.socket.makefile('rwb', 4096)
+        self.reader, self.writer = await asyncio.open_connection(
+            sock=self.socket)
 
     def close(self):
-        self.socket_file.close()
+        self.writer.close()
         self.socket.close()
 
-    def read(self):
+    async def read(self):
         try:
-            r = self.socket_file.readline().decode().rstrip('\n')
+            r = await self.reader.read(4096)
         except socket.error:
             raise self.BadConnectionError
-
-        if r == '':
+        if r == b'':
             raise EOFError
 
         return r
 
-    def send_command(self, name, timeout=30, **kwargs):
+    async def send_command(self, name, timeout=30, **kwargs):
 
         uid = uuid.uuid4()
         message = {
@@ -185,14 +190,14 @@ class RPCClient:
             'id': uid
         }
         message = utils.pack_rpc_message(message)
-        self.socket_file.write(message)
-        self.socket_file.flush()
+        self.writer.write(message)
+        await self.writer.drain()
 
         try:
             buf = b''
             t = time.time()
             while time.time() - t < timeout:
-                buf += self.socket_file.read(4096)
+                buf += await self.read()
                 resp, buf = utils.parse_rpc_message(buf)
                 if resp is not None:
                     break
