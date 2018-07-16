@@ -63,7 +63,7 @@ class RPCServer(object):
         return {
             'place_order': self.fix_client.place_order,
             'cancel_order': self.fix_client.cancel_order,
-            'cance_replace_order': self.fix_client.cancel_replace_order,
+            'cancel_replace_order': self.fix_client.cancel_replace_order,
             'send_test_request': self.fix_client.send_test_request
         }.get(data['method'])
 
