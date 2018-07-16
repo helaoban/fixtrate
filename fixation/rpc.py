@@ -141,7 +141,7 @@ class RPCServer(object):
 
 class RPCClient:
 
-    def __init__(self, timeout=5):
+    def __init__(self):
         self.socket = None
         self.reader = None
         self.writer = None
