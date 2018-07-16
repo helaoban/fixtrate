@@ -176,6 +176,16 @@ class FixRedisStore(FixStore):
             in uids_by_seq_num
         })
 
+    def get_messages_by_time(self):
+        uids_by_time = self.redis.zrange(
+            'messages_by_time', start=0, end=-1, withscores=True)
+        msgs = self.get_messages(keys=[uid for uid, _ in uids_by_time])
+        return SortedDict({
+            timestamp: msgs[uid]
+            for uid, timestamp
+            in uids_by_time
+        })
+
     def store_config(self, conf):
         jsoned = json.dumps(conf)
         self.redis.set('config', jsoned)
@@ -185,6 +195,6 @@ class FixRedisStore(FixStore):
         return json.loads(conf.decode())
 
     def new_session(self):
-        for key in ['messages', 'received', 'sent']:
+        for key in ['messages', 'received', 'sent', 'messages_by_time']:
             self.redis.delete(key)
         self.set_seq_num(0)
