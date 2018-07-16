@@ -24,38 +24,64 @@ class FixClient(object):
 
         self.TAGS = fc.FixTag.FIX42
 
-    async def place_order(self, data):
-        msg = fix42.new_order(
-            account='qafa001',
-            symbol=data['params']['symbol'],
-            quantity=data['params']['quantity'],
-            side=data['params']['side'],
-            order_type=fc.OrdType[['params']['order_type']],
-            price=data['params'].get('price'),
+    async def place_order(
+            self,
+            symbol,
+            quantity,
+            side,
+            order_type,
+            price=None,
             currency='USD',
             ex_destination='SMART'
+    ):
+        account = self.config['FIX_ACCOUNT']
+        msg = fix42.new_order(
+            account=account,
+            symbol=symbol,
+            quantity=quantity,
+            side=fc.Side[side],
+            order_type=fc.OrdType[order_type],
+            price=price,
+            currency=currency,
+            ex_destination=ex_destination
         )
         await self.session.send_message(msg)
 
-    async def cancel_replace_order(self, data):
+    async def cancel_replace_order(
+            self,
+            order_id,
+            symbol,
+            quantity,
+            side,
+            order_type,
+            price=None,
+    ):
+        account = self.config['FIX_ACCOUNT']
         msg = fix42.cancel_replace(
-            account='qafa001',
-            orig_cl_order_id=data['params']['orig_cl_order_id'],
-            symbol=data['params']['symbol'],
-            side=data['params']['side'],
-            quantity=data['params']['quantity'],
-            order_type=data['params']['order_type'],
-            price=data['params'].get('price')
-
+            account=account,
+            orig_cl_order_id=order_id,
+            symbol=symbol,
+            side=fc.Side[side],
+            order_type=fc.OrdType[order_type],
+            quantity=quantity,
+            price=price
         )
         await self.session.send_message(msg)
 
-    async def cancel_order(self, data):
+    async def cancel_order(
+        self,
+        order_id,
+        symbol,
+        side,
+        quantity
+    ):
+        account = self.config['FIX_ACCOUNT']
         msg = fix42.cancel(
-            account='qafa001',
-            orig_cl_order_id=data['params']['orig_cl_order_id'],
-            symbol=data['params']['symbol'],
-            side=data['params']['side'],
+            account=account,
+            orig_cl_order_id=order_id,
+            symbol=symbol,
+            side=fc.Side[side],
+            quantity=quantity
         )
         await self.session.send_message(msg)
 

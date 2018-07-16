@@ -175,9 +175,14 @@ def new_order(
         price=None,
         currency=None,
         security_exchange=None,
-        ex_destination=None
+        ex_destination=None,
+        customer_or_firm=fc.CustomerOrFirm.Customer
 ):
     msg = fm.FixMessage()
+    msg.append_pair(
+        TAGS.MsgType,
+        fc.FixMsgType.NewOrderSingle
+    )
     msg.append_pair(TAGS.Account, account)
 
     if cl_order_id is None:
@@ -202,6 +207,8 @@ def new_order(
     if ex_destination is not None:
         msg.append_pair(TAGS.ExDestination, ex_destination)
 
+    msg.append_pair(TAGS.CustomerOrFirm, customer_or_firm)
+
     return msg
 
 
@@ -217,6 +224,10 @@ def cancel_replace(
     handle_inst=2,
 ):
     msg = fm.FixMessage()
+    msg.append_pair(
+        TAGS.MsgType,
+        fc.FixMsgType.OrderCancelReplaceRequest
+    )
     msg.append_pair(TAGS.Account, account)
     msg.append_pair(TAGS.HandlInst, handle_inst)
     msg.append_pair(TAGS.OrigClOrdID, orig_cl_order_id)
@@ -229,7 +240,7 @@ def cancel_replace(
     msg.append_pair(TAGS.OrdType, order_type)
 
     if price is not None:
-        msg.append_pair(TAGS.OrdType, price)
+        msg.append_pair(TAGS.Price, price)
 
     return msg
 
@@ -239,9 +250,14 @@ def cancel(
     orig_cl_order_id,
     symbol,
     side,
+    quantity,
     cl_order_id=None,
 ):
     msg = fm.FixMessage()
+    msg.append_pair(
+        TAGS.MsgType,
+        fc.FixMsgType.OrderCancelRequest
+    )
     msg.append_pair(TAGS.Account, account)
     if cl_order_id is None:
         cl_order_id = utils.gen_uuid()
@@ -249,6 +265,7 @@ def cancel(
     msg.append_pair(TAGS.OrigClOrdID, orig_cl_order_id)
     msg.append_pair(TAGS.Symbol, symbol)
     msg.append_pair(TAGS.Side, side)
+    msg.append_pair(TAGS.OrderQty, quantity)
 
     return msg
 
