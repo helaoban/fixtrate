@@ -76,7 +76,7 @@ class RPCServer(object):
         try:
             js.validate(data, self.RPC_SCHEMA)
         except js.ValidationError as error:
-            raise exceptions.RPCInvalidRequest
+            raise exceptions.RPCInvalidRequest from error
 
         handler = self.dispatch_socket_command(data)
         if not handler:
@@ -89,8 +89,8 @@ class RPCServer(object):
                 result = handler(**data['params'])
         # TODO need to inspect method members, or else we swallow
         # actual TypeErrors in method call.
-        except TypeError:
-            raise exceptions.RPCInvalidParams
+        except TypeError as error:
+            raise exceptions.RPCInvalidParams from error
 
         return {
             'result': result,
