@@ -2,6 +2,12 @@ import enum
 
 
 @enum.unique
+class FixVersion(str, enum.Enum):
+    FIX42 = 'FIX.4.2'
+    FIX44 = 'FIX.4.4'
+
+
+@enum.unique
 class FixMsgType(str, enum.Enum):
     Heartbeat = '0'
     TestRequest = '1'
@@ -1739,8 +1745,3 @@ class CustomerOrFirm(int, enum.Enum):
     Customer = 0
     Firm = 1
 
-
-@enum.unique
-class FixVersion(str, enum.Enum):
-    FIX42 = 'FIX.4.2'
-    FIX44 = 'FIX.4.4'
