@@ -208,6 +208,8 @@ class RPCClient:
             logger.exception(error)
             return
 
+        resp = json.loads(resp.decode())
+
         if 'result' in resp:
             return resp['result']
         else:
