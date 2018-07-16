@@ -140,10 +140,6 @@ class RPCServer(object):
 
 class RPCClient:
 
-    class CouldNotConnectError(Exception): pass
-    class BadConnectionError(Exception): pass
-    class CommandError(Exception): pass
-
     def __init__(self, timeout=5):
         self.socket = None
         self.reader = None
@@ -162,7 +158,7 @@ class RPCClient:
                 )
             )
         except socket.error:
-            raise self.CouldNotConnectError
+            raise exceptions.RPCCouldNotConnectError
         self.reader, self.writer = await asyncio.open_connection(
             sock=self.socket)
 
@@ -174,7 +170,7 @@ class RPCClient:
         try:
             r = await self.reader.read(4096)
         except socket.error:
-            raise self.BadConnectionError
+            raise exceptions.RPCBadConnectionError
         if r == b'':
             raise EOFError
 
@@ -204,7 +200,7 @@ class RPCClient:
             else:
                 raise TimeoutError
         except KeyboardInterrupt:
-            raise self.BadConnectionError()
+            raise exceptions.RPCBadConnectionError()
         except TimeoutError:
             print('Timeout!')
             raise
@@ -215,4 +211,4 @@ class RPCClient:
         if 'result' in resp:
             return resp['result']
         else:
-            raise self.CommandError(resp['error'])
+            raise exceptions.RPCCommandError(resp['error'])

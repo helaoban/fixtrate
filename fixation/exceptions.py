@@ -81,3 +81,15 @@ class RPCInternalError(RPCError):
         message = 'Internal error'
         meaning = 'Internal JSON-RPC error.'
         super().__init__(-32603, message, meaning)
+
+
+class RPCCouldNotConnectError(Exception):
+    pass
+
+
+class RPCBadConnectionError(Exception):
+    pass
+
+
+class RPCCommandError(Exception):
+    pass
