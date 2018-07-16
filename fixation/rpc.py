@@ -8,7 +8,7 @@ import socket
 import time
 import uuid
 
-from fixation import constants as fc, exceptions, utils
+from fixation import exceptions, utils
 
 
 logger = logging.getLogger(__name__)
@@ -112,6 +112,7 @@ class RPCServer(object):
             message, buf = utils.parse_rpc_message(buf)
             if message is None:
                 continue
+
             try:
                 response = await self.handle_rpc_request(message)
             except exceptions.RPCError as error:
