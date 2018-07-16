@@ -67,26 +67,21 @@ class RPCServer(object):
             'send_test_request': self.fix_client.send_test_request
         }.get(data['method'])
 
-    async def handle_rpc_request(self, message):
+    async def handle_rpc_request(self, msg):
         try:
-            data = json.loads(message.decode())
-        except json.JSONDecodeError:
-            raise exceptions.RPCParseError
-
-        try:
-            js.validate(data, self.RPC_SCHEMA)
+            js.validate(msg, self.RPC_SCHEMA)
         except js.ValidationError as error:
             raise exceptions.RPCInvalidRequest from error
 
-        handler = self.dispatch_socket_command(data)
+        handler = self.dispatch_socket_command(msg)
         if not handler:
             raise exceptions.RPCMethodNotFound
 
         try:
             if utils.is_coro(handler):
-                result = await handler(**data['params'])
+                result = await handler(**msg['params'])
             else:
-                result = handler(**data['params'])
+                result = handler(**msg['params'])
         # TODO need to inspect method members, or else we swallow
         # actual TypeErrors in method call.
         except TypeError as error:
@@ -94,7 +89,7 @@ class RPCServer(object):
 
         return {
             'result': result,
-            'id': data['id']
+            'id': msg['id']
         }
 
     async def handle_socket_client(self, reader, writer, timeout=10):
@@ -114,7 +109,12 @@ class RPCServer(object):
                 continue
 
             try:
-                response = await self.handle_rpc_request(message)
+                msg = json.loads(msg.decode())
+            except json.JSONDecodeError:
+                raise exceptions.RPCParseError
+
+            try:
+                response = await self.handle_rpc_request(msg)
             except exceptions.RPCError as error:
                 response = {
                     'code': error.code,
