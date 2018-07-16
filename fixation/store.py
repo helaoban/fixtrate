@@ -163,7 +163,7 @@ class FixRedisStore(FixStore):
             msgs = dict(zip(keys, msgs))
         else:
             msgs = self.redis.hgetall('messages')
-        return [self.decode_message(msg, uid.decode()) for uid, msg in msgs.items()]
+        return {uid: self.decode_message(msg, uid.decode()) for uid, msg in msgs.items()}
 
     def get_messages_by_seq_num(self, remote=False):
         direction = 'remote' if remote else 'local'
