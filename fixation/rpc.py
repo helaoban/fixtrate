@@ -92,14 +92,10 @@ class RPCServer(object):
             'id': msg['id']
         }
 
-    async def handle_socket_client(self, reader, writer, timeout=10):
+    async def handle_socket_client(self, reader, writer):
         buf = b''
         while not writer.transport.is_closing():
-            try:
-                buf += await asyncio.wait_for(reader.read(4096), timeout)
-            except asyncio.TimeoutError as error:
-                logger.exception(error)
-                return
+            buf += await reader.read(4096)
             if buf == b'':
                 logger.info('client disconnected')
                 writer.close()
