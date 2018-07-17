@@ -189,7 +189,8 @@ class FixSession:
         )
         msg.append_pair(
             self.TAGS.MsgSeqNum,
-            self.store.incr_seq_num()
+            self.store.incr_seq_num(),
+            header=True
         )
 
         if timestamp is None:
