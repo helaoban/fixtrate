@@ -66,13 +66,14 @@ class FixMessage(simplefix.FixMessage):
     def to_json(self):
 
         msg_type = self.get(fc.FixTag.FIX42.MsgType)
-        msg_type = fc.FixMsgType(msg_type).name
+        msg_type = fc.FixMsgType(msg_type)
         seq_num = int(self.get(fc.FixTag.FIX42.MsgSeqNum))
 
         return {
             'uid': self.uid,
             'seqNum': seq_num,
             'msgType': msg_type,
+            'msgTypeName': msg_type.name,
             'pairs': self.to_decoded_pairs(),
             'raw': self.__str__()
         }
