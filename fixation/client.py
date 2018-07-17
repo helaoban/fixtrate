@@ -161,8 +161,9 @@ class FixClient(object):
             async for msg in self.session:
                 pass
         except asyncio.CancelledError:
-            print('Closing...')
-            await conn.close()
+            pass
+
+        await conn.close()
 
     def __call__(self):
         task = self.loop.create_task(self.main())

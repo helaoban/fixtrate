@@ -358,18 +358,18 @@ class FixSession:
                 data = await self._connection.read()
             except ConnectionError as error:
                 logger.error(error)
-                await self.on_disconnect()
-                return
+                break
             if data == b'':
                 logger.error('Server closed the connection!')
-                await self.on_disconnect()
-                return
+                break
             self.parser.append_buffer(data)
             msg = self.parser.get_message()
 
             if msg is not None:
                 await self.handle_message(msg)
                 return msg
+
+        return None
 
     def __aiter__(self):
         return self
