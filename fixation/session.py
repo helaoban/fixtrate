@@ -65,9 +65,9 @@ class FixConnectionContextManager(Coroutine):
 
         self._coro = self._connect()
 
-    async def _connect(self, retries=5, retry_wait=5):
-        tries = 1
-        while tries <= retries:
+    async def _connect(self, tries=5, retry_wait=5):
+        tried = 1
+        while tried <= tries:
             try:
                 reader, writer = await asyncio.open_connection(
                     host=self.config.get('FIX_HOST', '127.0.0.1'),
@@ -78,7 +78,7 @@ class FixConnectionContextManager(Coroutine):
                 logger.error(error)
                 logger.info('Connection failed, retrying in {} seconds...'
                             ''.format(retry_wait))
-                tries += 1
+                tried += 1
                 await asyncio.sleep(retry_wait)
                 continue
             else:
@@ -87,7 +87,7 @@ class FixConnectionContextManager(Coroutine):
                 self.on_connect(conn)
                 return conn
 
-        logger.info('Retries ({}) exhausted'.format(retries))
+        logger.info('Connection tries ({}) exhausted'.format(tries))
         raise ConnectionError
 
     def send(self, arg):
