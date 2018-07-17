@@ -109,29 +109,27 @@ def security_list():
 
 
 def market_data_request(
-        symbols,
-        entry_types,
-        subscription_type=fc.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES,
-        market_depth=fc.MarketDepth.TOP_OF_BOOK,
-        update_type=fc.MDUpdateType.FULL_REFRESH,
-        version=fc.FixVersion.FIX42
+    symbols,
+    entry_types,
+    subscription_type=fc.SubscriptionRequestType.SNAPSHOT_PLUS_UPDATES,
+    market_depth=fc.MarketDepth.TOP_OF_BOOK,
+    update_type=fc.MDUpdateType.FULL_REFRESH,
 ):
-    tags = getattr(fc.FixTag, version.name)
 
     msg = fm.FixMessage()
     msg.append_pair(
-        tags.MsgType,
+        TAGS.MsgType,
         fc.FixMsgType.MarketDataRequest,
         header=True
     )
-    msg.append_pair(tags.MDReqID, utils.gen_uuid())
+    msg.append_pair(TAGS.MDReqID, utils.gen_uuid())
 
     if subscription_type not in fc.SubscriptionRequestType:
         utils.raise_invalid_option(
             'subscription_type', fc.SubscriptionRequestType)
 
     msg.append_pair(
-        tags.SubscriptionRequestType,
+        TAGS.SubscriptionRequestType,
         subscription_type
     )
 
@@ -140,7 +138,7 @@ def market_data_request(
             'market_depth', fc.MarketDepth)
 
     msg.append_pair(
-        tags.MarketDepth,
+        TAGS.MarketDepth,
         market_depth
     )
 
@@ -150,24 +148,24 @@ def market_data_request(
                 'update_type', fc.MDUpdateType)
 
         msg.append_pair(
-            tags.MDUpdateType,
+            TAGS.MDUpdateType,
             update_type
         )
 
     msg.append_pair(
-        tags.NoMDEntryTypes,
+        TAGS.NoMDEntryTypes,
         len(entry_types)
     )
     for entry_type in entry_types:
         msg.append_pair(
-            tags.MDEntryType,
+            TAGS.MDEntryType,
             entry_type
         )
 
-    msg.append_pair(tags.NoRelatedSym, len(symbols))
+    msg.append_pair(TAGS.NoRelatedSym, len(symbols))
     for symbol in symbols:
         msg.append_pair(
-            tags.Symbol,
+            TAGS.Symbol,
             symbol
         )
 
