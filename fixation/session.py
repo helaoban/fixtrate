@@ -66,7 +66,7 @@ class FixConnectionContextManager(Coroutine):
         self._coro = self._connect()
 
     async def _connect(self, retries=5, retry_wait=5):
-        tries = 0
+        tries = 1
         while tries <= retries:
             try:
                 reader, writer = await asyncio.open_connection(
