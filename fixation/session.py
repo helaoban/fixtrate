@@ -87,9 +87,8 @@ class FixConnectionContextManager(Coroutine):
                 self.on_connect(conn)
                 return conn
 
-        if tries > retries:
-            logger.info('Retries ({}) exhausted, shutting down.'
-                        ''.format(retries))
+        logger.info('Retries ({}) exhausted'.format(retries))
+        raise ConnectionError
 
     def send(self, arg):
         self._coro.send(arg)
