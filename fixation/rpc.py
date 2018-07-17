@@ -128,7 +128,7 @@ class RPCServer(object):
     async def stop(self):
         logger.info('Shutting down...')
         self._socket_server.close()
-        await self._socket_server.wait_close()
+        await self._socket_server.wait_closed()
 
     async def start(self):
         sock = self.make_socket_file()
