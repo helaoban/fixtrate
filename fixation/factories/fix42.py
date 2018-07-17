@@ -52,7 +52,6 @@ def logon(
     msg.append_pair(
         TAGS.EncryptMethod,
         encrypt_method,
-        fc.EncryptMethod.NONE.value
     )
     msg.append_pair(
         TAGS.HeartBtInt,
