@@ -51,8 +51,45 @@ class FixConnection(object):
 
 class FixConnectionContextManager(Coroutine):
 
-    def __init__(self, coro):
-        self._coro = coro
+    def __init__(
+        self,
+        conf,
+        on_connect=None,
+        on_disconnect=None,
+        loop=None
+    ):
+        self.config = conf
+        self.on_connect = on_connect
+        self.on_disconnect = on_disconnect
+        self.loop = loop or asyncio.get_event_loop()
+
+        self._coro = self._connect()
+
+    async def _connect(self, retries=5, retry_wait=5):
+        tries = 0
+        while tries <= retries:
+            try:
+                reader, writer = await asyncio.open_connection(
+                    host=self.config.get('FIX_HOST', '127.0.0.1'),
+                    port=self.config.get('FIX_PORT', 4000),
+                    loop=self.loop
+                )
+            except OSError as error:
+                logger.error(error)
+                logger.info('Connection failed, retrying in {} seconds...'
+                            ''.format(retry_wait))
+                tries += 1
+                await asyncio.sleep(retry_wait)
+                continue
+            else:
+                conn = FixConnection(
+                    reader, writer, self.on_disconnect)
+                self.on_connect(conn)
+                return conn
+
+        if tries > retries:
+            logger.info('Retries ({}) exhausted, shutting down.'
+                        ''.format(retries))
 
     def send(self, arg):
         self._coro.send(arg)
@@ -112,35 +149,12 @@ class FixSession:
     def close(self):
         pass
 
-    async def _connect(self, retries=5, retry_wait=1):
-        tries = 0
-        while tries <= retries:
-            try:
-                reader, writer = await asyncio.open_connection(
-                    host=self.config.get('FIX_HOST', '127.0.0.1'),
-                    port=self.config.get('FIX_PORT', 4000),
-                    loop=self.loop
-                )
-            except OSError as error:
-                logger.error(error)
-                logger.info('Connection failed, retrying in 5 seconds...')
-                tries += 1
-                await asyncio.sleep(retry_wait)
-                continue
-            else:
-                self.on_connect()
-                self._connection = FixConnection(
-                    reader, writer, self.on_disconnect)
-                return self._connection
-
-        if tries > retries:
-            logger.info('Retries ({}) exhausted, shutting down.'
-                        ''.format(retries))
-
     def connect(self):
-        return FixConnectionContextManager(self._connect())
+        return FixConnectionContextManager(
+            self.config, self.on_connect, self.on_disconnect)
 
-    def on_connect(self):
+    def on_connect(self, conn):
+        self._connection = conn
         self.store.store_config(self.config)
 
     async def on_disconnect(self):
