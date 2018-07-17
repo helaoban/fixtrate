@@ -10,7 +10,8 @@ def heartbeat(test_request_id=None):
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Heartbeat
+        fc.FixMsgType.Heartbeat,
+        header=True
     )
     if test_request_id:
         msg.append_pair(TAGS.TestReqID, test_request_id)
@@ -21,7 +22,8 @@ def test_request(test_request_id=None):
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.TestRequest
+        fc.FixMsgType.TestRequest,
+        header=True
     )
     if test_request_id is None:
         test_request_id = utils.gen_uuid()
@@ -48,6 +50,7 @@ def logon(
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.Logon,
+        header=True
     )
     msg.append_pair(
         TAGS.EncryptMethod,
@@ -66,7 +69,8 @@ def resend_request(start_sequence, end_sequence):
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.ResendRequest
+        fc.FixMsgType.ResendRequest,
+        header=True
     )
     msg.append_pair(TAGS.BeginSeqNo, start_sequence)
     msg.append_pair(TAGS.EndSeqNo, end_sequence)
@@ -80,7 +84,8 @@ def sequence_reset(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.ResendRequest
+        fc.FixMsgType.SequenceReset,
+        header=True
     )
     msg.append_pair(TAGS.NewSeqNo, new_sequence_number)
     msg.append_pair(TAGS.GapFillFlag, gap_fill)
@@ -89,6 +94,11 @@ def sequence_reset(
 
 def security_list():
     msg = fm.FixMessage()
+    msg.append_pair(
+        TAGS.MsgType,
+        fc.FixMsgType.SecurityListRequest,
+        header=True
+    )
     uid = utils.gen_uuid()
     msg.append_pair(TAGS.SecurityReqID, uid)
     msg.append_pair(
@@ -111,7 +121,8 @@ def market_data_request(
     msg = fm.FixMessage()
     msg.append_pair(
         tags.MsgType,
-        fc.FixMsgType.MarketDataRequest
+        fc.FixMsgType.MarketDataRequest,
+        header=True
     )
     msg.append_pair(tags.MDReqID, utils.gen_uuid())
 
@@ -180,7 +191,8 @@ def new_order(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.NewOrderSingle
+        fc.FixMsgType.NewOrderSingle,
+        header=True
     )
     msg.append_pair(TAGS.Account, account)
 
@@ -225,7 +237,8 @@ def cancel_replace(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.OrderCancelReplaceRequest
+        fc.FixMsgType.OrderCancelReplaceRequest,
+        header=True
     )
     msg.append_pair(TAGS.Account, account)
     msg.append_pair(TAGS.HandlInst, handle_inst)
@@ -255,7 +268,8 @@ def cancel(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.OrderCancelRequest
+        fc.FixMsgType.OrderCancelRequest,
+        header=True
     )
     msg.append_pair(TAGS.Account, account)
     if cl_order_id is None:
@@ -288,7 +302,8 @@ def reject(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Reject
+        fc.FixMsgType.Reject,
+        header=True
     )
     msg.append_pair(TAGS.RefSeqNum, ref_sequence_number)
     msg.append_pair(TAGS.Text, reject_reason)
