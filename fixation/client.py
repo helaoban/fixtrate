@@ -163,6 +163,8 @@ class FixClient(object):
             except asyncio.CancelledError:
                 pass
 
+        await self.rpc_server.stop()
+
     def __call__(self):
         task = self.loop.create_task(self.main())
         try:
