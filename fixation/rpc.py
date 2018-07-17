@@ -126,7 +126,7 @@ class RPCServer(object):
             writer.write(response)
 
     async def stop(self):
-        logger.info('Shutting down...')
+        logger.info('Shutting down RPC server...')
         self._socket_server.close()
         await self._socket_server.wait_closed()
 
