@@ -153,15 +153,19 @@ class FixClient(object):
             loop=self.loop
         )
 
-        async with self.session.connect():
-            await self.session.logon()
-            await self.rpc_server.start()
-
+        while True:
             try:
-                async for msg in self.session:
-                    pass
+                async with self.session.connect():
+                    await self.session.logon()
+                    await self.rpc_server.start()
+
+                    async for msg in self.session:
+                        pass
+
+            except ConnectionError:
+                continue
             except asyncio.CancelledError:
-                pass
+                break
 
         await self.rpc_server.stop()
 
