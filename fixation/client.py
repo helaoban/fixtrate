@@ -153,17 +153,15 @@ class FixClient(object):
             loop=self.loop
         )
 
-        conn = await self.session.connect()
-        await self.session.logon()
-        await self.rpc_server.start()
+        async with self.session.connect():
+            await self.session.logon()
+            await self.rpc_server.start()
 
-        try:
-            async for msg in self.session:
+            try:
+                async for msg in self.session:
+                    pass
+            except asyncio.CancelledError:
                 pass
-        except asyncio.CancelledError:
-            pass
-
-        await conn.close()
 
     def __call__(self):
         task = self.loop.create_task(self.main())
