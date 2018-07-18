@@ -25,6 +25,10 @@ class FixClient(object):
 
         self.TAGS = fc.FixTag.FIX42
 
+    async def send_test_request(self):
+        msg = fix42.test_request()
+        await self.session.send_message(msg)
+
     async def place_order(
             self,
             symbol,
