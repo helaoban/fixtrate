@@ -32,9 +32,12 @@ class FixClient(object):
             order_type,
             price=None,
             currency='USD',
-            ex_destination='SMART'
+            ex_destination='SMART',
+            time_in_force=None
     ):
         account = self.config['FIX_ACCOUNT']
+        if time_in_force is not None:
+            time_in_force = fc.TimeInForce[time_in_force]
         msg = fix42.new_order(
             account=account,
             symbol=symbol,
@@ -43,7 +46,8 @@ class FixClient(object):
             order_type=fc.OrdType[order_type],
             price=price,
             currency=currency,
-            ex_destination=ex_destination
+            ex_destination=ex_destination,
+            time_in_force=time_in_force
         )
         await self.session.send_message(msg)
 
