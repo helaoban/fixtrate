@@ -285,6 +285,19 @@ def cancel(
     return msg
 
 
+def order_status(
+    cl_order_id='*',
+):
+    msg = fm.FixMessage()
+    msg.append_pair(
+        TAGS.MsgType,
+        fc.FixMsgType.OrderStatusRequest,
+        header=True
+    )
+    msg.append_pair(TAGS.ClOrdID, cl_order_id)
+    return msg
+
+
 def reject(
         ref_sequence_number,
         ref_tag,
