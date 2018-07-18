@@ -61,7 +61,14 @@ class FixMessage(simplefix.FixMessage):
         return val
 
     def to_decoded_pairs(self):
-        return [(fc.FixTag.FIX42(tag).name, val.decode()) for tag, val in self]
+        pairs = []
+        for tag, val in self:
+            try:
+                tag = fc.FixTag.FIX42(tag).name
+            except ValueError:
+                tag = 'Unknown Tag <{}>'.format(tag)
+            pairs.append((tag, val.decode()))
+        return pairs
 
     def to_json(self):
 
