@@ -372,6 +372,37 @@ class ResetSeqNumFlag(str, enum.Enum):
     YES = 'Y'
 
 
+@enum.unique
+class ExecTransType(str, enum.Enum):
+    NEW = '0'
+    CANCEL = '1'
+    CORRECT = '2'
+    STATUS = '3'
+
+
+@enum.unique
+class ExecType(str, enum.Enum):
+    NEW = '0'
+    PARTIAL_FILL = '1'
+    FILL = '2'
+    DONE_FOR_DAY = '3'
+    CANCELED = '4'
+    REPLACE = '5'
+    PENDING_CANCEL = '6'
+    STOPPED = '7'
+    REJECTED = '8'
+    SUSPENDED = '9'
+    PENDING_NEW = 'A'
+    CALCULATED = 'B'
+    EXPIRED = 'C'
+    RESTATED = 'D'
+    PENDING_REPLACE = 'E'
+    TRADE = 'F'
+    TRADE_CORRECT = 'G'
+    TRADE_CANCEL = 'H'
+    ORDER_STATUS = 'I'
+
+
 class FixTag:
     # TODO do we lose nice __str__ if we inherit from int?
 
