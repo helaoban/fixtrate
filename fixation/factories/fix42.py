@@ -184,7 +184,8 @@ def new_order(
         currency=None,
         security_exchange=None,
         ex_destination=None,
-        customer_or_firm=fc.CustomerOrFirm.Customer
+        customer_or_firm=fc.CustomerOrFirm.Customer,
+        time_in_force=None
 ):
     msg = fm.FixMessage()
     msg.append_pair(
@@ -209,6 +210,9 @@ def new_order(
 
     if order_type == fc.OrdType.LIMIT:
         msg.append_pair(TAGS.Price, price)
+
+    if time_in_force is not None:
+        msg.append_pair(TAGS.TimeInForce, time_in_force)
 
     if security_exchange is not None:
         msg.append_pair(TAGS.SecurityExchange, security_exchange)
