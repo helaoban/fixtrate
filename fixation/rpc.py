@@ -211,8 +211,4 @@ class RPCClient:
             return
 
         resp = json.loads(resp.decode())
-
-        if 'result' in resp:
-            return resp['result']
-        else:
-            raise exceptions.RPCCommandError(resp['error'])
+        return resp
