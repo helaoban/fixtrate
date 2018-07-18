@@ -85,6 +85,17 @@ class FixClient(object):
         )
         await self.session.send_message(msg)
 
+    async def order_status(
+        self,
+        order_id='*'
+    ):
+        msg = fix42.order_status(
+            cl_order_id=order_id,
+        )
+        account = self.config['FIX_ACCOUNT']
+        msg.append_pair(self.TAGS.Account, account)
+        await self.session.send_message(msg)
+
     async def get_security_list(self):
         msg = fix42.security_list()
         await self.session.send_message(msg)
