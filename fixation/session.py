@@ -145,9 +145,6 @@ class FixSession:
 
         self.raise_on_sequence_gap = raise_on_sequence_gap
 
-    def close(self):
-        pass
-
     def connect(self):
         return FixConnectionContextManager(
             self.config, self.on_connect, self.on_disconnect)
