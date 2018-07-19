@@ -155,9 +155,10 @@ class FixSession:
         return FixConnectionContextManager(
             self.config, self.on_connect, self.on_disconnect)
 
-    def on_connect(self, conn):
+    async def on_connect(self, conn):
         self._connection = conn
         self.store.store_config(self.config)
+        await self.logon()
 
     async def on_disconnect(self):
         await self.shutdown()
