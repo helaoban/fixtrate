@@ -84,7 +84,10 @@ class FixConnectionContextManager(Coroutine):
             else:
                 conn = FixConnection(
                     reader, writer, self.on_disconnect)
-                self.on_connect(conn)
+                if utils.is_coro(self.on_connect):
+                    await self.on_connect(conn)
+                else:
+                    self.on_connect(conn)
                 return conn
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
