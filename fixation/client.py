@@ -4,7 +4,7 @@ import collections
 from fixation import (
     config, session,
     rpc, constants as fc,
-    utils
+    utils, exceptions as fe
 )
 from fixation.factories import fix42
 
@@ -197,14 +197,23 @@ class FixClient(object):
             loop=self.loop
         )
 
+        async def read_messages(session):
+            try:
+                async for msg in session:
+                    await self.handle_message(msg)
+            except fe.SequenceGap:
+                await read_messages(session)
+
         while True:
             try:
                 async with self.session.connect():
                     await self.session.logon()
                     await self.rpc_server.start()
 
-                    async for msg in self.session:
-                        await self.handle_message(msg)
+                    try:
+                        await read_messages(self.session)
+                    except fe.FatalSequenceError:
+                        break
 
             except ConnectionError:
                 continue
