@@ -119,7 +119,8 @@ class FixSession:
         conf=None,
         store=None,
         loop=None,
-        dictionary=None
+        dictionary=None,
+        raise_on_sequence_gap=True
     ):
 
         if conf is None:
@@ -141,6 +142,8 @@ class FixSession:
         self.TAGS = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
 
         self._is_resetting = False
+
+        self.raise_on_sequence_gap = raise_on_sequence_gap
 
     def __enter__(self):
         return self
@@ -262,14 +265,22 @@ class FixSession:
             await self.send_message(sent_messages[i])
 
     def check_sequence_integrity(self, msg):
-        seq_num = msg.get(self.TAGS.MsgSeqNum)
-        recorded_seq_num = self.store.get_seq_num(remote=True)
-        seq_diff = int(seq_num) - int(recorded_seq_num)
-        if seq_diff != 1:
-            raise exceptions.SequenceGap
+        seq_num = int(msg.get(self.TAGS.MsgSeqNum))
+        recorded_seq_num = int(self.store.get_seq_num(remote=True))
+        seq_diff = seq_num - recorded_seq_num
+        if seq_diff == 1:
+            return
 
-    def handle_sequence_gap(self, msg):
-        logger.error('Sequence GAP, resetting...')
+        if seq_diff > 1:
+            raise exceptions.SequenceGap(
+                msg_seq_num=seq_num,
+                recorded_seq_num=seq_num
+            )
+
+        raise exceptions.FatalSequenceError(
+            msg_seq_num=seq_num,
+            recorded_seq_num=seq_num
+        )
 
     async def dispatch(self, msg):
         msg_type = msg.get(self.TAGS.MsgType)
@@ -304,11 +315,19 @@ class FixSession:
             fc.FixMsgType.ResendRequest,
             fc.FixMsgType.Reject
         ]:
-
             try:
                 self.check_sequence_integrity(msg)
-            except exceptions.SequenceGap:
-                self.handle_sequence_gap(msg)
+            except exceptions.SequenceGap as error:
+                await self.request_resend(
+                    start_sequence=error.recorded_seq_num + 1,
+                    end_sequence=error.msg_seq_num
+                )
+                if self.raise_on_sequence_gap:
+                    raise
+                return
+            except exceptions.FatalSequenceError:
+                await self.shutdown()
+                raise
 
             self.store.incr_seq_num(remote=True)
 
