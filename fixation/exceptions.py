@@ -1,5 +1,15 @@
 class SequenceGap(Exception):
-    pass
+    def __init__(self, msg_seq_num, recorded_seq_num):
+        super().__init__('Sequence gap detected')
+        self.msg_seq_num = msg_seq_num
+        self.recorded_seq_num = recorded_seq_num
+
+
+class FatalSequenceError(Exception):
+    def __init__(self, msg_seq_num, recorded_seq_num):
+        super().__init__('Remote sequence number is lower than expected ')
+        self.msg_seq_num = msg_seq_num
+        self.recorded_seq_num = recorded_seq_num
 
 
 class ImproperlyConfigured(Exception):
