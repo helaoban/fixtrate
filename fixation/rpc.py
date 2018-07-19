@@ -87,6 +87,8 @@ class RPCServer(object):
         # actual TypeErrors in method call.
         except TypeError as error:
             raise exceptions.RPCInvalidParams from error
+        except Exception as error:
+            raise exceptions.RPCCommandError from error
 
         return {
             'result': result,

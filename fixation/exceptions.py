@@ -93,13 +93,17 @@ class RPCInternalError(RPCError):
         super().__init__(-32603, message, meaning)
 
 
+@register_rpc_error(-32000)
+class RPCCommandError(RPCError):
+    def __init__(self):
+        message = 'RPC command error'
+        meaning = 'An exception was raised during server method call'
+        super().__init__(-32000, message, meaning)
+
+
 class RPCCouldNotConnectError(Exception):
     pass
 
 
 class RPCBadConnectionError(Exception):
-    pass
-
-
-class RPCCommandError(Exception):
     pass
