@@ -145,12 +145,6 @@ class FixSession:
 
         self.raise_on_sequence_gap = raise_on_sequence_gap
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
     def close(self):
         pass
 
