@@ -207,7 +207,6 @@ class FixClient(object):
         while True:
             try:
                 async with self.session.connect():
-                    await self.session.logon()
                     await self.rpc_server.start()
 
                     try:
