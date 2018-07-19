@@ -155,7 +155,7 @@ class FixSession:
         await self.logon()
 
     async def on_disconnect(self):
-        await self.shutdown()
+        await self._close()
 
     def append_standard_header(
         self,
@@ -317,7 +317,7 @@ class FixSession:
                     raise
                 return
             except exceptions.FatalSequenceError:
-                await self.shutdown()
+                await self.close()
                 raise
 
             self.store.incr_seq_num(remote=True)
@@ -394,7 +394,11 @@ class FixSession:
             raise StopAsyncIteration
         return msg
 
-    async def shutdown(self):
+    async def _close(self):
         logger.info('Shutting down...')
+
+    async def close(self):
         if self._connection.connected:
             await self.logoff()
+            await self._connection.close()
+        self._close()
