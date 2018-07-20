@@ -390,8 +390,8 @@ class FixSession:
         await self.send_heartbeat()
 
     async def handle_resend_request(self, msg):
-        start_sequence_number = msg.get(self.TAGS.BeginSeqNo)
-        end_sequence_number = msg.get(self.TAGS.EndSeqNo)
+        start_sequence_number = int(msg.get(self.TAGS.BeginSeqNo))
+        end_sequence_number = int(msg.get(self.TAGS.EndSeqNo))
         await self.resend_messages(start_sequence_number, end_sequence_number)
 
     async def handle_test_request(self, msg):
