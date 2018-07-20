@@ -272,10 +272,12 @@ class FixSession:
         await self.send_message(msg)
 
     async def resend_messages(self, start, end):
-        sequence_range = range(start, end + 1)
-        sent_messages = self.store.get_messages_by_seq_num(remote=False)
-        for i in sequence_range:
-            await self.send_message(sent_messages[i])
+        sent_messages = self.store.get_messages_by_seq_num(
+            start=start, end=end, remote=False)
+        for msg in sent_messages:
+            msg.append_pair(self.TAGS.PossDupFlag, fc.PossDupFlag.YES,
+                            header=True)
+            await self.send_message(msg)
 
     def check_sequence_integrity(self, msg):
         seq_num = int(msg.get(self.TAGS.MsgSeqNum))
