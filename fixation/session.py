@@ -15,6 +15,16 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+ADMIN_MESSAGES = [
+    fc.FixMsgType.Logon,
+    fc.FixMsgType.Logout,
+    fc.FixMsgType.Heartbeat,
+    fc.FixMsgType.TestRequest,
+    fc.FixMsgType.ResendRequest,
+    fc.FixMsgType.SequenceReset,
+    fc.FixMsgType.Reject,
+]
+
 
 class FixConnection(object):
 
@@ -265,18 +275,18 @@ class FixSession:
         seq_num = int(msg.get(self.TAGS.MsgSeqNum))
         recorded_seq_num = int(self.store.get_seq_num(remote=True))
         seq_diff = seq_num - recorded_seq_num
-        if seq_diff == 1:
+        if seq_diff == 0:
             return
 
-        if seq_diff > 1:
+        if seq_diff >= 1:
             raise exceptions.SequenceGap(
                 msg_seq_num=seq_num,
-                recorded_seq_num=seq_num
+                recorded_seq_num=recorded_seq_num
             )
 
         raise exceptions.FatalSequenceError(
             msg_seq_num=seq_num,
-            recorded_seq_num=seq_num
+            recorded_seq_num=recorded_seq_num
         )
 
     async def dispatch(self, msg):
@@ -301,32 +311,42 @@ class FixSession:
                 handler(msg)
 
     async def handle_message(self, msg):
+
+        self.store.incr_seq_num(remote=True)
+        self.store.store_message(msg, remote=True)
         self.print_msg_to_console(msg, remote=True)
 
-        print('{}: {} <--'.format(send_time, msg_type))
-
-        if msg_type not in [
-            fc.FixMsgType.Logon,
-            fc.FixMsgType.ResendRequest,
-            fc.FixMsgType.Reject
-        ]:
-            try:
-                self.check_sequence_integrity(msg)
-            except exceptions.SequenceGap as error:
-                await self.request_resend(
-                    start_sequence=error.recorded_seq_num + 1,
-                    end_sequence=error.msg_seq_num
-                )
-                if self.raise_on_sequence_gap:
-                    raise
-                return
-            except exceptions.FatalSequenceError:
-                await self.close()
+        try:
+            self.check_sequence_integrity(msg)
+        except exceptions.SequenceGap as error:
+            await self.request_resend(
+                start_sequence=error.recorded_seq_num + 1,
+                end_sequence=0
+            )
+            if self.raise_on_sequence_gap:
                 raise
+            return
+        except exceptions.FatalSequenceError as error:
+            logger.exception(error)
+            await self.close()
+            raise
 
-            self.store.incr_seq_num(remote=True)
+        msg_type = msg.get(self.TAGS.MsgType)
+        msg_type = fc.FixMsgType(msg_type)
 
-        self.store.store_message(msg, remote=True)
+        if msg_type == fc.FixMsgType.SequenceReset:
+            gap_fill_flag = msg.get(self.TAGS.GapFillFlag)
+            gap_fill_flag = gap_fill_flag or fc.GapFillFlag.NO
+            if gap_fill_flag == fc.GapFillFlag.NO:
+                pass
+
+            new_seq_num = int(msg.get(self.TAGS.NewSeqNo))
+            self.store.set_seq_num(new_seq_num - 1, remote=True)
+
+        is_resend = msg.get(self.TAGS.PossDupFlag) == fc.PossDupFlag.YES
+        if is_resend and msg_type in ADMIN_MESSAGES:
+            return
+
         await self.dispatch(msg)
 
     async def handle_logon(self, msg):

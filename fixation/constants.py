@@ -403,6 +403,12 @@ class ExecType(str, enum.Enum):
     ORDER_STATUS = 'I'
 
 
+@enum.unique
+class PossDupFlag(str, enum.Enum):
+    YES = 'Y'
+    NO = 'N'
+
+
 class FixTag:
     # TODO do we lose nice __str__ if we inherit from int?
 
