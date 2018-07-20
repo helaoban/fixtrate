@@ -221,7 +221,7 @@ class FixSession:
         msg = fix42.heartbeat(test_request_id)
         await self.send_message(msg)
 
-    async def logon(self):
+    async def logon(self, reset=False):
         """
         Send a Logon <A> message. Note: setting reset_sequence=True will
         set the ResetSeqNumFlag to 'Y', which for most counter-parties
@@ -229,7 +229,7 @@ class FixSession:
 
         :return:
         """
-        self._is_resetting = self.config['FIX_RESET_SEQUENCE']
+        self._is_resetting = reset
         if self._is_resetting:
             self.store.new_session()
 
