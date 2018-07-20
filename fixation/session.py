@@ -425,4 +425,4 @@ class FixSession:
     async def close(self):
         if self._connection.connected:
             await self._connection.close()
-        self._close()
+        await self._close()
