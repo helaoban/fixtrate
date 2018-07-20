@@ -197,6 +197,6 @@ class FixRedisStore(FixStore):
         return json.loads(conf.decode())
 
     def new_session(self):
-        for key in ['messages', 'received', 'sent', 'messages_by_time']:
+        for key in ['messages', 'remote', 'local', 'messages_by_time']:
             self.redis.delete(key)
         self.set_seq_num(0)
