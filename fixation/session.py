@@ -232,6 +232,11 @@ class FixSession:
         msg = fix42.heartbeat(test_request_id)
         await self.send_message(msg)
 
+    async def sent_sequence_reset(self):
+        seq_num = self.store.get_seq_num()
+        msg = fix42.sequence_reset(seq_num + 1)
+        await self.send_message(msg)
+
     async def logon(self, reset=False):
         """
         Send a Logon <A> message. Note: setting reset_sequence=True will
