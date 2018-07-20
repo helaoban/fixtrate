@@ -310,6 +310,7 @@ class FixSession:
             fc.FixMsgType.Heartbeat: self.handle_heartbeat,
             fc.FixMsgType.TestRequest: self.handle_test_request,
             fc.FixMsgType.Reject: self.handle_reject,
+            fc.FixMsgType.ResendRequest: self.handle_resend_request,
         }.get(msg_type)
 
         if handler is not None:
