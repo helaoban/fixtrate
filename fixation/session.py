@@ -325,6 +325,19 @@ class FixSession:
         self.store.store_message(msg, remote=True)
         self.print_msg_to_console(msg, remote=True)
 
+        msg_type = msg.get(self.TAGS.MsgType)
+        msg_type = fc.FixMsgType(msg_type)
+        seq_num = int(msg.get(34))
+
+        if msg_type == fc.FixMsgType.Logon:
+            reset_seq = msg.get(self.TAGS.ResetSeqNumFlag)
+            if reset_seq == fc.ResetSeqNumFlag.YES:
+                self.store.set_seq_num(seq_num, remote=True)
+
+        if msg_type == fc.FixMsgType.ResendRequest:
+            await self.handle_resend_request(msg)
+            return
+
         try:
             self.check_sequence_integrity(msg)
         except exceptions.SequenceGap as error:
@@ -339,9 +352,6 @@ class FixSession:
             logger.exception(error)
             await self.close()
             raise
-
-        msg_type = msg.get(self.TAGS.MsgType)
-        msg_type = fc.FixMsgType(msg_type)
 
         if msg_type == fc.FixMsgType.SequenceReset:
             gap_fill_flag = msg.get(self.TAGS.GapFillFlag)
