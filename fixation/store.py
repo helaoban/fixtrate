@@ -144,7 +144,8 @@ class FixRedisStore(FixStore):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        return self.redis.get(key)
+        seq_num = int(self.redis.get(key))
+        return seq_num
 
     def store_message(self, msg, remote=False):
         direction = 'remote' if remote else 'local'
