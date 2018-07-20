@@ -148,6 +148,13 @@ class FixSession:
 
         self.raise_on_sequence_gap = raise_on_sequence_gap
 
+    def print_msg_to_console(self, msg, remote=False):
+        msg_type = msg.get(self.TAGS.MsgType)
+        msg_type = fc.FixMsgType(msg_type)
+        send_time = msg.get(self.TAGS.SendingTime)
+        direction = '<--' if remote else '-->'
+        print('{}: {} {}'.format(send_time, msg_type, direction))
+
     def connect(self):
         return FixConnectionContextManager(
             self.config, self.on_connect, self.on_disconnect)
@@ -206,11 +213,8 @@ class FixSession:
 
     async def send_message(self, msg):
         self.append_standard_header(msg)
-        msg_type = fc.FixMsgType(msg.get(
-            self.TAGS.MsgType))
-        send_time = msg.get(self.TAGS.SendingTime)
+        self.print_msg_to_console(msg)
         encoded = msg.encode()
-        print('{}: {} -->'.format(send_time, msg_type))
         await self._connection.write(encoded)
         self.store.store_message(msg)
 
@@ -298,9 +302,7 @@ class FixSession:
                 handler(msg)
 
     async def handle_message(self, msg):
-        msg_type = msg.get(self.TAGS.MsgType)
-        msg_type = fc.FixMsgType(msg_type)
-        send_time = msg.get(self.TAGS.SendingTime)
+        self.print_msg_to_console(msg, remote=True)
 
         print('{}: {} <--'.format(send_time, msg_type))
 
