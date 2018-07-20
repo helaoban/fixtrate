@@ -165,7 +165,7 @@ class FixClient(object):
     def handle_execution_report(self, msg):
         pass
 
-    def handle_order_cancel_reject(self):
+    def handle_order_cancel_reject(self, msg):
         pass
 
     def dispatch_message(self, msg_type):
