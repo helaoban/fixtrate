@@ -381,7 +381,8 @@ class FixSession:
 
     async def handle_reject(self, msg):
         reject_reason = msg.get(self.TAGS.Text)
-        raise exceptions.FixRejection(reason=reject_reason)
+        print('Reject: {}'.format(reject_reason))
+        # raise exceptions.FixRejection(reason=reject_reason)
 
     def decode_entry(self, msg):
         pass
