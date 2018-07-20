@@ -27,7 +27,7 @@ class FixStore(object):
     def get_messages(self, keys=None):
         raise NotImplementedError
 
-    def get_messages_by_seq_num(self, remote=False):
+    def get_messages_by_seq_num(self, start=None, end=None, remote=False):
         raise NotImplementedError
 
     def new_session(self):
@@ -87,7 +87,7 @@ class FixMemoryStore(FixStore):
         else:
             return self._messages
 
-    def get_messages_by_seq_num(self, remote=False):
+    def get_messages_by_seq_num(self, start=0, end=-1, remote=False):
         uids_by_seq = self._local
         if remote:
             uids_by_seq = self._remote
@@ -165,15 +165,16 @@ class FixRedisStore(FixStore):
             msgs = self.redis.hgetall('messages')
         return {uid: self.decode_message(msg, uid.decode()) for uid, msg in msgs.items()}
 
-    def get_messages_by_seq_num(self, remote=False):
+    def get_messages_by_seq_num(self, start='-inf', end='inf', remote=False):
         direction = 'remote' if remote else 'local'
-        uids_by_seq_num = self.redis.zrange(
-            direction, start=0, end=-1, withscores=True)
+        uids_by_seq_num = self.redis.zrangebyscore(
+            direction, min=start, max=end, withscores=True)
         msgs = self.get_messages(keys=[uid for uid, _ in uids_by_seq_num])
         return SortedDict({
-            seq_num: msgs[uid]
+            int(seq_num): msgs[uid]
             for uid, seq_num
             in uids_by_seq_num
+            if seq_num is not None
         })
 
     def get_messages_by_time(self):
