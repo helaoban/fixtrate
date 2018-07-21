@@ -27,3 +27,4 @@ Now, let's try connecting to a FIX server.::
         async for msg in fix_session:
             print(msg)
 
+Now, we have a :class:`~fixation.session.FixSession` called ``session``.

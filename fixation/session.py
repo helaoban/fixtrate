@@ -114,6 +114,9 @@ class FixConnectionContextManager(Coroutine):
 
 
 class FixSession:
+    """
+    FIX Session Manager
+    """
     def __init__(
         self,
         conf=None,
