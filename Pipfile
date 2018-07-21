@@ -17,6 +17,7 @@ ipython = "*"
 pytest = "*"
 pytest-profiling = "*"
 snakeviz = "*"
+sphinx = "*"
 
 [requires]
 python_version = "3.6"
