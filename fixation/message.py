@@ -52,6 +52,10 @@ class FixMessage(simplefix.FixMessage):
         super().__init__()
         self.uid = uid or str(uuid.uuid4())
 
+    @property
+    def msg_type(self):
+        return fc.FixMsgType(self.get(35))
+
     def get(self, tag, nth=1, raw=False):
         val = super().get(tag, nth=nth)
         if not val:
