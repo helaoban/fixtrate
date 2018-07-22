@@ -135,11 +135,8 @@ class FixSession:
         dictionary=None,
         raise_on_sequence_gap=True
     ):
-
-        if conf is None:
-            conf = config.get_config_from_env()
-        else:
-            config.validate_config(conf)
+        conf = conf or config.get_config_from_env()
+        config.validate_config(conf)
         self.config = conf
 
         self.loop = loop or asyncio.get_event_loop()
