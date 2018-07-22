@@ -146,7 +146,6 @@ class FixSession:
         self.store = store or fix_store.FixRedisStore()
 
         self._connection = None
-        self._closing = False
 
         self.parser = parse.FixParser(self.config)
 
