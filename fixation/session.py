@@ -179,6 +179,7 @@ class FixSession:
     def append_standard_header(
         self,
         msg,
+        seq_num,
         timestamp=None
     ):
         """
@@ -206,7 +207,7 @@ class FixSession:
         )
         msg.append_pair(
             self.TAGS.MsgSeqNum,
-            self.store.get_seq_num(),
+            seq_num,
             header=True
         )
 
@@ -221,11 +222,11 @@ class FixSession:
         )
 
     async def send_message(self, msg):
-        self.append_standard_header(msg)
+        seq_num = self.store.incr_seq_num()
+        self.append_standard_header(msg, seq_num=seq_num)
         self.print_msg_to_console(msg)
         encoded = msg.encode()
         await self._connection.write(encoded)
-        self.store.incr_seq_num()
         self.store.store_message(msg)
 
     async def send_heartbeat(self, test_request_id=None):
