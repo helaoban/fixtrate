@@ -215,9 +215,10 @@ class FixSession:
             header=True
         )
 
-    async def send_message(self, msg):
-        self.append_standard_header(
-            msg, seq_num=self._store.incr_seq_num())
+    async def send_message(self, msg, skip_headers=False):
+        if not skip_headers:
+            self.append_standard_header(
+                msg, seq_num=self._store.incr_seq_num())
         if self._debug:
             self.print_msg_to_console(msg)
         await self._connection.write(msg.encode())
@@ -276,7 +277,7 @@ class FixSession:
                 fc.PossDupFlag.YES,
                 header=True
             )
-            await self.send_message(msg)
+            await self.send_message(msg, skip_headers=True)
 
     def check_sequence_integrity(self, msg):
         seq_num = int(msg.get(self._tags.MsgSeqNum))
