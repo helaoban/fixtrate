@@ -131,28 +131,24 @@ class FixSession:
         self,
         conf=None,
         store=None,
-        loop=None,
         dictionary=None,
-        raise_on_sequence_gap=True
+        raise_on_sequence_gap=True,
+        loop=None
     ):
         conf = conf or config.get_config_from_env()
         config.validate_config(conf)
+
         self.config = conf
-
-        self.loop = loop or asyncio.get_event_loop()
-        self.store = store or fix_store.FixRedisStore()
-
-        self._connection = None
-
-        self.parser = parse.FixParser(self.config)
-
         self.TAGS = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
+        self.store = store or fix_store.FixRedisStore()
+        self.parser = parse.FixParser(self.config)
+        self.raise_on_sequence_gap = raise_on_sequence_gap
+        self._fix_dict = dictionary
 
         self._is_resetting = False
-
-        self.raise_on_sequence_gap = raise_on_sequence_gap
-
+        self._connection = None
         self._hearbeat_timer = None
+        self.loop = loop or asyncio.get_event_loop()
 
     def print_msg_to_console(self, msg, remote=False):
         msg_type = msg.get(self.TAGS.MsgType)
