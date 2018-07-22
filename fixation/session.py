@@ -133,7 +133,8 @@ class FixSession:
         store=None,
         dictionary=None,
         raise_on_sequence_gap=True,
-        loop=None
+        loop=None,
+        debug=False
     ):
         conf = conf or config.get_config_from_env()
         config.validate_config(conf)
@@ -149,6 +150,7 @@ class FixSession:
         self._connection = None
         self._hearbeat_timer = None
         self._loop = loop or asyncio.get_event_loop()
+        self._debug = self._config.get('FIX_DEBUG', debug)
 
     def print_msg_to_console(self, msg, remote=False):
         msg_type = msg.get(self._tags.MsgType)
@@ -216,7 +218,8 @@ class FixSession:
     async def send_message(self, msg):
         seq_num = self._store.incr_seq_num()
         self.append_standard_header(msg, seq_num=seq_num)
-        self.print_msg_to_console(msg)
+        if self._debug:
+            self.print_msg_to_console(msg)
         encoded = msg.encode()
         await self._connection.write(encoded)
         self._store.store_message(msg)
@@ -320,7 +323,9 @@ class FixSession:
 
         self._store.incr_seq_num(remote=True)
         self._store.store_message(msg, remote=True)
-        self.print_msg_to_console(msg, remote=True)
+
+        if self._debug:
+            self.print_msg_to_console(msg, remote=True)
 
         msg_type = msg.get(self._tags.MsgType)
         msg_type = fc.FixMsgType(msg_type)
