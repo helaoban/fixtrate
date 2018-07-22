@@ -158,6 +158,8 @@ class FixSession:
 
         self.raise_on_sequence_gap = raise_on_sequence_gap
 
+        self._hearbeat_timer = None
+
     def print_msg_to_console(self, msg, remote=False):
         msg_type = msg.get(self.TAGS.MsgType)
         msg_type = fc.FixMsgType(msg_type)
@@ -228,6 +230,7 @@ class FixSession:
         encoded = msg.encode()
         await self._connection.write(encoded)
         self.store.store_message(msg)
+        self.reset_heartbeat_timer()
 
     async def send_heartbeat(self, test_request_id=None):
         msg = fix42.heartbeat(test_request_id)
@@ -388,7 +391,7 @@ class FixSession:
         logger.debug('Login successful!')
 
     async def handle_heartbeat(self, msg):
-        await self.send_heartbeat()
+        pass
 
     async def handle_resend_request(self, msg):
         start_sequence_number = int(msg.get(self.TAGS.BeginSeqNo))
@@ -429,6 +432,19 @@ class FixSession:
                 return msg
 
         return None
+
+    async def set_heartbeat_timer(self):
+        interval = self.config['FIX_HEARTBEAT_INTERVAL']
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                await self.send_heartbeat()
+        except asyncio.CancelledError:
+            pass
+
+    def reset_heartbeat_timer(self):
+        self._hearbeat_timer = self.loop.create_task(
+            self.set_heartbeat_timer())
 
     def __aiter__(self):
         return self
