@@ -144,9 +144,7 @@ class FixSession:
 
         self.loop = loop or asyncio.get_event_loop()
         self.store = store or fix_store.FixRedisStore()
-        self.reader = None
-        self.writer = None
-        self._connected = True
+
         self._connection = None
         self._closing = False
 
