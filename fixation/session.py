@@ -278,7 +278,7 @@ class FixSession:
     async def resend_messages(self, start, end):
         sent_messages = self.store.get_messages_by_seq_num(
             start=start, end=end, remote=False)
-        for msg in sent_messages:
+        for seq_num, msg in sent_messages.items():
             msg.append_pair(self.TAGS.PossDupFlag, fc.PossDupFlag.YES,
                             header=True)
             await self.send_message(msg)
