@@ -137,8 +137,8 @@ class FixSession:
     ):
         conf = conf or config.get_config_from_env()
         config.validate_config(conf)
-
         self._config = conf
+
         self._tags = getattr(fc.FixTag, self._config['FIX_VERSION'].name)
         self._store = store or fix_store.FixRedisStore()
         self._parser = parse.FixParser(self._config)
@@ -269,8 +269,11 @@ class FixSession:
         sent_messages = self._store.get_messages_by_seq_num(
             start=start, end=end, remote=False)
         for seq_num, msg in sent_messages.items():
-            msg.append_pair(self._tags.PossDupFlag, fc.PossDupFlag.YES,
-                            header=True)
+            msg.append_pair(
+                self._tags.PossDupFlag,
+                fc.PossDupFlag.YES,
+                header=True
+            )
             await self.send_message(msg)
 
     def check_sequence_integrity(self, msg):
@@ -395,7 +398,6 @@ class FixSession:
     async def handle_reject(self, msg):
         reject_reason = msg.get(self._tags.Text)
         print('Reject: {}'.format(reject_reason))
-        # raise exceptions.FixRejection(reason=reject_reason)
 
     def decode_entry(self, msg):
         pass
