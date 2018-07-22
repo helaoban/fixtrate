@@ -216,12 +216,11 @@ class FixSession:
         )
 
     async def send_message(self, msg):
-        seq_num = self._store.incr_seq_num()
-        self.append_standard_header(msg, seq_num=seq_num)
+        self.append_standard_header(
+            msg, seq_num=self._store.incr_seq_num())
         if self._debug:
             self.print_msg_to_console(msg)
-        encoded = msg.encode()
-        await self._connection.write(encoded)
+        await self._connection.write(msg.encode())
         self._store.store_message(msg)
         self.reset_heartbeat_timer()
 
