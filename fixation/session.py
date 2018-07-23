@@ -322,6 +322,7 @@ class FixSession:
             fc.FixMsgType.TestRequest: self.handle_test_request,
             fc.FixMsgType.Reject: self.handle_reject,
             fc.FixMsgType.ResendRequest: self.handle_resend_request,
+            fc.FixMsgType.SequenceReset: self.handle_sequence_reset,
         }.get(msg.msg_type)
 
         if handler is not None:
@@ -329,6 +330,13 @@ class FixSession:
                 await handler(msg)
             else:
                 handler(msg)
+
+    def is_gap_fill(self, msg):
+        gf_flag = msg.get(self._tags.GapFillFlag)
+        if gf_flag is None:
+            return False
+        gf_flag = fc.GapFillFlag(gf_flag)
+        return gf_flag == fc.GapFillFlag.YES
 
     async def handle_message(self, msg):
 
@@ -376,6 +384,12 @@ class FixSession:
             return
 
         await self.dispatch(msg)
+
+    async def handle_sequence_reset(self, msg):
+        if not self.is_gap_fill(msg):
+            pass
+        new_seq_num = int(msg.get(self._tags.NewSeqNo))
+        self._store.set_seq_num(new_seq_num - 1, remote=True)
 
     async def _handle_logon(self, msg):
         """
