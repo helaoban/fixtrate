@@ -153,11 +153,9 @@ class FixSession:
         self._debug = self._config.get('FIX_DEBUG', debug)
 
     def print_msg_to_console(self, msg, remote=False):
-        msg_type = msg.get(self._tags.MsgType)
-        msg_type = fc.FixMsgType(msg_type)
         send_time = msg.get(self._tags.SendingTime)
         direction = '<--' if remote else '-->'
-        print('{}: {} {}'.format(send_time, msg_type, direction))
+        print('{}: {} {}'.format(send_time, msg.msg_type, direction))
 
     def connect(self):
         return FixConnectionContextManager(
@@ -310,20 +308,13 @@ class FixSession:
         )
 
     async def dispatch(self, msg):
-        msg_type = msg.get(self._tags.MsgType)
-        try:
-            msg_type = fc.FixMsgType(msg_type)
-        except ValueError:
-            logger.error('Unrecognized FIX message type: {}.'.format(msg_type))
-            return
-
         handler = {
             fc.FixMsgType.Logon: self.handle_logon,
             fc.FixMsgType.Heartbeat: self.handle_heartbeat,
             fc.FixMsgType.TestRequest: self.handle_test_request,
             fc.FixMsgType.Reject: self.handle_reject,
             fc.FixMsgType.ResendRequest: self.handle_resend_request,
-        }.get(msg_type)
+        }.get(msg.msg_type)
 
         if handler is not None:
             if utils.is_coro(handler):
@@ -339,16 +330,12 @@ class FixSession:
         if self._debug:
             self.print_msg_to_console(msg, remote=True)
 
-        msg_type = msg.get(self._tags.MsgType)
-        msg_type = fc.FixMsgType(msg_type)
-        seq_num = int(msg.get(34))
-
-        if msg_type == fc.FixMsgType.Logon:
+        if msg.msg_type == fc.FixMsgType.Logon:
             reset_seq = msg.get(self._tags.ResetSeqNumFlag)
             if reset_seq == fc.ResetSeqNumFlag.YES:
-                self._store.set_seq_num(seq_num, remote=True)
+                self._store.set_seq_num(msg.seq_num, remote=True)
 
-        if msg_type == fc.FixMsgType.ResendRequest:
+        if msg.msg_type == fc.FixMsgType.ResendRequest:
             await self.handle_resend_request(msg)
             return
 
@@ -367,7 +354,7 @@ class FixSession:
             await self.close()
             raise
 
-        if msg_type == fc.FixMsgType.SequenceReset:
+        if msg.msg_type == fc.FixMsgType.SequenceReset:
             gap_fill_flag = msg.get(self._tags.GapFillFlag)
             gap_fill_flag = gap_fill_flag or fc.GapFillFlag.NO
             if gap_fill_flag == fc.GapFillFlag.NO:
@@ -377,7 +364,7 @@ class FixSession:
             self._store.set_seq_num(new_seq_num - 1, remote=True)
 
         is_resend = msg.get(self._tags.PossDupFlag) == fc.PossDupFlag.YES
-        if is_resend and msg_type in ADMIN_MESSAGES:
+        if is_resend and msg.msg_type in ADMIN_MESSAGES:
             return
 
         await self.dispatch(msg)
