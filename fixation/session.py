@@ -152,6 +152,8 @@ class FixSession:
         self._loop = loop or asyncio.get_event_loop()
         self._debug = self._config.get('FIX_DEBUG', debug)
 
+        self._is_initiator = utils.Tristate(None)
+
     def print_msg_to_console(self, msg, remote=False):
         send_time = msg.get(self._tags.SendingTime)
         direction = '<--' if remote else '-->'
@@ -232,6 +234,13 @@ class FixSession:
         msg = fix42.sequence_reset(seq_num + 1)
         await self.send_message(msg)
 
+    async def _send_login(self):
+        login_msg = fix42.logon(
+            heartbeat_interval=self._config['FIX_HEARTBEAT_INTERVAL'],
+            reset_sequence=self._is_resetting
+        )
+        await self.send_message(login_msg)
+
     async def logon(self, reset=False):
         """
         Send a Logon <A> message. Note: setting reset_sequence=True will
@@ -244,11 +253,10 @@ class FixSession:
         if self._is_resetting:
             self._store.new_session()
 
-        login_msg = fix42.logon(
-            heartbeat_interval=self._config['FIX_HEARTBEAT_INTERVAL'],
-            reset_sequence=self._is_resetting
-        )
-        await self.send_message(login_msg)
+        await self._send_login()
+
+        if self._is_initiator is None:
+            self._is_initiator = utils.Tristate(True)
 
     async def logoff(self):
         msg = fix42.logoff()
@@ -309,7 +317,7 @@ class FixSession:
 
     async def dispatch(self, msg):
         handler = {
-            fc.FixMsgType.Logon: self.handle_logon,
+            fc.FixMsgType.Logon: self._handle_logon,
             fc.FixMsgType.Heartbeat: self.handle_heartbeat,
             fc.FixMsgType.TestRequest: self.handle_test_request,
             fc.FixMsgType.Reject: self.handle_reject,
@@ -369,7 +377,7 @@ class FixSession:
 
         await self.dispatch(msg)
 
-    async def handle_logon(self, msg):
+    async def _handle_logon(self, msg):
         """
         Handle a Logon <A> message sent from server. The only
         action that needs to be taken is when we have set
@@ -386,6 +394,11 @@ class FixSession:
             self._store.set_seq_num(seq_num, remote=True)
             self._is_resetting = False
         logger.debug('Login successful!')
+
+        if self._is_initiator in (False, None):
+            await self._send_login()
+        if self._is_initiator is None:
+            self._is_initiator = utils.Tristate(False)
 
     async def handle_heartbeat(self, msg):
         pass
