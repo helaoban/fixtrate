@@ -1,4 +1,3 @@
-from functools import lru_cache
 import sys
 import uuid
 
@@ -52,25 +51,29 @@ class FixMessage(simplefix.FixMessage):
     def __init__(self, uid=None):
         super().__init__()
         self.uid = uid or str(uuid.uuid4())
+        self._cache = {}
 
-    @property
-    @lru_cache()
+    def _bust_cache(self, name):
+        try:
+            del self.__dict__[name]
+        except KeyError:
+            pass
+
+    @utils.cached_property
     def seq_num(self):
         _seq_num = self.get(34)
         if _seq_num is not None:
             _seq_num = int(_seq_num)
         return _seq_num
 
-    @property
-    @lru_cache()
+    @utils.cached_property
     def msg_type(self):
         _msg_type = self.get(35)
         if _msg_type is not None:
             _msg_type = fc.FixMsgType(_msg_type)
         return _msg_type
 
-    @property
-    @lru_cache()
+    @utils.cached_property
     def is_duplicate(self):
         poss_dup_flag = self.get(43)
         poss_dup_flag = fc.PossDupFlag(poss_dup_flag)
@@ -90,9 +93,9 @@ class FixMessage(simplefix.FixMessage):
         # there is posibility of missing a cache clear, which could
         # be really dangerous
         if tag == 34:
-            self.seq_num.cache_clear()
+            self._bust_cache('seq_num')
         if tag == 35:
-            self.msg_type.cache_clear()
+            self._bust_cache('msg_type')
 
     def to_decoded_pairs(self):
         pairs = []
