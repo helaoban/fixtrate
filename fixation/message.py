@@ -69,6 +69,13 @@ class FixMessage(simplefix.FixMessage):
             _msg_type = fc.FixMsgType(_msg_type)
         return _msg_type
 
+    @property
+    @lru_cache()
+    def is_duplicate(self):
+        poss_dup_flag = self.get(43)
+        poss_dup_flag = fc.PossDupFlag(poss_dup_flag)
+        return poss_dup_flag == fc.PossDupFlag.YES
+
     def get(self, tag, nth=1, raw=False):
         val = super().get(tag, nth=nth)
         if not val:
