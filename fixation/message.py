@@ -53,6 +53,10 @@ class FixMessage(simplefix.FixMessage):
         self.uid = uid or str(uuid.uuid4())
 
     @property
+    def seq_num(self):
+        return int(self.get(34))
+
+    @property
     def msg_type(self):
         return fc.FixMsgType(self.get(35))
 
