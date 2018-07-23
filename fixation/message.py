@@ -1,3 +1,4 @@
+from functools import lru_cache
 import sys
 import uuid
 
@@ -53,12 +54,20 @@ class FixMessage(simplefix.FixMessage):
         self.uid = uid or str(uuid.uuid4())
 
     @property
+    @lru_cache()
     def seq_num(self):
-        return int(self.get(34))
+        _seq_num = self.get(34)
+        if _seq_num is not None:
+            _seq_num = int(_seq_num)
+        return _seq_num
 
     @property
+    @lru_cache()
     def msg_type(self):
-        return fc.FixMsgType(self.get(35))
+        _msg_type = self.get(35)
+        if _msg_type is not None:
+            _msg_type = fc.FixMsgType(_msg_type)
+        return _msg_type
 
     def get(self, tag, nth=1, raw=False):
         val = super().get(tag, nth=nth)
@@ -67,6 +76,16 @@ class FixMessage(simplefix.FixMessage):
         if not raw:
             return val.decode()
         return val
+
+    def append_pair(self, tag, value, header=False):
+        super().append_pair(tag, value, header=header)
+        # TODO need to guarantee that tag is an int, or else
+        # there is posibility of missing a cache clear, which could
+        # be really dangerous
+        if tag == 34:
+            self.seq_num.cache_clear()
+        if tag == 35:
+            self.msg_type.cache_clear()
 
     def to_decoded_pairs(self):
         pairs = []
