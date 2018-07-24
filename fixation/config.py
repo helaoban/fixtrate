@@ -11,7 +11,6 @@ REQUIRED = [
     ('FIX_TARGET_COMP_ID', str),
     ('FIX_ACCOUNT', str),
     ('FIX_HEARTBEAT_INTERVAL', int),
-    ('FIX_RESET_SEQUENCE', bool),
 ]
 
 
