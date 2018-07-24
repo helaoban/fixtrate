@@ -339,21 +339,21 @@ class FixSession:
                 await self.send_message(msg, skip_headers=True)
 
     def _check_sequence_integrity(self, msg):
-        recorded_seq_num = self._store.get_seq_num(remote=True)
-        seq_diff = msg.seq_num - recorded_seq_num
+        actual = self._store.get_seq_num(remote=True)
+        diff = msg.seq_num - actual
 
-        if seq_diff == 0:
+        if diff == 0:
             return
 
-        if seq_diff >= 1:
+        if diff >= 1:
             raise exceptions.SequenceGap(
                 actual=msg.seq_num,
-                expected=recorded_seq_num
+                expected=actual
             )
 
         raise exceptions.FatalSequenceError(
             actual=msg.seq_num,
-            expected=recorded_seq_num
+            expected=actual
         )
 
     async def _dispatch(self, msg):
