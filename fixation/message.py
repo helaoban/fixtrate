@@ -76,6 +76,8 @@ class FixMessage(simplefix.FixMessage):
     @utils.cached_property
     def is_duplicate(self):
         poss_dup_flag = self.get(43)
+        if poss_dup_flag is None:
+            return False
         poss_dup_flag = fc.PossDupFlag(poss_dup_flag)
         return poss_dup_flag == fc.PossDupFlag.YES
 
