@@ -450,16 +450,40 @@ class FixSession:
         :param msg:
         :return:
         """
+        heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
+        if heartbeat_interval != self._config['FIX_HEARTBEAT_INTERVAL']:
+            await self._send_reject(
+                msg=msg,
+                tag=self._tags.HeartBtInt,
+                rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                reason='HeartBtInt must be {}'.format(
+                    self._config['FIX_HEARTBEAT_INTERVAL'])
+            )
+            return
+
+        target_comp_id = msg.get(self._tags.TargetCompID)
+        if target_comp_id != self._config['FIX_SENDER_COMP_ID']:
+            await self._send_reject(
+                msg=msg,
+                tag=self._tags.TargetCompID,
+                rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                reason='Target Comp ID is incorrect.'
+            )
+            return
+
         if self._is_resetting:
             seq_num = int(msg.get(self._tags.MsgSeqNum))
             self._store.set_seq_num(seq_num, remote=True)
             self._is_resetting = False
+
+        reset_seq = msg.get(self._tags.ResetSeqNumFlag)
+        if reset_seq == fc.ResetSeqNumFlag.YES:
+            self._store.set_seq_num(msg.seq_num, remote=True)
+
         logger.debug('Login successful!')
 
-        if self._is_initiator in (False, None):
+        if self._is_initiator == False:
             await self._send_login()
-        if self._is_initiator is None:
-            self._is_initiator = utils.Tristate(False)
 
     async def handle_heartbeat(self, msg):
         pass
