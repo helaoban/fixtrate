@@ -250,10 +250,11 @@ class FixSession:
     async def send_message(self, msg, skip_headers=False):
         if not skip_headers:
             self.append_standard_header(
-                msg, seq_num=self._store.incr_seq_num())
+                msg, seq_num=self._store.get_seq_num())
         if self._debug:
             self.print_msg_to_console(msg)
         await self._connection.write(msg.encode())
+        self._store.incr_seq_num()
         self._store.store_message(msg)
         self._reset_heartbeat_timer()
 
@@ -369,7 +370,6 @@ class FixSession:
 
     async def handle_message(self, msg):
 
-        self._store.incr_seq_num(remote=True)
         self._store.store_message(msg, remote=True)
 
         if self._debug:
@@ -411,6 +411,8 @@ class FixSession:
         is_resend = msg.get(self._tags.PossDupFlag) == fc.PossDupFlag.YES
         if is_resend and msg.msg_type in ADMIN_MESSAGES:
             return
+        finally:
+            self._store.incr_seq_num(remote=True)
 
         await self.dispatch(msg)
 

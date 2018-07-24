@@ -43,8 +43,8 @@ class FixStore(object):
 class FixMemoryStore(FixStore):
 
     def __init__(self):
-        self._local_seq_num = 0
-        self._remote_seq_num = 0
+        self._local_seq_num = 1
+        self._remote_seq_num = 1
         self._messages = {}
         self._local = SortedDict()
         self._remote = SortedDict()
@@ -102,6 +102,8 @@ class FixMemoryStore(FixStore):
         self._local = SortedDict()
         self._remote = SortedDict()
         self._config = None
+        self.set_seq_num(1)
+        self.set_seq_num(1, remote=True)
 
     def store_config(self, conf):
         self._config = conf
@@ -199,4 +201,5 @@ class FixRedisStore(FixStore):
     def new_session(self):
         for key in ['messages', 'remote', 'local', 'messages_by_time']:
             self.redis.delete(key)
-        self.set_seq_num(0)
+        self.set_seq_num(1)
+        self.set_seq_num(1, remote=True)
