@@ -1,15 +1,15 @@
 class SequenceGap(Exception):
-    def __init__(self, msg_seq_num, recorded_seq_num):
+    def __init__(self, actual, expected):
         super().__init__('Sequence gap detected')
-        self.msg_seq_num = msg_seq_num
-        self.recorded_seq_num = recorded_seq_num
+        self.actual = actual
+        self.expected = expected
 
 
 class FatalSequenceError(Exception):
-    def __init__(self, msg_seq_num, recorded_seq_num):
+    def __init__(self, actual, expected):
         super().__init__('Remote sequence number is lower than expected ')
-        self.msg_seq_num = msg_seq_num
-        self.recorded_seq_num = recorded_seq_num
+        self.actual = actual
+        self.expected = expected
 
 
 class ImproperlyConfigured(Exception):

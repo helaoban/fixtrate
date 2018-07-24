@@ -347,13 +347,13 @@ class FixSession:
 
         if seq_diff >= 1:
             raise exceptions.SequenceGap(
-                msg_seq_num=msg.seq_num,
-                recorded_seq_num=recorded_seq_num
+                actual=msg.seq_num,
+                expected=recorded_seq_num
             )
 
         raise exceptions.FatalSequenceError(
-            msg_seq_num=msg.seq_num,
-            recorded_seq_num=recorded_seq_num
+            actual=msg.seq_num,
+            expected=recorded_seq_num
         )
 
     async def _dispatch(self, msg):
@@ -405,7 +405,7 @@ class FixSession:
             if msg.msg_type == fc.FixMsgType.Logon:
                 await self._handle_logon(msg)
                 await self._request_resend(
-                    start=error.recorded_seq_num + 1,
+                    start=error.expected + 1,
                     end=0
                 )
 
@@ -416,14 +416,14 @@ class FixSession:
             if msg.msg_type == fc.FixMsgType.ResendRequest:
                 await self._handle_resend_request(msg)
                 await self._request_resend(
-                    start=error.recorded_seq_num + 1,
+                    start=error.expected + 1,
                     end=0
                 )
 
             if msg.msg_type == fc.FixMsgType.SequenceReset:
                 if self._is_gap_fill(msg):
                     await self._request_resend(
-                        start=error.recorded_seq_num + 1,
+                        start=error.expected + 1,
                         end=0
                     )
                 else:
