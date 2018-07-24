@@ -262,9 +262,25 @@ class FixSession:
         msg = fix42.heartbeat(test_request_id)
         await self.send_message(msg)
 
+    async def _send_test_request(self, test_request_id):
+        msg = fix42.test_request(test_request_id)
+        await self.send_message(msg)
+
     async def sent_sequence_reset(self):
         seq_num = self._store.get_seq_num()
         msg = fix42.sequence_reset(seq_num + 1)
+        await self.send_message(msg)
+
+    async def _send_reject(self, msg, tag, rejection_type, reason):
+        ref_sequence_number = msg.seq_num
+        ref_message_type = msg.msg_type
+        msg = fix42.reject(
+            ref_sequence_number=ref_sequence_number,
+            ref_message_type=ref_message_type,
+            ref_tag=tag,
+            rejection_type=rejection_type,
+            reject_reason=reason,
+        )
         await self.send_message(msg)
 
     async def _send_login(self):
