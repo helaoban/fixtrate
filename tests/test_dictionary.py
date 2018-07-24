@@ -18,7 +18,7 @@ def market_data_request(fix_session):
         symbols=['GLNG', 'NAT'],
         entry_types=[et for et in fc.MDEntryType],
     )
-    fix_session.append_standard_header(msg)
+    fix_session._append_standard_header(msg)
     return msg
 
 

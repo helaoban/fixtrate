@@ -180,7 +180,7 @@ class FixSession:
 
         self._is_initiator = utils.Tristate(None)
 
-    def print_msg_to_console(self, msg, remote=False):
+    def _print_msg_to_console(self, msg, remote=False):
         send_time = msg.get(self._tags.SendingTime)
         direction = '<--' if remote else '-->'
         print('{}: {} {}'.format(send_time, msg.msg_type, direction))
@@ -188,21 +188,21 @@ class FixSession:
     def connect(self):
         self._is_initiator = utils.Tristate(True)
         return FixConnectionContextManager(
-            self._config, self.on_connect, self.on_disconnect)
+            self._config, self._on_connect, self._on_disconnect)
 
     def listen(self):
         self._is_initiator = utils.Tristate(False)
         return FixConnectionContextManager(
-            self._config, self.on_connect, self.on_disconnect, is_server=True)
+            self._config, self._on_connect, self._on_disconnect, is_server=True)
 
-    async def on_connect(self, conn):
+    async def _on_connect(self, conn):
         self._connection = conn
         self._store.store_config(self._config)
 
-    async def on_disconnect(self):
+    async def _on_disconnect(self):
         await self._close()
 
-    def append_standard_header(
+    def _append_standard_header(
         self,
         msg,
         seq_num,
@@ -249,16 +249,16 @@ class FixSession:
 
     async def send_message(self, msg, skip_headers=False):
         if not skip_headers:
-            self.append_standard_header(
-                msg, seq_num=self._store.get_seq_num())
+            seq_num = self._store.get_seq_num()
+            self._append_standard_header(msg, seq_num)
         if self._debug:
-            self.print_msg_to_console(msg)
+            self._print_msg_to_console(msg)
         await self._connection.write(msg.encode())
         self._store.incr_seq_num()
         self._store.store_message(msg)
         self._reset_heartbeat_timer()
 
-    async def send_heartbeat(self, test_request_id=None):
+    async def _send_heartbeat(self, test_request_id=None):
         msg = fix42.heartbeat(test_request_id)
         await self.send_message(msg)
 
@@ -266,17 +266,15 @@ class FixSession:
         msg = fix42.test_request(test_request_id)
         await self.send_message(msg)
 
-    async def sent_sequence_reset(self):
+    async def _send_sequence_reset(self):
         seq_num = self._store.get_seq_num()
         msg = fix42.sequence_reset(seq_num + 1)
         await self.send_message(msg)
 
     async def _send_reject(self, msg, tag, rejection_type, reason):
-        ref_sequence_number = msg.seq_num
-        ref_message_type = msg.msg_type
         msg = fix42.reject(
-            ref_sequence_number=ref_sequence_number,
-            ref_message_type=ref_message_type,
+            ref_sequence_number=msg.seq_num,
+            ref_message_type=msg.msg_type,
             ref_tag=tag,
             rejection_type=rejection_type,
             reject_reason=reason,
@@ -308,19 +306,16 @@ class FixSession:
         msg = fix42.logoff()
         await self.send_message(msg)
 
-    async def request_resend(self, start_sequence, end_sequence):
-        msg = fix42.resend_request(
-            start_sequence,
-            end_sequence
-        )
+    async def _request_resend(self, start, end):
+        msg = fix42.resend_request(start, end)
         await self.send_message(msg)
 
-    async def reset_sequence(self, new_sequence_number):
-        self._store.set_remote_sequence_number(new_sequence_number - 1)
-        msg = fix42.sequence_reset(new_sequence_number)
+    async def _reset_sequence(self, new_seq_num):
+        self._store.set_remote_sequence_number(new_seq_num - 1)
+        msg = fix42.sequence_reset(new_seq_num)
         await self.send_message(msg)
 
-    async def resend_messages(self, start, end):
+    async def _resend_messages(self, start, end):
         sent_messages = self._store.get_messages_by_seq_num(
             start=start, end=end, remote=False)
 
@@ -332,8 +327,8 @@ class FixSession:
                 gf_new_seq_num = seq_num + 1
             else:
                 if gf_new_seq_num is not None:
-                    await self.reset_sequence(
-                        new_sequence_number=gf_new_seq_num)
+                    await self._reset_sequence(
+                        new_seq_num=gf_new_seq_num)
                     gf_seq_num, gf_new_seq_num = None, None
 
                 msg.append_pair(
@@ -343,7 +338,7 @@ class FixSession:
                 )
                 await self.send_message(msg, skip_headers=True)
 
-    def check_sequence_integrity(self, msg):
+    def _check_sequence_integrity(self, msg):
         recorded_seq_num = int(self._store.get_seq_num(remote=True))
         seq_diff = msg.seq_num - recorded_seq_num
 
@@ -361,14 +356,13 @@ class FixSession:
             recorded_seq_num=recorded_seq_num
         )
 
-    async def dispatch(self, msg):
+    async def _dispatch(self, msg):
         handler = {
             fc.FixMsgType.Logon: self._handle_logon,
-            fc.FixMsgType.Heartbeat: self.handle_heartbeat,
-            fc.FixMsgType.TestRequest: self.handle_test_request,
-            fc.FixMsgType.Reject: self.handle_reject,
-            fc.FixMsgType.ResendRequest: self.handle_resend_request,
-            fc.FixMsgType.SequenceReset: self.handle_sequence_reset,
+            fc.FixMsgType.TestRequest: self._handle_test_request,
+            fc.FixMsgType.Reject: self._handle_reject,
+            fc.FixMsgType.ResendRequest: self._handle_resend_request,
+            fc.FixMsgType.SequenceReset: self._handle_sequence_reset,
         }.get(msg.msg_type)
 
         if handler is not None:
@@ -377,22 +371,22 @@ class FixSession:
             else:
                 handler(msg)
 
-    def is_gap_fill(self, msg):
+    def _is_gap_fill(self, msg):
         gf_flag = msg.get(self._tags.GapFillFlag)
         if gf_flag is None:
             return False
         gf_flag = fc.GapFillFlag(gf_flag)
         return gf_flag == fc.GapFillFlag.YES
 
-    async def handle_message(self, msg):
+    async def _handle_message(self, msg):
 
         self._store.store_message(msg, remote=True)
 
         if self._debug:
-            self.print_msg_to_console(msg, remote=True)
+            self._print_msg_to_console(msg, remote=True)
 
         try:
-            self.check_sequence_integrity(msg)
+            self._check_sequence_integrity(msg)
         except exceptions.FatalSequenceError as error:
             logger.exception(error)
 
@@ -400,8 +394,8 @@ class FixSession:
                 return
 
             if msg.msg_type == fc.FixMsgType.SequenceReset:
-                if not self.is_gap_fill(msg):
-                    await self.handle_sequence_reset(msg)
+                if not self._is_gap_fill(msg):
+                    await self._handle_sequence_reset(msg)
                     return
 
             await self.close()
@@ -410,9 +404,9 @@ class FixSession:
 
             if msg.msg_type == fc.FixMsgType.Logon:
                 await self._handle_logon(msg)
-                await self.request_resend(
-                    start_sequence=error.recorded_seq_num + 1,
-                    end_sequence=0
+                await self._request_resend(
+                    start=error.recorded_seq_num + 1,
+                    end=0
                 )
 
             if msg.msg_type == fc.FixMsgType.Logout:
@@ -420,17 +414,17 @@ class FixSession:
                 pass
 
             if msg.msg_type == fc.FixMsgType.ResendRequest:
-                await self.handle_resend_request(msg)
-                await self.request_resend(
-                    start_sequence=error.recorded_seq_num + 1,
-                    end_sequence=0
+                await self._handle_resend_request(msg)
+                await self._request_resend(
+                    start=error.recorded_seq_num + 1,
+                    end=0
                 )
 
             if msg.msg_type == fc.FixMsgType.SequenceReset:
-                if self.is_gap_fill(msg):
-                    await self.request_resend(
-                        start_sequence=error.recorded_seq_num + 1,
-                        end_sequence=0
+                if self._is_gap_fill(msg):
+                    await self._request_resend(
+                        start=error.recorded_seq_num + 1,
+                        end=0
                     )
                 else:
                     new_seq_num = int(msg.get(self._tags.NewSeqNo))
@@ -442,10 +436,10 @@ class FixSession:
         finally:
             self._store.incr_seq_num(remote=True)
 
-        await self.dispatch(msg)
+        await self._dispatch(msg)
 
-    async def handle_sequence_reset(self, msg):
-        if not self.is_gap_fill(msg):
+    async def _handle_sequence_reset(self, msg):
+        if not self._is_gap_fill(msg):
             pass
         new_seq_num = int(msg.get(self._tags.NewSeqNo))
         self._store.set_seq_num(new_seq_num - 1, remote=True)
@@ -496,26 +490,20 @@ class FixSession:
         if self._is_initiator == False:
             await self._send_login()
 
-    async def handle_heartbeat(self, msg):
-        pass
-
-    async def handle_resend_request(self, msg):
+    async def _handle_resend_request(self, msg):
         start_sequence_number = int(msg.get(self._tags.BeginSeqNo))
         end_sequence_number = int(msg.get(self._tags.EndSeqNo))
-        await self.resend_messages(start_sequence_number, end_sequence_number)
+        await self._resend_messages(start_sequence_number, end_sequence_number)
 
-    async def handle_test_request(self, msg):
+    async def _handle_test_request(self, msg):
         test_request_id = msg.get(self._tags.TestReqID)
-        await self.send_heartbeat(test_request_id=test_request_id)
+        await self._send_heartbeat(test_request_id=test_request_id)
 
-    async def handle_reject(self, msg):
+    async def _handle_reject(self, msg):
         reject_reason = msg.get(self._tags.Text)
         print('Reject: {}'.format(reject_reason))
 
-    def decode_entry(self, msg):
-        pass
-
-    async def recv_msg(self):
+    async def _recv_msg(self):
         msg = self._parser.get_message()
         if msg:
             return msg
@@ -532,7 +520,7 @@ class FixSession:
             self._parser.append_buffer(data)
             msg = self._parser.get_message()
             if msg is not None:
-                await self.handle_message(msg)
+                await self._handle_message(msg)
                 return msg
 
         return None
@@ -545,13 +533,13 @@ class FixSession:
     def _reset_heartbeat_timer(self):
         self._cancel_heartbeat_timer()
         self._hearbeat_cb = self._loop.create_task(
-            self.set_heartbeat_timer())
+            self._set_heartbeat_timer())
 
-    async def set_heartbeat_timer(self):
+    async def _set_heartbeat_timer(self):
         interval = self._config['FIX_HEARTBEAT_INTERVAL']
         try:
             await asyncio.sleep(interval)
-            await self.send_heartbeat()
+            await self._send_heartbeat()
         except asyncio.CancelledError:
             pass
         self._reset_heartbeat_timer()
@@ -560,7 +548,7 @@ class FixSession:
         return self
 
     async def __anext__(self):
-        msg = await self.recv_msg()
+        msg = await self._recv_msg()
         if msg is None:
             raise StopAsyncIteration
         return msg
