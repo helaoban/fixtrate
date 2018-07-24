@@ -391,41 +391,53 @@ class FixSession:
         if self._debug:
             self.print_msg_to_console(msg, remote=True)
 
-        if msg.msg_type == fc.FixMsgType.Logon:
-            reset_seq = msg.get(self._tags.ResetSeqNumFlag)
-            if reset_seq == fc.ResetSeqNumFlag.YES:
-                self._store.set_seq_num(msg.seq_num, remote=True)
-
-        if msg.msg_type == fc.FixMsgType.ResendRequest:
-            await self.handle_resend_request(msg)
-            return
-
         try:
             self.check_sequence_integrity(msg)
-        except exceptions.SequenceGap as error:
-            await self.request_resend(
-                start_sequence=error.recorded_seq_num + 1,
-                end_sequence=0
-            )
-            if self._raise_on_sequence_gap:
-                raise
-            return
         except exceptions.FatalSequenceError as error:
             logger.exception(error)
+
+            if msg.is_duplicate:
+                return
+
+            if msg.msg_type == fc.FixMsgType.SequenceReset:
+                if not self.is_gap_fill(msg):
+                    await self.handle_sequence_reset(msg)
+                    return
+
             await self.close()
             raise
+        except exceptions.SequenceGap as error:
 
-        if msg.msg_type == fc.FixMsgType.SequenceReset:
-            gap_fill_flag = msg.get(self._tags.GapFillFlag)
-            gap_fill_flag = gap_fill_flag or fc.GapFillFlag.NO
-            if gap_fill_flag == fc.GapFillFlag.NO:
+            if msg.msg_type == fc.FixMsgType.Logon:
+                await self._handle_logon(msg)
+                await self.request_resend(
+                    start_sequence=error.recorded_seq_num + 1,
+                    end_sequence=0
+                )
+
+            if msg.msg_type == fc.FixMsgType.Logout:
+                # TODO handle logout sequence gap case
                 pass
 
-            new_seq_num = int(msg.get(self._tags.NewSeqNo))
-            self._store.set_seq_num(new_seq_num - 1, remote=True)
+            if msg.msg_type == fc.FixMsgType.ResendRequest:
+                await self.handle_resend_request(msg)
+                await self.request_resend(
+                    start_sequence=error.recorded_seq_num + 1,
+                    end_sequence=0
+                )
 
-        is_resend = msg.get(self._tags.PossDupFlag) == fc.PossDupFlag.YES
-        if is_resend and msg.msg_type in ADMIN_MESSAGES:
+            if msg.msg_type == fc.FixMsgType.SequenceReset:
+                if self.is_gap_fill(msg):
+                    await self.request_resend(
+                        start_sequence=error.recorded_seq_num + 1,
+                        end_sequence=0
+                    )
+                else:
+                    new_seq_num = int(msg.get(self._tags.NewSeqNo))
+                    self._store.set_seq_num(new_seq_num)
+
+            if self._raise_on_sequence_gap:
+                raise
             return
         finally:
             self._store.incr_seq_num(remote=True)
