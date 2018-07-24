@@ -339,7 +339,7 @@ class FixSession:
                 await self.send_message(msg, skip_headers=True)
 
     def _check_sequence_integrity(self, msg):
-        recorded_seq_num = int(self._store.get_seq_num(remote=True))
+        recorded_seq_num = self._store.get_seq_num(remote=True)
         seq_diff = msg.seq_num - recorded_seq_num
 
         if seq_diff == 0:
