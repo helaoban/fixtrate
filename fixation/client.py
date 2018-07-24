@@ -212,7 +212,7 @@ class FixClient(object):
 
                     try:
                         await read_messages(self.session)
-                    except fe.FatalSequenceError:
+                    except fe.FatalSequenceGap:
                         break
 
                     await self.session.logoff()

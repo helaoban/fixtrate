@@ -351,7 +351,7 @@ class FixSession:
                 expected=actual
             )
 
-        raise exceptions.FatalSequenceError(
+        raise exceptions.FatalSequenceGap(
             actual=msg.seq_num,
             expected=actual
         )
@@ -387,7 +387,7 @@ class FixSession:
 
         try:
             self._check_sequence_integrity(msg)
-        except exceptions.FatalSequenceError as error:
+        except exceptions.FatalSequenceGap as error:
             logger.exception(error)
 
             if msg.is_duplicate:
