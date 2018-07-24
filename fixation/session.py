@@ -344,20 +344,20 @@ class FixSession:
                 await self.send_message(msg, skip_headers=True)
 
     def check_sequence_integrity(self, msg):
-        seq_num = int(msg.get(self._tags.MsgSeqNum))
         recorded_seq_num = int(self._store.get_seq_num(remote=True))
-        seq_diff = seq_num - recorded_seq_num
+        seq_diff = msg.seq_num - recorded_seq_num
+
         if seq_diff == 0:
             return
 
         if seq_diff >= 1:
             raise exceptions.SequenceGap(
-                msg_seq_num=seq_num,
+                msg_seq_num=msg.seq_num,
                 recorded_seq_num=recorded_seq_num
             )
 
         raise exceptions.FatalSequenceError(
-            msg_seq_num=seq_num,
+            msg_seq_num=msg.seq_num,
             recorded_seq_num=recorded_seq_num
         )
 
@@ -484,8 +484,7 @@ class FixSession:
             return
 
         if self._is_resetting:
-            seq_num = int(msg.get(self._tags.MsgSeqNum))
-            self._store.set_seq_num(seq_num, remote=True)
+            self._store.set_seq_num(msg.seq_num, remote=True)
             self._is_resetting = False
 
         reset_seq = msg.get(self._tags.ResetSeqNumFlag)
