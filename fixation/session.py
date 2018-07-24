@@ -66,22 +66,25 @@ class FixConnectionContextManager(Coroutine):
         conf,
         on_connect=None,
         on_disconnect=None,
+        is_server=False,
         loop=None
     ):
         self.config = conf
         self.on_connect = on_connect
         self.on_disconnect = on_disconnect
         self.loop = loop or asyncio.get_event_loop()
-
-        self._coro = self._connect()
+        self._coro = self._listen() if is_server else self._connect()
+        self._server = None
 
     async def _connect(self, tries=5, retry_wait=5):
+        host = self.config.get('FIX_HOST', '127.0.0.1')
+        port = self.config.get('FIX_PORT', 4000)
         tried = 1
         while tried <= tries:
             try:
                 reader, writer = await asyncio.open_connection(
-                    host=self.config.get('FIX_HOST', '127.0.0.1'),
-                    port=self.config.get('FIX_PORT', 4000),
+                    host=host,
+                    port=port,
                     loop=self.loop
                 )
             except OSError as error:
@@ -102,6 +105,29 @@ class FixConnectionContextManager(Coroutine):
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
         raise ConnectionError
+
+    async def _listen(self):
+        queue = asyncio.Queue()
+
+        async def put(reader, writer):
+            _conn = FixConnection(
+                reader, writer, self.on_disconnect)
+            await queue.put(_conn)
+
+        host = self.config.get('FIX_HOST', '127.0.0.1')
+        port = self.config.get('FIX_PORT', 4000)
+        await asyncio.start_server(
+            put,
+            host=host,
+            port=port,
+            backlog=1
+        )
+        conn = await queue.get()
+        if utils.is_coro(self.on_connect):
+            await self.on_connect(conn)
+        else:
+            self.on_connect(conn)
+        return conn
 
     def send(self, arg):
         self._coro.send(arg)
@@ -160,8 +186,14 @@ class FixSession:
         print('{}: {} {}'.format(send_time, msg.msg_type, direction))
 
     def connect(self):
+        self._is_initiator = utils.Tristate(True)
         return FixConnectionContextManager(
             self._config, self.on_connect, self.on_disconnect)
+
+    def listen(self):
+        self._is_initiator = utils.Tristate(False)
+        return FixConnectionContextManager(
+            self._config, self.on_connect, self.on_disconnect, is_server=True)
 
     async def on_connect(self, conn):
         self._connection = conn
@@ -254,9 +286,6 @@ class FixSession:
             self._store.new_session()
 
         await self._send_login()
-
-        if self._is_initiator is None:
-            self._is_initiator = utils.Tristate(True)
 
     async def logoff(self):
         msg = fix42.logoff()
@@ -445,11 +474,10 @@ class FixSession:
                 logger.error(error)
                 break
             if data == b'':
-                logger.error('Server closed the connection!')
+                logger.error('Peer closed the connection!')
                 break
             self._parser.append_buffer(data)
             msg = self._parser.get_message()
-
             if msg is not None:
                 await self.handle_message(msg)
                 return msg
