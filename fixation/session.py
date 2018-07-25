@@ -158,7 +158,6 @@ class FixSession:
         conf=None,
         store=None,
         dictionary=None,
-        raise_on_sequence_gap=True,
         loop=None,
         debug=False
     ):
@@ -169,7 +168,6 @@ class FixSession:
         self._tags = getattr(fc.FixTag, self._config['FIX_VERSION'].name)
         self._store = store or fix_store.FixRedisStore()
         self._parser = parse.FixParser(self._config)
-        self._raise_on_sequence_gap = raise_on_sequence_gap
         self._fix_dict = dictionary
 
         self._is_resetting = False
@@ -417,9 +415,6 @@ class FixSession:
                 else:
                     new_seq_num = int(msg.get(self._tags.NewSeqNo))
                     self._store.set_seq_num(new_seq_num)
-
-            if self._raise_on_sequence_gap:
-                raise
             return
         finally:
             self._store.incr_seq_num(remote=True)
