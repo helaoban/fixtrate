@@ -101,7 +101,6 @@ class FixMemoryStore(FixStore):
         self._messages = {}
         self._local = SortedDict()
         self._remote = SortedDict()
-        self._config = None
         self.set_seq_num(1)
         self.set_seq_num(1, remote=True)
 
