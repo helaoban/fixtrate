@@ -256,7 +256,7 @@ class FixSession:
         await self._connection.write(msg.encode())
         self._store.incr_seq_num()
         self._store.store_message(msg)
-        self._reset_heartbeat_timer()
+        await self._reset_heartbeat_timer()
 
     async def _send_heartbeat(self, test_request_id=None):
         msg = fix42.heartbeat(test_request_id)
@@ -525,24 +525,27 @@ class FixSession:
 
         return None
 
-    def _cancel_heartbeat_timer(self):
+    async def _cancel_heartbeat_timer(self):
         if self._hearbeat_cb is not None:
             self._hearbeat_cb.cancel()
+            try:
+                await self._hearbeat_cb
+            except asyncio.CancelledError:
+                pass
             self._hearbeat_cb = None
 
-    def _reset_heartbeat_timer(self):
-        self._cancel_heartbeat_timer()
+    async def _reset_heartbeat_timer(self):
+        await self._cancel_heartbeat_timer()
         self._hearbeat_cb = self._loop.create_task(
             self._set_heartbeat_timer())
 
     async def _set_heartbeat_timer(self):
-        interval = self._config['FIX_HEARTBEAT_INTERVAL']
         try:
+            interval = self._config['FIX_HEARTBEAT_INTERVAL']
             await asyncio.sleep(interval)
             await self._send_heartbeat()
         except asyncio.CancelledError:
-            pass
-        self._reset_heartbeat_timer()
+            raise
 
     def __aiter__(self):
         return self
@@ -554,7 +557,7 @@ class FixSession:
         return msg
 
     async def _close(self):
-        self._cancel_heartbeat_timer()
+        await self._cancel_heartbeat_timer()
         logger.info('Shutting down...')
 
     async def close(self):
