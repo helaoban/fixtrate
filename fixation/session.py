@@ -496,10 +496,11 @@ class FixSession:
 
             self._parser.append_buffer(data)
 
-        if self._debug:
-            self._print_msg_to_console(msg, remote=True)
+        if msg:
+            if self._debug:
+                self._print_msg_to_console(msg, remote=True)
+            await self._handle_message(msg)
 
-        await self._handle_message(msg)
         return msg
 
     async def _cancel_heartbeat_timer(self):
