@@ -46,10 +46,7 @@ class FixConnection(object):
         self.connected = False
 
         if self.on_disconnect is not None:
-            if utils.is_coro(self.on_disconnect):
-                await self.on_disconnect()
-            else:
-                self.on_disconnect()
+            utils.maybe_await(self.on_disconnect)
 
     async def read(self):
         return await self.reader.read(4096)
@@ -97,10 +94,7 @@ class FixConnectionContextManager(Coroutine):
             else:
                 conn = FixConnection(
                     reader, writer, self.on_disconnect)
-                if utils.is_coro(self.on_connect):
-                    await self.on_connect(conn)
-                else:
-                    self.on_connect(conn)
+                utils.maybe_await(self.on_connect, conn)
                 return conn
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
@@ -123,10 +117,7 @@ class FixConnectionContextManager(Coroutine):
             backlog=1
         )
         conn = await queue.get()
-        if utils.is_coro(self.on_connect):
-            await self.on_connect(conn)
-        else:
-            self.on_connect(conn)
+        utils.maybe_await(self.on_connect, conn)
         return conn
 
     def send(self, arg):
@@ -355,10 +346,7 @@ class FixSession:
         }.get(msg.msg_type)
 
         if handler is not None:
-            if utils.is_coro(handler):
-                await handler(msg)
-            else:
-                handler(msg)
+            await utils.maybe_await(handler, msg)
 
     def _is_gap_fill(self, msg):
         gf_flag = msg.get(self._tags.GapFillFlag)
