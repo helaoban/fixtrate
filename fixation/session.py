@@ -492,26 +492,23 @@ class FixSession:
         print('Reject: {}'.format(reject_reason))
 
     async def _recv_msg(self):
-        msg = self._parser.get_message()
-        if msg:
-            return msg
+        while True:
+            msg = self._parser.get_message()
+            if msg:
+                break
 
-        while self._connection.connected:
             try:
                 data = await self._connection.read()
             except ConnectionError as error:
                 logger.error(error)
-                break
+                return
             if data == b'':
                 logger.error('Peer closed the connection!')
-                break
+                return
             self._parser.append_buffer(data)
-            msg = self._parser.get_message()
-            if msg is not None:
-                await self._handle_message(msg)
-                return msg
 
-        return None
+        await self._handle_message(msg)
+        return msg
 
     async def _cancel_heartbeat_timer(self):
         if self._hearbeat_cb is not None:
