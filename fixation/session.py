@@ -364,9 +364,6 @@ class FixSession:
 
     def _is_gap_fill(self, msg):
         gf_flag = msg.get(self._tags.GapFillFlag)
-        if gf_flag is None:
-            return False
-        gf_flag = fc.GapFillFlag(gf_flag)
         return gf_flag == fc.GapFillFlag.YES
 
     async def _handle_message(self, msg):
