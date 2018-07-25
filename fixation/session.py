@@ -5,7 +5,7 @@ import logging
 
 from fixation import (
     constants as fc,
-    utils, exceptions, parse,
+    utils, exceptions as fe, parse,
     store as fix_store, config
 )
 from fixation.factories import fix42
@@ -346,12 +346,12 @@ class FixSession:
             return
 
         if diff >= 1:
-            raise exceptions.SequenceGap(
+            raise fe.SequenceGap(
                 actual=msg.seq_num,
                 expected=actual
             )
 
-        raise exceptions.FatalSequenceGap(
+        raise fe.FatalSequenceGap(
             actual=msg.seq_num,
             expected=actual
         )
@@ -387,7 +387,7 @@ class FixSession:
 
         try:
             self._check_sequence_integrity(msg)
-        except exceptions.FatalSequenceGap as error:
+        except fe.FatalSequenceGap as error:
             logger.exception(error)
 
             if msg.is_duplicate:
@@ -400,7 +400,7 @@ class FixSession:
 
             await self.close()
             raise
-        except exceptions.SequenceGap as error:
+        except fe.SequenceGap as error:
 
             if msg.msg_type == fc.FixMsgType.Logon:
                 await self._handle_logon(msg)
