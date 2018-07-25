@@ -195,12 +195,10 @@ class FixSession:
         print('{}: {} {}'.format(send_time, msg.msg_type, direction))
 
     def connect(self):
-        self._is_initiator = utils.Tristate(True)
         return FixConnectionContextManager(
             self._config, self._on_connect, self._on_disconnect)
 
     def listen(self):
-        self._is_initiator = utils.Tristate(False)
         return FixConnectionContextManager(
             self._config, self._on_connect, self._on_disconnect, is_server=True)
 
@@ -282,10 +280,17 @@ class FixSession:
         )
         await self.send_message(msg)
 
-    async def _send_login(self):
+    async def _send_login(self, reset=False):
+
+        if self._is_initiator == None:
+            self._is_initiator = utils.Tristate(True)
+
+        if self._is_initiator == False:
+            self._is_initiator = utils.Tristate(None)
+
         login_msg = fix42.logon(
             heartbeat_interval=self._config['FIX_HEARTBEAT_INTERVAL'],
-            reset_sequence=self._is_resetting
+            reset_sequence=reset
         )
         await self.send_message(login_msg)
 
@@ -297,11 +302,7 @@ class FixSession:
 
         :return:
         """
-        self._is_resetting = reset
-        if self._is_resetting:
-            self._store.new_session()
-
-        await self._send_login()
+        await self._send_login(reset)
 
     async def logoff(self):
         msg = fix42.logoff()
@@ -371,18 +372,23 @@ class FixSession:
         try:
             self._check_sequence_integrity(msg)
         except fe.FatalSequenceGap as error:
-            logger.exception(error)
-
             if msg.is_duplicate:
                 return
 
-            if msg.msg_type == fc.FixMsgType.SequenceReset:
+            elif msg.msg_type == fc.FixMsgType.Logon:
+                reset_seq = msg.get(self._tags.ResetSeqNumFlag)
+                is_reset = reset_seq == fc.ResetSeqNumFlag.YES
+                if is_reset:
+                    await self._handle_logon(msg)
+
+            elif msg.msg_type == fc.FixMsgType.SequenceReset:
                 if not self._is_gap_fill(msg):
                     await self._handle_sequence_reset(msg)
                     return
-
-            await self.close()
-            raise
+            else:
+                logger.exception(error)
+                await self.close()
+                raise
         except fe.SequenceGap as error:
 
             if msg.msg_type == fc.FixMsgType.Logon:
@@ -457,18 +463,19 @@ class FixSession:
             )
             return
 
-        if self._is_resetting:
-            self._store.set_seq_num(msg.seq_num, remote=True)
-            self._is_resetting = False
-
         reset_seq = msg.get(self._tags.ResetSeqNumFlag)
-        if reset_seq == fc.ResetSeqNumFlag.YES:
-            self._store.set_seq_num(msg.seq_num, remote=True)
+        is_reset = reset_seq == fc.ResetSeqNumFlag.YES
 
-        logger.debug('Login successful!')
+        if is_reset:
+            self._store.set_seq_num(1)
+            self._store.set_seq_num(1, remote=True)
 
-        if self._is_initiator == False:
-            await self._send_login()
+        if self._is_initiator == None:
+            self._is_initiator = utils.Tristate(False)
+            await self._send_login(reset=is_reset)
+
+        if self._is_initiator == True:
+            self._is_initiator = utils.Tristate(None)
 
     async def _handle_resend_request(self, msg):
         start_sequence_number = int(msg.get(self._tags.BeginSeqNo))
