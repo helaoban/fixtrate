@@ -32,11 +32,13 @@ class FixConnection(object):
         self,
         reader,
         writer,
+        server=None,
         on_disconnect=None,
         loop=None
     ):
         self.reader = reader
         self.writer = writer
+        self._server = server
         self.on_disconnect = on_disconnect
         self.loop = loop or asyncio.get_event_loop()
         self.connected = True
@@ -44,6 +46,10 @@ class FixConnection(object):
     async def close(self):
         self.writer.close()
         self.connected = False
+
+        if self._server:
+            self._server.close()
+            await self._server.wait_closed()
 
         if self.on_disconnect is not None:
             await utils.maybe_await(self.on_disconnect)
@@ -71,7 +77,6 @@ class FixConnectionContextManager(Coroutine):
         self.on_disconnect = on_disconnect
         self.loop = loop or asyncio.get_event_loop()
         self._coro = self._listen() if is_server else self._connect()
-        self._server = None
 
     async def _connect(self, tries=5, retry_wait=5):
         host = self.config.get('FIX_HOST', '127.0.0.1')
@@ -93,7 +98,7 @@ class FixConnectionContextManager(Coroutine):
                 continue
             else:
                 conn = FixConnection(
-                    reader, writer, self.on_disconnect)
+                    reader, writer, on_disconnect=self.on_disconnect)
                 await utils.maybe_await(self.on_connect, conn)
                 return conn
 
@@ -104,19 +109,22 @@ class FixConnectionContextManager(Coroutine):
         queue = asyncio.Queue()
 
         async def put(reader, writer):
-            _conn = FixConnection(
-                reader, writer, self.on_disconnect)
-            await queue.put(_conn)
+            await queue.put((reader, writer))
 
         host = self.config.get('FIX_HOST', '127.0.0.1')
         port = self.config.get('FIX_PORT', 4000)
-        await asyncio.start_server(
+        self._server = await asyncio.start_server(
             put,
             host=host,
             port=port,
             backlog=1
         )
-        conn = await queue.get()
+        reader, writer = await queue.get()
+        conn = FixConnection(
+            reader,
+            writer,
+            server=self._server,
+            on_disconnect=self.on_disconnect)
         await utils.maybe_await(self.on_connect, conn)
         return conn
 
