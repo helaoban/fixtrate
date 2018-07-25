@@ -544,8 +544,3 @@ class FixSession:
     async def _close(self):
         await self._cancel_heartbeat_timer()
         logger.info('Shutting down...')
-
-    async def close(self):
-        await self._close()
-        if self._connection.connected:
-            await self._connection.close()
