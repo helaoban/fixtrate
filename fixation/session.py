@@ -46,7 +46,7 @@ class FixConnection(object):
         self.connected = False
 
         if self.on_disconnect is not None:
-            utils.maybe_await(self.on_disconnect)
+            await utils.maybe_await(self.on_disconnect)
 
     async def read(self):
         return await self.reader.read(4096)
@@ -94,7 +94,7 @@ class FixConnectionContextManager(Coroutine):
             else:
                 conn = FixConnection(
                     reader, writer, self.on_disconnect)
-                utils.maybe_await(self.on_connect, conn)
+                await utils.maybe_await(self.on_connect, conn)
                 return conn
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
@@ -117,7 +117,7 @@ class FixConnectionContextManager(Coroutine):
             backlog=1
         )
         conn = await queue.get()
-        utils.maybe_await(self.on_connect, conn)
+        await utils.maybe_await(self.on_connect, conn)
         return conn
 
     def send(self, arg):
