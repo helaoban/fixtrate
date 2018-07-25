@@ -43,6 +43,10 @@ class FixConnection(object):
         self._loop = loop or asyncio.get_event_loop()
         self.connected = True
 
+    @property
+    def closed(self):
+        return not self.connected
+
     async def close(self):
 
         if not self.connected:
@@ -182,7 +186,7 @@ class FixSession:
         self._fix_dict = dictionary
 
         self._is_resetting = False
-        self._connection = None
+        self._conn = None
         self._hearbeat_cb = None
         self._loop = loop or asyncio.get_event_loop()
         self._debug = self._config.get('FIX_DEBUG', debug)
@@ -203,7 +207,7 @@ class FixSession:
             self._config, self._on_connect, self._on_disconnect, is_server=True)
 
     async def _on_connect(self, conn):
-        self._connection = conn
+        self._conn = conn
         self._store.store_config(self._config)
 
     async def _on_disconnect(self):
@@ -252,9 +256,9 @@ class FixSession:
             self._append_standard_header(msg, seq_num)
         if self._debug:
             self._print_msg_to_console(msg)
-        await self._connection.write(msg.encode())
         self._store.incr_seq_num()
         self._store.store_message(msg)
+        await self._conn.write(msg.encode())
         await self._reset_heartbeat_timer()
 
     async def _send_heartbeat(self, test_request_id=None):
@@ -496,7 +500,7 @@ class FixSession:
             if msg:
                 break
             try:
-                data = await self._connection.read()
+                data = await self._conn.read()
             except ConnectionError:
                 break
             self._parser.append_buffer(data)
@@ -540,3 +544,7 @@ class FixSession:
     async def _close(self):
         await self._cancel_heartbeat_timer()
         logger.info('Shutting down...')
+
+    @property
+    def closed(self):
+        return self._conn is None or self._conn.closed
