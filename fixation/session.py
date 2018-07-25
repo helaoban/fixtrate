@@ -545,6 +545,10 @@ class FixSession:
         await self._cancel_heartbeat_timer()
         logger.info('Shutting down...')
 
+    async def close(self):
+        if not self.closed:
+            await self._close()
+
     @property
     def closed(self):
         return self._conn is None or self._conn.closed
