@@ -205,30 +205,22 @@ class FixSession:
         :param timestamp:
         :return:
         """
-        msg.append_pair(
-            self._tags.BeginString,
-            self._config['FIX_VERSION'],
-            header=True
-        )
-        msg.append_pair(
-            self._tags.SenderCompID,
-            self._config['FIX_SENDER_COMP_ID'],
-            header=True
-        )
-        msg.append_pair(
-            self._tags.TargetCompID,
-            self._config['FIX_TARGET_COMP_ID'],
-            header=True
-        )
-        msg.append_pair(
-            self._tags.MsgSeqNum,
-            seq_num,
-            header=True
+
+        version = self._config['FIX_VERSION']
+        sender_id = self._config['FIX_VERSION']
+        target_id = self._config['FIX_TARGET_COMP_ID']
+
+        pairs = (
+            (self._tags.BeginString, version),
+            (self._tags.SenderCompID, sender_id),
+            (self._tags.TargetCompID, target_id),
+            (self._tags.MsgSeqNum, seq_num),
         )
 
-        if timestamp is None:
-            timestamp = dt.datetime.utcnow()
+        for tag, val in pairs:
+            msg.append_pair(tag, val, header=True)
 
+        timestamp = timestamp or dt.datetime.utcnow()
         msg.append_utc_timestamp(
             self._tags.SendingTime,
             timestamp=timestamp,
