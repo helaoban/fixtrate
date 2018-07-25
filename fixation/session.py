@@ -59,7 +59,15 @@ class FixConnection(object):
             await utils.maybe_await(self.on_disconnect)
 
     async def read(self):
-        return await self.reader.read(4096)
+        try:
+            data = await self.reader.read(4096)
+        except ConnectionError as error:
+            logger.error(error)
+            raise
+        if data == b'':
+            logger.error('Peer closed the connection!')
+            raise ConnectionAbortedError
+        return data
 
     async def write(self, *args, **kwargs):
         self.writer.write(*args, **kwargs)
@@ -483,12 +491,9 @@ class FixSession:
 
             try:
                 data = await self._connection.read()
-            except ConnectionError as error:
-                logger.error(error)
-                return
-            if data == b'':
-                logger.error('Peer closed the connection!')
-                return
+            except ConnectionError:
+                break
+
             self._parser.append_buffer(data)
 
         if self._debug:
