@@ -1,101 +1,137 @@
 import asyncio
 import pytest
+import uuid
 
-from fixation import parse, constants as fc
+from fixation import constants as fc
+
+TAGS = fc.FixTag.FIX42
 
 
 @pytest.mark.asyncio
-async def test_login(
-    fix_session,
-    client_config,
-    client_store,
-):
+async def test_successful_login(fix_session, test_server):
+    async with fix_session.connect():
+        await fix_session.logon()
+        async for msg in fix_session:
+            assert msg.msg_type == fc.FixMsgType.Logon
+            break
+        else:
+            raise AssertionError('No message received')
 
-    msgs = []
+
+@pytest.mark.asyncio
+async def test_heartbeat(fix_session, test_server):
+
+    async def iter_messages():
+        async with fix_session.connect():
+            await fix_session.logon()
+            async for msg in fix_session:
+                assert msg.msg_type == fc.FixMsgType.Logon
+                break
+            else:
+                raise AssertionError('No message received')
+
+            async for msg in fix_session:
+                assert msg.msg_type == fc.FixMsgType.Heartbeat
+                break
+            else:
+                raise AssertionError('No message received')
+
+    await asyncio.wait_for(iter_messages(), timeout=2)
+
+
+@pytest.mark.asyncio
+async def test_incorrect_heartbeat_int(fix_session, test_server):
+    fix_session._config['FIX_HEARTBEAT_INTERVAL'] = 90
+    async with fix_session.connect():
+        await fix_session.logon()
+        async for msg in fix_session:
+            assert msg.msg_type == fc.FixMsgType.Reject
+            break
+        else:
+            raise AssertionError('No message received')
+
+
+@pytest.mark.asyncio
+async def test_incorrect_target_comp_id(fix_session, test_server):
+    fix_session._config['FIX_TARGET_COMP_ID'] = 'not-a-correct-id'
+    async with fix_session.connect():
+        await fix_session.logon()
+        async for msg in fix_session:
+            assert msg.msg_type == fc.FixMsgType.Reject
+            break
+        else:
+            raise AssertionError('No message received')
+
+
+@pytest.mark.asyncio
+async def test_new_seq_num(fix_session, test_server):
+
+    test_id = str(uuid.uuid4())
 
     async with fix_session.connect():
         await fix_session.logon()
         async for msg in fix_session:
-            msgs.append(msg)
+            assert msg.msg_type == fc.FixMsgType.Logon
             break
+        else:
+            AssertionError('No message received')
 
-    first = msgs[0]
-    msg_type = fc.FixMsgType(first.get(fc.FixTag.FIX42.MsgType))
-    assert msg_type == fc.FixMsgType.Heartbeat
+        await fix_session._send_test_request(test_id)
+        async for msg in fix_session:
+            if msg.msg_type == fc.FixMsgType.Heartbeat:
+                if msg.get(112) == test_id:
+                    break
+        else:
+            raise AssertionError('No message received')
 
-
-@pytest.mark.asyncio
-async def test_iterate_messages(fix_session):
-
-    msgs = []
-
-    async def iter_messages():
-        async with fix_session.connect():
-            await fix_session.logon()
-            async for msg in fix_session:
-                msgs.append(msg)
-
-    with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(iter_messages(), timeout=2)
-
-    assert len(msgs) > 0
-
-
-@pytest.mark.asyncio
-async def test_heartbeat(fix_session, test_server, client_store, client_config):
-
-    # fix_session.config['FIX_HEARTBEAT_INTERVAL'] = 1
-    # test_server.config['FIX_HEARTBEAT_INTERVAL'] = 1
-    messages = []
-
-    async def iter_messages():
-        async with fix_session.connect():
-            await fix_session.logon()
-            async for msg in fix_session:
-                messages.append(msg)
-
-    with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(iter_messages(), timeout=2)
-
-    received_heartbeats = [
-        m for m in messages
-        if fc.FixMsgType(m.message_type.decode()) == fc.FixMsgType.Heartbeat
-    ]
-
-    assert len(received_heartbeats) > 0
-
-    sent_messages = [
-        parse.FixParser.parse(v, client_config)
-        for k, v in client_store.get_sent_messages()
-    ]
-
-    sent_heartbeats = [
-        m for m in sent_messages
-        if fc.FixMsgType(m.message_type.decode()) == fc.FixMsgType.Heartbeat
-    ]
-
-    assert len(sent_heartbeats) > 0
+        await fix_session.logon(reset=True)
+        async for msg in fix_session:
+            assert msg.msg_type == fc.FixMsgType.Logon
+            assert msg.get(TAGS.ResetSeqNumFlag) == fc.ResetSeqNumFlag.YES
+            assert msg.seq_num == 1
+            assert fix_session._store.get_seq_num() == 2
+            break
+        else:
+            raise AssertionError('No message received')
 
 
 @pytest.mark.asyncio
-async def test_test_request(fix_session):
+async def test_test_request(fix_session, test_server):
 
-    messages = []
+    test_id = str(uuid.uuid4())
 
-    async def iter_messages():
-        async with fix_session.connect():
-            await fix_session.logon()
-            await fix_session.send_test_request()
-            async for msg in fix_session:
-                messages.append(msg)
+    async with fix_session.connect():
+        await fix_session.logon()
+        await fix_session._send_test_request(test_id)
+        async for msg in fix_session:
+            if msg.msg_type == fc.FixMsgType.Heartbeat:
+                if msg.get(112) == test_id:
+                    break
+        else:
+            raise AssertionError('No message received')
 
-    with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(iter_messages(), timeout=2)
 
-    heartbeats = [
-        m for m in messages
-        if fc.FixMsgType(m.message_type.decode()) == fc.FixMsgType.Heartbeat
-    ]
+@pytest.mark.asyncio
+async def test_recover_from_disconnect(fix_session, test_server):
 
-    # test_request_id = heartbeats[0].get(fc.FixTag.FIX42.TestReqID)
-    # assert test_request_id is not None
+    async with fix_session.connect():
+        await fix_session.logon()
+        async for msg in fix_session:
+            assert msg.msg_type == fc.FixMsgType.Logon
+            break
+        else:
+            raise AssertionError('No message received')
+
+        test_server.close()
+        await test_server.wait_close()
+
+        # flush any remaning msgs from buffer
+        async for msg in fix_session:
+            pass
+
+        test_server.start()
+
+        async for msg in fix_session:
+            assert msg.msg_type == fc.FixMsgType.Heartbeat
+        else:
+            raise AssertionError('No message received')

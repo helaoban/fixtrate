@@ -19,6 +19,7 @@ def server_store():
 def server_config():
     return dict(
         FIX_HOST='127.0.0.1',
+        FIX_ACCOUNT='U001',
         FIX_PORT=8686,
         FIX_SENDER_COMP_ID='FIXTEST',
         FIX_VERSION=fixation.constants.FixVersion.FIX42,
@@ -35,9 +36,10 @@ async def test_server(event_loop, server_store, server_config):
         loop=event_loop,
         store=server_store
     )
-    server()
+    server.start()
     yield server
-    server.shutdown()
+    server.close()
+    await server.wait_close()
 
 
 @pytest.fixture
@@ -47,7 +49,6 @@ def client_config(server_config):
         'FIX_TARGET_COMP_ID': server_config['FIX_SENDER_COMP_ID'],
         'FIX_SENDER_COMP_ID': 'TESTCLIENT',
         'FIX_ACCOUNT': 'account',
-        'FIX_HEARTBEAT_INTERVAL': 1,
         'FIX_RESET_SEQUENCE': True
     }
 
@@ -58,6 +59,5 @@ def parser(client_config):
 
 
 @pytest.fixture
-async def fix_session(client_config, client_store, test_server):
+async def fix_session(client_config, client_store):
     return session.FixSession(client_config, store=client_store)
-
