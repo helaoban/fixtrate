@@ -368,9 +368,6 @@ class FixSession:
 
         self._store.store_message(msg, remote=True)
 
-        if self._debug:
-            self._print_msg_to_console(msg, remote=True)
-
         try:
             self._check_sequence_integrity(msg)
         except fe.FatalSequenceGap as error:
@@ -501,6 +498,9 @@ class FixSession:
                 logger.error('Peer closed the connection!')
                 return
             self._parser.append_buffer(data)
+
+        if self._debug:
+            self._print_msg_to_console(msg, remote=True)
 
         await self._handle_message(msg)
         return msg
