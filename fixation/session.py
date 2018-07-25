@@ -44,6 +44,10 @@ class FixConnection(object):
         self.connected = True
 
     async def close(self):
+
+        if not self.connected:
+            return
+
         self.writer.close()
         self.connected = False
 
