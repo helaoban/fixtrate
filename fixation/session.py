@@ -36,11 +36,11 @@ class FixConnection(object):
         on_disconnect=None,
         loop=None
     ):
-        self.reader = reader
-        self.writer = writer
+        self._reader = reader
+        self._writer = writer
         self._server = server
-        self.on_disconnect = on_disconnect
-        self.loop = loop or asyncio.get_event_loop()
+        self._on_disconnect = on_disconnect
+        self._loop = loop or asyncio.get_event_loop()
         self.connected = True
 
     async def close(self):
@@ -48,19 +48,19 @@ class FixConnection(object):
         if not self.connected:
             return
 
-        self.writer.close()
+        self._writer.close()
         self.connected = False
 
         if self._server:
             self._server.close()
             await self._server.wait_closed()
 
-        if self.on_disconnect is not None:
-            await utils.maybe_await(self.on_disconnect)
+        if self._on_disconnect is not None:
+            await utils.maybe_await(self._on_disconnect)
 
     async def read(self):
         try:
-            data = await self.reader.read(4096)
+            data = await self._reader.read(4096)
         except ConnectionError as error:
             logger.error(error)
             raise
@@ -70,8 +70,8 @@ class FixConnection(object):
         return data
 
     async def write(self, *args, **kwargs):
-        self.writer.write(*args, **kwargs)
-        await self.writer.drain()
+        self._writer.write(*args, **kwargs)
+        await self._writer.drain()
 
 
 class FixConnectionContextManager(Coroutine):
@@ -84,22 +84,22 @@ class FixConnectionContextManager(Coroutine):
         is_server=False,
         loop=None
     ):
-        self.config = conf
-        self.on_connect = on_connect
-        self.on_disconnect = on_disconnect
-        self.loop = loop or asyncio.get_event_loop()
+        self._config = conf
+        self._on_connect = on_connect
+        self._on_disconnect = on_disconnect
+        self._loop = loop or asyncio.get_event_loop()
         self._coro = self._listen() if is_server else self._connect()
 
     async def _connect(self, tries=5, retry_wait=5):
-        host = self.config.get('FIX_HOST', '127.0.0.1')
-        port = self.config.get('FIX_PORT', 4000)
+        host = self._config.get('FIX_HOST', '127.0.0.1')
+        port = self._config.get('FIX_PORT', 4000)
         tried = 1
         while tried <= tries:
             try:
                 reader, writer = await asyncio.open_connection(
                     host=host,
                     port=port,
-                    loop=self.loop
+                    loop=self._loop
                 )
             except OSError as error:
                 logger.error(error)
@@ -110,8 +110,8 @@ class FixConnectionContextManager(Coroutine):
                 continue
             else:
                 conn = FixConnection(
-                    reader, writer, on_disconnect=self.on_disconnect)
-                await utils.maybe_await(self.on_connect, conn)
+                    reader, writer, on_disconnect=self._on_disconnect)
+                await utils.maybe_await(self._on_connect, conn)
                 return conn
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
@@ -123,8 +123,8 @@ class FixConnectionContextManager(Coroutine):
         async def put(reader, writer):
             await queue.put((reader, writer))
 
-        host = self.config.get('FIX_HOST', '127.0.0.1')
-        port = self.config.get('FIX_PORT', 4000)
+        host = self._config.get('FIX_HOST', '127.0.0.1')
+        port = self._config.get('FIX_PORT', 4000)
         self._server = await asyncio.start_server(
             put,
             host=host,
@@ -136,8 +136,8 @@ class FixConnectionContextManager(Coroutine):
             reader,
             writer,
             server=self._server,
-            on_disconnect=self.on_disconnect)
-        await utils.maybe_await(self.on_connect, conn)
+            on_disconnect=self._on_disconnect)
+        await utils.maybe_await(self._on_connect, conn)
         return conn
 
     def send(self, arg):
