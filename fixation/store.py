@@ -1,6 +1,7 @@
 import abc
 import json
 import time
+import hashlib
 
 from sortedcontainers import SortedDict
 
@@ -123,9 +124,19 @@ class FixMemoryStore(FixStore):
 
 class FixRedisStore(FixStore):
 
-    def __init__(self, redis_pool, **options):
+    def __init__(self, redis_pool, conf):
         self._redis = redis_pool
-        self._conf = options.get('conf', config.get_config_from_env())
+        self._conf = conf
+
+    @property
+    def session_key(self):
+        sender_id = self._conf['FIX_SENDER_COMP_ID']
+        target_id = self._conf['FIX_TARGET_COMP_ID']
+        key = sender_id + target_id
+        return hashlib.sha3_256(key.encode()).hexdigest()
+
+    def _make_namespaced_key(self, key):
+        return self.session_key + ':' + key
 
     @staticmethod
     def decode_message(msg, uid=None):
@@ -137,35 +148,46 @@ class FixRedisStore(FixStore):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        return await self._redis.incr(key)
+        return await self._redis.incr(
+            self._make_namespaced_key(key))
 
     async def set_seq_num(self, seq_num, remote=False):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        await self._redis.set(key, str(seq_num))
+        await self._redis.set(
+            self._make_namespaced_key(key), str(seq_num))
 
     async def get_seq_num(self, remote=False):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        seq_num = int(await self._redis.get(key))
+        seq_num = int(await self._redis.get(
+            self._make_namespaced_key(key)))
         return seq_num
 
     async def store_message(self, msg, remote=False):
         direction = 'remote' if remote else 'local'
         seq_num = msg.get(34)
-        await self._redis.hset('messages', msg.uid, msg.encode())
-        await self._redis.zadd(direction, int(seq_num), msg.uid)
-        await self._redis.zadd('messages_by_time', time.time(), msg.uid)
+        await self._redis.hset(
+            self._make_namespaced_key('messages'),
+            msg.uid, msg.encode())
+        await self._redis.zadd(
+            self._make_namespaced_key(direction),
+            int(seq_num), msg.uid)
+        await self._redis.zadd(
+            self._make_namespaced_key('messages_by_time'),
+            time.time(), msg.uid)
 
     async def get_message(self, uid):
-        msg = await self._redis.hget('messages', uid)
+        msg = await self._redis.hget(
+            self._make_namespaced_key('messages'), uid)
         return self.decode_message(msg, uid)
 
     async def get_messages(self, keys=None):
         if keys:
-            msgs = await self._redis.hmget('messages', *keys)
+            msgs = await self._redis.hmget(
+                self._make_namespaced_key('messages'), *keys)
             msgs = dict(zip(keys, msgs))
         else:
             msgs = await self._redis.hgetall('messages')
@@ -174,7 +196,8 @@ class FixRedisStore(FixStore):
     async def get_messages_by_seq_num(self, start='-inf', end='inf', remote=False):
         direction = 'remote' if remote else 'local'
         uids_by_seq_num = await self._redis.zrangebyscore(
-            direction, min=start, max=end, withscores=True)
+            self._make_namespaced_key(direction),
+            min=start, max=end, withscores=True)
         msgs = await self.get_messages(keys=[uid for uid, _ in uids_by_seq_num])
         return SortedDict({
             int(seq_num): msgs[uid]
@@ -185,7 +208,8 @@ class FixRedisStore(FixStore):
 
     async def get_messages_by_time(self):
         uids_by_time = await self._redis.zrange(
-            'messages_by_time', start=0, stop=-1, withscores=True)
+            self._make_namespaced_key('messages_by_time'),
+            start=0, stop=-1, withscores=True)
         msgs = await self.get_messages(keys=[uid for uid, _ in uids_by_time])
         return SortedDict({
             timestamp: msgs[uid]
@@ -195,10 +219,10 @@ class FixRedisStore(FixStore):
 
     async def store_config(self, conf):
         jsoned = json.dumps(conf)
-        await self._redis.set('config', jsoned)
+        await self._redis.set(self._make_namespaced_key('config'), jsoned)
 
     async def get_config(self):
-        conf = await self._redis.get('config')
+        conf = await self._redis.get(self._make_namespaced_key('config'))
         return json.loads(conf.decode())
 
     async def new_session(self):

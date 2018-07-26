@@ -194,7 +194,7 @@ class FixClient(object):
         redis_pool = await aioredis.create_redis_pool(
             'redis://localhost', minsize=5, maxsize=10)
 
-        store = fs.FixRedisStore(redis_pool)
+        store = fs.FixRedisStore(redis_pool, self.config)
 
         self.session = session.FixSession(
             conf=self.config,
