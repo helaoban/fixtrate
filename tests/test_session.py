@@ -2,7 +2,7 @@ import asyncio
 import pytest
 import uuid
 
-from fixation import constants as fc
+from fixation import constants as fc, message as fm
 
 TAGS = fc.FixTag.FIX42
 
@@ -112,7 +112,7 @@ async def test_test_request(fix_session, test_server):
 
 
 @pytest.mark.asyncio
-async def test_recover_from_disconnect(fix_session, test_server):
+async def test_message_recovery(fix_session, test_server):
 
     async with fix_session.connect():
         await fix_session.logon()
@@ -122,16 +122,30 @@ async def test_recover_from_disconnect(fix_session, test_server):
         else:
             raise AssertionError('No message received')
 
-        test_server.close()
-        await test_server.wait_close()
+    news_msg = fm.FixMessage()
+    news_msg.append_pair(
+        TAGS.MsgType,
+        fc.FixMsgType.News,
+        header=True
+    )
+    news_msg.append_pair(TAGS.Headline, 'BREAKING NEWS')
+    news_msg.append_pair(TAGS.LinesOfText, 1)
+    news_msg.append_pair(TAGS.Text, 'Government admits turning frogs gay.')
 
-        # flush any remaning msgs from buffer
+    _, server_session = test_server._clients[0]
+    await server_session.send_message(news_msg)
+
+    async with fix_session.connect():
+        await fix_session.logon()
         async for msg in fix_session:
-            pass
-
-        test_server.start()
+            assert msg.msg_type == fc.FixMsgType.Logon
+            break
+        else:
+            raise AssertionError('No message received')
 
         async for msg in fix_session:
-            assert msg.msg_type == fc.FixMsgType.Heartbeat
+            assert msg.msg_type == fc.FixMsgType.News
+            assert msg.is_duplicate
+            break
         else:
             raise AssertionError('No message received')
