@@ -142,23 +142,17 @@ class FixRedisStore(FixStore):
         return parser.get_message(uid)
 
     async def incr_seq_num(self, remote=False):
-        key = 'seq_num_local'
-        if remote:
-            key = 'seq_num_remote'
+        key = 'seq_num_{}'.format('remote' if remote else 'local')
         return await self._redis.incr(
             self._make_namespaced_key(key))
 
     async def set_seq_num(self, seq_num, remote=False):
-        key = 'seq_num_local'
-        if remote:
-            key = 'seq_num_remote'
+        key = 'seq_num_{}'.format('remote' if remote else 'local')
         await self._redis.set(
             self._make_namespaced_key(key), str(seq_num))
 
     async def get_seq_num(self, remote=False):
-        key = 'seq_num_local'
-        if remote:
-            key = 'seq_num_remote'
+        key = 'seq_num_{}'.format('remote' if remote else 'local')
         seq_num = await self._redis.get(
             self._make_namespaced_key(key))
         seq_num = seq_num or await self.incr_seq_num(remote=remote)
