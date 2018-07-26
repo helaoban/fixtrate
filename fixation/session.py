@@ -221,12 +221,12 @@ class FixSession:
 
     async def send_message(self, msg, skip_headers=False):
         if not skip_headers:
-            seq_num = self._store.get_seq_num()
+            seq_num = await self._store.get_seq_num()
             self._append_standard_header(msg, seq_num)
         if self._debug:
             self._print_msg_to_console(msg)
-        self._store.incr_seq_num()
-        self._store.store_message(msg)
+        await self._store.incr_seq_num()
+        await self._store.store_message(msg)
         await self._conn.write(msg.encode())
         await self._reset_heartbeat_timer()
 
@@ -239,7 +239,7 @@ class FixSession:
         await self.send_message(msg)
 
     async def _send_sequence_reset(self):
-        seq_num = self._store.get_seq_num()
+        seq_num = await self._store.get_seq_num()
         msg = fix42.sequence_reset(seq_num + 1)
         await self.send_message(msg)
 
@@ -279,12 +279,12 @@ class FixSession:
         await self.send_message(msg)
 
     async def _reset_sequence(self, new_seq_num):
-        self._store.set_remote_sequence_number(new_seq_num - 1)
+        await self._store.set_remote_sequence_number(new_seq_num - 1)
         msg = fix42.sequence_reset(new_seq_num)
         await self.send_message(msg)
 
     async def _resend_messages(self, start, end):
-        sent_messages = self._store.get_messages_by_seq_num(
+        sent_messages = await self._store.get_messages_by_seq_num(
             start=start, end=end, remote=False)
 
         gf_seq_num,  gf_new_seq_num = None, None
@@ -306,8 +306,8 @@ class FixSession:
                 )
                 await self.send_message(msg, skip_headers=True)
 
-    def _check_sequence_integrity(self, msg):
-        actual = self._store.get_seq_num(remote=True)
+    async def _check_sequence_integrity(self, msg):
+        actual = await self._store.get_seq_num(remote=True)
         diff = msg.seq_num - actual
         if diff == 0:
             return
@@ -333,10 +333,10 @@ class FixSession:
 
     async def _handle_message(self, msg):
 
-        self._store.store_message(msg, remote=True)
+        await self._store.store_message(msg, remote=True)
 
         try:
-            self._check_sequence_integrity(msg)
+            await self._check_sequence_integrity(msg)
         except fe.FatalSequenceGap as error:
             if msg.is_duplicate:
                 return
@@ -383,10 +383,10 @@ class FixSession:
                     )
                 else:
                     new_seq_num = int(msg.get(self._tags.NewSeqNo))
-                    self._store.set_seq_num(new_seq_num)
+                    await self._store.set_seq_num(new_seq_num)
             return
         finally:
-            self._store.incr_seq_num(remote=True)
+            await self._store.incr_seq_num(remote=True)
 
         await self._dispatch(msg)
 
@@ -394,7 +394,7 @@ class FixSession:
         if not self._is_gap_fill(msg):
             pass
         new_seq_num = int(msg.get(self._tags.NewSeqNo))
-        self._store.set_seq_num(new_seq_num - 1, remote=True)
+        await self._store.set_seq_num(new_seq_num - 1, remote=True)
 
     async def _handle_logon(self, msg):
         heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
@@ -422,8 +422,8 @@ class FixSession:
         is_reset = reset_seq == fc.ResetSeqNumFlag.YES
 
         if is_reset:
-            self._store.set_seq_num(1)
-            self._store.set_seq_num(1, remote=True)
+            await self._store.set_seq_num(1)
+            await self._store.set_seq_num(1, remote=True)
 
         if self._is_initiator == None:
             self._is_initiator = utils.Tristate(False)

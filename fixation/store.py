@@ -143,45 +143,45 @@ class FixRedisStore(FixStore):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        return self._redis.incr(key)
+        return await self._redis.incr(key)
 
     async def set_seq_num(self, seq_num, remote=False):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        self._redis.set(key, str(seq_num))
+        await self._redis.set(key, str(seq_num))
 
     async def get_seq_num(self, remote=False):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        seq_num = int(self._redis.get(key))
+        seq_num = int(await self._redis.get(key))
         return seq_num
 
     async def store_message(self, msg, remote=False):
         direction = 'remote' if remote else 'local'
         seq_num = msg.get(34)
-        self._redis.hset('messages', msg.uid, msg.encode())
-        self._redis.zadd(direction, int(seq_num), msg.uid)
-        self._redis.zadd('messages_by_time', time.time(), msg.uid)
+        await self._redis.hset('messages', msg.uid, msg.encode())
+        await self._redis.zadd(direction, int(seq_num), msg.uid)
+        await self._redis.zadd('messages_by_time', time.time(), msg.uid)
 
     async def get_message(self, uid):
-        msg = self._redis.hget('messages', uid)
+        msg = await self._redis.hget('messages', uid)
         return self.decode_message(msg, uid)
 
     async def get_messages(self, keys=None):
         if keys:
-            msgs = self._redis.hmget('messages', *keys)
+            msgs = await self._redis.hmget('messages', *keys)
             msgs = dict(zip(keys, msgs))
         else:
-            msgs = self._redis.hgetall('messages')
+            msgs = await self._redis.hgetall('messages')
         return {uid: self.decode_message(msg, uid.decode()) for uid, msg in msgs.items()}
 
     async def get_messages_by_seq_num(self, start='-inf', end='inf', remote=False):
         direction = 'remote' if remote else 'local'
-        uids_by_seq_num = self._redis.zrangebyscore(
+        uids_by_seq_num = await self._redis.zrangebyscore(
             direction, min=start, max=end, withscores=True)
-        msgs = self.get_messages(keys=[uid for uid, _ in uids_by_seq_num])
+        msgs = await self.get_messages(keys=[uid for uid, _ in uids_by_seq_num])
         return SortedDict({
             int(seq_num): msgs[uid]
             for uid, seq_num
@@ -190,9 +190,9 @@ class FixRedisStore(FixStore):
         })
 
     async def get_messages_by_time(self):
-        uids_by_time = self._redis.zrange(
+        uids_by_time = await self._redis.zrange(
             'messages_by_time', start=0, end=-1, withscores=True)
-        msgs = self.get_messages(keys=[uid for uid, _ in uids_by_time])
+        msgs = await self.get_messages(keys=[uid for uid, _ in uids_by_time])
         return SortedDict({
             timestamp: msgs[uid]
             for uid, timestamp
@@ -201,14 +201,14 @@ class FixRedisStore(FixStore):
 
     async def store_config(self, conf):
         jsoned = json.dumps(conf)
-        self._redis.set('config', jsoned)
+        await self._redis.set('config', jsoned)
 
     async def get_config(self):
-        conf = self._redis.get('config')
+        conf = await self._redis.get('config')
         return json.loads(conf.decode())
 
     async def new_session(self):
         for key in ['messages', 'remote', 'local', 'messages_by_time']:
-            self._redis.delete(key)
-        self.set_seq_num(1)
-        self.set_seq_num(1, remote=True)
+            await self._redis.delete(key)
+        await self.set_seq_num(1)
+        await self.set_seq_num(1, remote=True)
