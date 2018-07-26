@@ -57,7 +57,7 @@ class MockFixServer(object):
         fix_session.listen(reader, writer)
 
         async for msg in fix_session:
-            msg.get
+            pass
 
         task = self.loop.create_task(self.handle_client(fix_session))
         self._clients.append((task, fix_session))

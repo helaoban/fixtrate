@@ -89,7 +89,8 @@ async def test_new_seq_num(fix_session, test_server):
             assert msg.msg_type == fc.FixMsgType.Logon
             assert msg.get(TAGS.ResetSeqNumFlag) == fc.ResetSeqNumFlag.YES
             assert msg.seq_num == 1
-            assert fix_session._store.get_seq_num() == 2
+            stored_seq_num = await fix_session._store.get_seq_num()
+            assert stored_seq_num == 2
             break
         else:
             raise AssertionError('No message received')
