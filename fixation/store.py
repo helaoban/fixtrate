@@ -127,12 +127,6 @@ class FixRedisStore(FixStore):
         self._redis = redis_pool
         self._conf = options.get('conf', config.get_config_from_env())
 
-    def get(self, key):
-        res = self._redis.get(key)
-        if res is not None:
-            return res.decode()
-        return None
-
     @staticmethod
     def decode_message(msg, uid=None):
         parser = fp.FixParser()
