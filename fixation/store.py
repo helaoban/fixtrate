@@ -127,16 +127,16 @@ class FixRedisStore(FixStore):
     def __init__(self, redis_pool, conf):
         self._redis = redis_pool
         self._conf = conf
+        self._session_id = self._generate_session_id()
 
-    @property
-    def session_key(self):
+    def _generate_session_id(self):
         sender_id = self._conf['FIX_SENDER_COMP_ID']
         target_id = self._conf['FIX_TARGET_COMP_ID']
         key = sender_id + target_id
         return hashlib.sha3_256(key.encode()).hexdigest()
 
     def _make_namespaced_key(self, key):
-        return self.session_key + ':' + key
+        return self._session_id + ':' + key
 
     @staticmethod
     def decode_message(msg, uid=None):
