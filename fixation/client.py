@@ -6,7 +6,8 @@ import aioredis
 from fixation import (
     config, session,
     rpc, constants as fc,
-    utils, store as fs
+    utils, store as fs,
+    signals
 )
 from fixation.factories import fix42
 
@@ -201,13 +202,13 @@ class FixClient(object):
             loop=self._loop
         )
 
-        @self._session.on_recv_message
-        def print_incoming_to_console(msg):
+        @signals.message_received.connect
+        def print_incoming_to_console(sender, msg):
             send_time = msg.get(self._tags.SendingTime)
             print('{}: {} <--'.format(send_time, msg))
 
-        @self._session.on_send_message
-        def print_outgoing_to_console(msg):
+        @signals.message_sent.connect
+        def print_outgoing_to_console(sender, msg):
             send_time = msg.get(self._tags.SendingTime)
             print('{}: {} -->'.format(send_time, msg))
 
