@@ -11,6 +11,7 @@ untangle = "*"
 aenum = "*"
 sortedcontainers = "*"
 aioredis = "*"
+blinker = "*"
 
 [dev-packages]
 ipython = "*"

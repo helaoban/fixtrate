@@ -14,6 +14,7 @@ REQUIRES = [
     'aenum',
     'jsonschema',
     'aioredis',
+    'blinker',
     'simplefix',
     'sortedcontainers',
     'untangle',

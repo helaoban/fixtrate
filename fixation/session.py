@@ -9,6 +9,7 @@ from fixation import (
     store as fix_store, config
 )
 from fixation.factories import fix42
+from .signals import message_received, message_sent
 
 
 logging.basicConfig()
@@ -216,6 +217,8 @@ class FixSession:
         for func in self.on_send_msg_funcs:
             await utils.maybe_await(func, msg)
 
+        message_sent.send(self, msg=msg)
+
         await self._conn.write(msg.encode())
         await self._reset_heartbeat_timer()
 
@@ -350,11 +353,12 @@ class FixSession:
         return msg
 
     async def _handle_message(self, msg):
-
         await self._store.store_message(msg, remote=True)
 
         for func in self.on_recv_msg_funcs:
             await utils.maybe_await(func, msg)
+
+        message_received.send(self, msg=msg)
 
         try:
             await self._check_sequence_integrity(msg)
