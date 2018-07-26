@@ -1,3 +1,4 @@
+import abc
 import json
 import time
 
@@ -7,37 +8,47 @@ from sortedcontainers import SortedDict
 from fixation import parse as fp, config
 
 
-class FixStore(object):
+class FixStore(metaclass=abc.ABCMeta):
 
+    @abc.abstractmethod
     def incr_seq_num(self, remote=False):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def get_seq_num(self, remote=False):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def set_seq_num(self, seq_num, remote=False):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def store_message(self, msg, remote=False):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def get_message(self, uid):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def get_messages(self, keys=None):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def get_messages_by_seq_num(self, start=None, end=None, remote=False):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def new_session(self):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def store_config(self, conf):
-        raise NotImplementedError
+        pass
 
+    @abc.abstractmethod
     def get_config(self):
-        raise NotImplementedError
+        pass
 
 
 class FixMemoryStore(FixStore):
