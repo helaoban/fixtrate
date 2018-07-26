@@ -268,13 +268,6 @@ class FixSession:
         await self.send_message(login_msg)
 
     async def logon(self, reset=False):
-        """
-        Send a Logon <A> message. Note: setting reset_sequence=True will
-        set the ResetSeqNumFlag to 'Y', which for most counter-parties
-        means opening new FIX session, and so we clear the store.
-
-        :return:
-        """
         await self._send_login(reset)
 
     async def logoff(self):
