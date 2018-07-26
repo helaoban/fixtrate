@@ -4,7 +4,7 @@ import logging
 from fixation import (
     constants as fc,
     store as fix_store,
-    session
+    session, utils
 )
 
 logger = logging.getLogger(__name__)
@@ -29,31 +29,52 @@ class MockFixServer(object):
         self._closing = False
 
         self._last_message_time = None
-        self.TAGS = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
+        self._tags = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
 
         self._hearbeat_cb = None
+        self._server = None
+        self._clients = []
 
-        self._listener = None
+    async def send_message(self, msg):
+        await self.session.send_message(msg)
 
-    async def listen(self):
-        self.session = session.FixSession(
-            conf=self.config,
-            store=self.store,
-            loop=self.loop,
-        )
-
-        async with self.session.listen():
-            async for msg in self.session:
-                pass
-
-    def start(self):
-        self._listener = self.loop.create_task(self.listen())
-
-    def close(self):
-        self._listener.cancel()
-
-    async def wait_close(self):
+    async def handle_client(self, session):
         try:
-            await self._listener
+            async for msg in session:
+                # print('SERVER RECEIVED: {}'.format(msg))
+                pass
         except asyncio.CancelledError:
             pass
+        finally:
+            await session.close()
+
+    async def accept_client(self, reader, writer):
+        fix_session = session.FixSession(
+            conf=self.config,
+            store=self.store,
+            loop=self.loop
+        )
+        fix_session.listen(reader, writer)
+
+        async for msg in fix_session:
+            msg.get
+
+        task = self.loop.create_task(self.handle_client(fix_session))
+        self._clients.append((task, fix_session))
+
+    async def start(self):
+        host = self.config.get('FIX_HOST', '127.0.0.1')
+        port = self.config.get('FIX_PORT', 4000)
+        self._server = await asyncio.start_server(
+            self.accept_client,
+            host=host,
+            port=port,
+        )
+
+    async def close(self):
+        for task, fix_session in self._clients:
+            task.cancel()
+            await task
+
+        self._server.close()
+        await self._server.wait_closed()

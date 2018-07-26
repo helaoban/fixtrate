@@ -36,10 +36,9 @@ async def test_server(event_loop, server_store, server_config):
         loop=event_loop,
         store=server_store
     )
-    server.start()
+    await server.start()
     yield server
-    server.close()
-    await server.wait_close()
+    await server.close()
 
 
 @pytest.fixture
