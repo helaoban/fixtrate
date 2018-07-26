@@ -204,13 +204,15 @@ class FixClient(object):
 
         @signals.message_received.connect
         def print_incoming_to_console(sender, msg):
-            send_time = msg.get(self._tags.SendingTime)
-            print('{}: {} <--'.format(send_time, msg))
+            print('{} ({}) <--'.format(msg.msg_type.name, msg.seq_num))
 
         @signals.message_sent.connect
         def print_outgoing_to_console(sender, msg):
-            send_time = msg.get(self._tags.SendingTime)
-            print('{}: {} -->'.format(send_time, msg))
+            print('{} ({}) -->'.format(msg.msg_type.name, msg.seq_num))
+
+        @signals.sequence_gap.connect
+        def debug_sequence_gap(sender, exc):
+            print(exc)
 
         while True:
             try:
