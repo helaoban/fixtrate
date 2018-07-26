@@ -248,7 +248,7 @@ class FixSession:
         timestamp=None
     ):
         version = self._config['FIX_VERSION']
-        sender_id = self._config['FIX_VERSION']
+        sender_id = self._config['FIX_SENDER_COMP_ID']
         target_id = self._config['FIX_TARGET_COMP_ID']
 
         pairs = (
