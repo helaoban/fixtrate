@@ -71,9 +71,9 @@ class FixMemoryStore(FixStore):
 
     async def get_seq_num(self, remote=False):
         if remote:
-            return self._remote_seq_num
+            return self._remote_seq_num or self.incr_seq_num(remote=True)
         else:
-            return self._local_seq_num
+            return self._local_seq_num or self.incr_seq_num()
 
     async def set_seq_num(self, seq_num, remote=False):
         if remote:
@@ -161,8 +161,8 @@ class FixRedisStore(FixStore):
             key = 'seq_num_remote'
         seq_num = await self._redis.get(
             self._make_namespaced_key(key))
-        if seq_num:
-            return int(seq_num)
+        seq_num = seq_num or await self.incr_seq_num(remote=remote)
+        return int(seq_num)
 
     async def store_message(self, msg, remote=False):
         direction = 'remote' if remote else 'local'
