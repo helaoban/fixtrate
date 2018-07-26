@@ -491,7 +491,7 @@ class FixSession:
         if not self._is_gap_fill(msg):
             pass
         new_seq_num = int(msg.get(self._tags.NewSeqNo))
-        await self._store.set_seq_num(new_seq_num - 1, remote=True)
+        await self._store.set_seq_num(new_seq_num, remote=True)
 
     async def _cancel_heartbeat_timer(self):
         if self._hearbeat_cb is not None:
