@@ -69,7 +69,11 @@ class FixConnection(object):
 
     async def write(self, *args, **kwargs):
         self._writer.write(*args, **kwargs)
-        await self._writer.drain()
+        try:
+            await self._writer.drain()
+        except ConnectionError as error:
+            logger.error(error)
+            await self.close()
 
 
 class FixConnectionContextManager(Coroutine):
