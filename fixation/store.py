@@ -5,7 +5,7 @@ import hashlib
 
 from sortedcontainers import SortedDict
 
-from fixation import parse as fp, config
+from fixation import parse as fp
 
 
 class FixStore(metaclass=abc.ABCMeta):
@@ -162,9 +162,9 @@ class FixRedisStore(FixStore):
         key = 'seq_num_local'
         if remote:
             key = 'seq_num_remote'
-        seq_num = int(await self._redis.get(
-            self._make_namespaced_key(key)))
-        return seq_num
+        seq_num = await self._redis.get(
+            self._make_namespaced_key(key))
+        return int(seq_num)
 
     async def store_message(self, msg, remote=False):
         direction = 'remote' if remote else 'local'
@@ -191,9 +191,17 @@ class FixRedisStore(FixStore):
             msgs = dict(zip(keys, msgs))
         else:
             msgs = await self._redis.hgetall('messages')
-        return {uid: self.decode_message(msg, uid.decode()) for uid, msg in msgs.items()}
+        return {
+            uid: self.decode_message(msg, uid.decode())
+            for uid, msg in msgs.items()
+        }
 
-    async def get_messages_by_seq_num(self, start='-inf', end='inf', remote=False):
+    async def get_messages_by_seq_num(
+        self,
+        start='-inf',
+        end='inf',
+        remote=False
+    ):
         direction = 'remote' if remote else 'local'
         uids_by_seq_num = await self._redis.zrangebyscore(
             self._make_namespaced_key(direction),
