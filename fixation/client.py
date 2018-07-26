@@ -25,7 +25,7 @@ class FixClient(object):
 
         self.config = conf
 
-        self.TAGS = fc.FixTag.FIX42
+        self.TAGS = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
 
     async def send_test_request(self):
         msg = fix42.test_request()
