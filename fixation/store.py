@@ -133,7 +133,7 @@ class FixRedisStore(FixStore):
         sender_id = self._conf['FIX_SENDER_COMP_ID']
         target_id = self._conf['FIX_TARGET_COMP_ID']
         key = sender_id + target_id
-        return hashlib.sha3_256(key.encode()).hexdigest()
+        return hashlib.sha256(key.encode()).hexdigest()
 
     def _make_namespaced_key(self, key):
         return self._session_id + ':' + key
