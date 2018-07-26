@@ -155,7 +155,7 @@ class FixSession:
         self._config = conf
 
         self._tags = getattr(fc.FixTag, self._config['FIX_VERSION'].name)
-        self._store = store or fix_store.FixRedisStore()
+        self._store = store or fix_store.FixMemoryStore()
         self._parser = parse.FixParser(self._config)
         self._fix_dict = dictionary
 
