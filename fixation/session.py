@@ -32,13 +32,11 @@ class FixConnection(object):
         self,
         reader,
         writer,
-        server=None,
         on_disconnect=None,
         loop=None
     ):
         self._reader = reader
         self._writer = writer
-        self._server = server
         self._on_disconnect = on_disconnect
         self._loop = loop or asyncio.get_event_loop()
         self.connected = True
@@ -54,10 +52,6 @@ class FixConnection(object):
 
         self._writer.close()
         self.connected = False
-
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
 
         if self._on_disconnect is not None:
             await utils.maybe_await(self._on_disconnect)
@@ -85,14 +79,13 @@ class FixConnectionContextManager(Coroutine):
         conf,
         on_connect=None,
         on_disconnect=None,
-        is_server=False,
         loop=None
     ):
         self._config = conf
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
         self._loop = loop or asyncio.get_event_loop()
-        self._coro = self._listen() if is_server else self._connect()
+        self._coro = self._connect()
 
     async def _connect(self, tries=5, retry_wait=5):
         host = self._config.get('FIX_HOST', '127.0.0.1')
@@ -120,29 +113,6 @@ class FixConnectionContextManager(Coroutine):
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
         raise ConnectionError
-
-    async def _listen(self):
-        queue = asyncio.Queue()
-
-        async def put(reader, writer):
-            await queue.put((reader, writer))
-
-        host = self._config.get('FIX_HOST', '127.0.0.1')
-        port = self._config.get('FIX_PORT', 4000)
-        self._server = await asyncio.start_server(
-            put,
-            host=host,
-            port=port,
-            backlog=1
-        )
-        reader, writer = await queue.get()
-        conn = FixConnection(
-            reader,
-            writer,
-            server=self._server,
-            on_disconnect=self._on_disconnect)
-        await utils.maybe_await(self._on_connect, conn)
-        return conn
 
     def send(self, arg):
         self._coro.send(arg)
@@ -202,9 +172,13 @@ class FixSession:
         return FixConnectionContextManager(
             self._config, self._on_connect, self._on_disconnect)
 
-    def listen(self):
-        return FixConnectionContextManager(
-            self._config, self._on_connect, self._on_disconnect, is_server=True)
+    def listen(self, reader, writer):
+        conn = FixConnection(
+            reader=reader,
+            writer=writer,
+            on_disconnect=self._on_disconnect
+        )
+        self._on_connect(conn)
 
     async def _on_connect(self, conn):
         self._conn = conn
