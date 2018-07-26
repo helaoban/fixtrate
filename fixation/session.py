@@ -9,7 +9,7 @@ from fixation import (
     store as fix_store, config
 )
 from fixation.factories import fix42
-from .signals import message_received, message_sent
+from .signals import message_received, message_sent, sequence_gap
 
 
 logging.basicConfig()
@@ -381,6 +381,8 @@ class FixSession:
                 await self.close()
                 raise
         except fe.SequenceGap as error:
+
+            sequence_gap.send(self, exc=error)
 
             if msg.msg_type == fc.FixMsgType.Logon:
                 await self._handle_logon(msg)

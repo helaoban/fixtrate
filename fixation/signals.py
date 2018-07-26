@@ -52,3 +52,4 @@ _signals = Namespace()
 
 message_received = _signals.signal('message-received')
 message_sent = _signals.signal('message-sent')
+sequence_gap = _signals.signal('sequence-gap')
