@@ -161,7 +161,8 @@ class FixRedisStore(FixStore):
             key = 'seq_num_remote'
         seq_num = await self._redis.get(
             self._make_namespaced_key(key))
-        return int(seq_num)
+        if seq_num:
+            return int(seq_num)
 
     async def store_message(self, msg, remote=False):
         direction = 'remote' if remote else 'local'
@@ -179,7 +180,8 @@ class FixRedisStore(FixStore):
     async def get_message(self, uid):
         msg = await self._redis.hget(
             self._make_namespaced_key('messages'), uid)
-        return self.decode_message(msg, uid)
+        if msg:
+            return self.decode_message(msg, uid)
 
     async def get_messages(self):
         msgs = await self._redis.hgetall('messages')
