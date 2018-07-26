@@ -8,7 +8,6 @@ simplefix = "*"
 "e1839a8" = {path = ".", editable = true}
 jsonschema = "*"
 untangle = "*"
-redis = "*"
 aenum = "*"
 sortedcontainers = "*"
 aioredis = "*"
