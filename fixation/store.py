@@ -31,7 +31,7 @@ class FixStore(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    async def get_messages(self, keys=None):
+    async def get_messages(self):
         pass
 
     @abc.abstractmethod
@@ -92,11 +92,8 @@ class FixMemoryStore(FixStore):
     async def get_message(self, uid):
         return self._messages.get(uid)
 
-    async def get_messages(self, keys=None):
-        if keys:
-            return {k: self._messages[k] for k in keys}
-        else:
-            return self._messages
+    async def get_messages(self):
+        return self._messages
 
     async def get_messages_by_seq_num(self, start=0, end=-1, remote=False):
         uids_by_seq = self._local
@@ -184,13 +181,9 @@ class FixRedisStore(FixStore):
             self._make_namespaced_key('messages'), uid)
         return self.decode_message(msg, uid)
 
-    async def get_messages(self, keys=None):
-        if keys:
-            msgs = await self._redis.hmget(
-                self._make_namespaced_key('messages'), *keys)
-            msgs = dict(zip(keys, msgs))
-        else:
-            msgs = await self._redis.hgetall('messages')
+    async def get_messages(self):
+        msgs = await self._redis.hgetall('messages')
+        msgs = msgs or {}
         return {
             uid: self.decode_message(msg, uid.decode())
             for uid, msg in msgs.items()
@@ -206,7 +199,7 @@ class FixRedisStore(FixStore):
         uids_by_seq_num = await self._redis.zrangebyscore(
             self._make_namespaced_key(direction),
             min=start, max=end, withscores=True)
-        msgs = await self.get_messages(keys=[uid for uid, _ in uids_by_seq_num])
+        msgs = await self.get_messages()
         return SortedDict({
             int(seq_num): msgs[uid]
             for uid, seq_num
@@ -218,7 +211,7 @@ class FixRedisStore(FixStore):
         uids_by_time = await self._redis.zrange(
             self._make_namespaced_key('messages_by_time'),
             start=0, stop=-1, withscores=True)
-        msgs = await self.get_messages(keys=[uid for uid, _ in uids_by_time])
+        msgs = await self.get_messages()
         return SortedDict({
             timestamp: msgs[uid]
             for uid, timestamp
