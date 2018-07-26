@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "5c1d7c90d1532ffe73a39d88268c11b6985dc787291a321ddb9e1d1adad5616e"
+            "sha256": "a81e7b08d25d5e35734d4b753effde0cd7b8b386c65e5b63951c3828aca07559"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -25,9 +25,30 @@
             "index": "pypi",
             "version": "==2.1.2"
         },
+        "aioredis": {
+            "hashes": [
+                "sha256:9ffa0f9ea4076e5caedf55f095ea758f5137c7d1cd06cd9916081f4320fdaa4d",
+                "sha256:d3adfc3295a91a97cab472751e26ff85949566a131cebb27a778e49aa0638c1a"
+            ],
+            "index": "pypi",
+            "version": "==1.1.0"
+        },
+        "async-timeout": {
+            "hashes": [
+                "sha256:474d4bc64cee20603e225eb1ece15e248962958b45a3648a9f5cc29e827a610c",
+                "sha256:b3c0ddc416736619bd4a95ca31de8da6920c3b9a140c64dbef2b2fa7bf521287"
+            ],
+            "version": "==3.0.0"
+        },
         "e1839a8": {
             "editable": true,
             "path": "."
+        },
+        "hiredis": {
+            "hashes": [
+                "sha256:ca958e13128e49674aa4a96f02746f5de5973f39b57297b84d59fd44d314d5b5"
+            ],
+            "version": "==0.2.0"
         },
         "jsonschema": {
             "hashes": [

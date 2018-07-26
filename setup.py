@@ -13,7 +13,7 @@ REQUIRES_PYTHON = '>=3.6.5'
 REQUIRES = [
     'aenum',
     'jsonschema',
-    'redis',
+    'aioredis',
     'simplefix',
     'sortedcontainers',
     'untangle',

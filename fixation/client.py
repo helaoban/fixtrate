@@ -1,10 +1,12 @@
 import asyncio
 import collections
 
+import aioredis
+
 from fixation import (
     config, session,
     rpc, constants as fc,
-    utils, exceptions as fe
+    utils, store as fs
 )
 from fixation.factories import fix42
 
@@ -188,8 +190,15 @@ class FixClient(object):
                 handler(msg)
 
     async def main(self):
+
+        redis_pool = await aioredis.create_redis_pool(
+            'redis://localhost', minsize=5, maxsize=10)
+
+        store = fs.FixRedisStore(redis_pool)
+
         self.session = session.FixSession(
             conf=self.config,
+            store=store,
             loop=self.loop,
         )
         self.rpc_server = rpc.RPCServer(

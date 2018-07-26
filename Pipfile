@@ -11,6 +11,7 @@ untangle = "*"
 redis = "*"
 aenum = "*"
 sortedcontainers = "*"
+aioredis = "*"
 
 [dev-packages]
 ipython = "*"
