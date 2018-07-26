@@ -2,7 +2,6 @@ import abc
 import json
 import time
 
-import redis
 from sortedcontainers import SortedDict
 
 from fixation import parse as fp, config
@@ -123,9 +122,9 @@ class FixMemoryStore(FixStore):
 
 
 class FixRedisStore(FixStore):
-    def __init__(self, **options):
-        self._redis = redis.StrictRedis(
-            host='127.0.0.1', port=6379, db=0, socket_timeout=5)
+
+    def __init__(self, redis_pool, **options):
+        self._redis = redis_pool
         self._conf = options.get('conf', config.get_config_from_env())
 
     def get(self, key):
