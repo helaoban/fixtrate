@@ -184,9 +184,9 @@ class FixSession:
         )
         self._on_connect(conn)
 
-    def _on_connect(self, conn):
+    async def _on_connect(self, conn):
         self._conn = conn
-        self._store.store_config(self._config)
+        await self._store.store_config(self._config)
 
     async def _on_disconnect(self):
         await self._close()
