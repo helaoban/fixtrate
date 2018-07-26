@@ -197,15 +197,6 @@ class FixSession:
         seq_num,
         timestamp=None
     ):
-        """
-        Create a base message with standard headers set.
-        BodyLength and Checksum are handled by SimpleFix
-
-        :param msg:
-        :param timestamp:
-        :return:
-        """
-
         version = self._config['FIX_VERSION']
         sender_id = self._config['FIX_VERSION']
         target_id = self._config['FIX_TARGET_COMP_ID']
@@ -413,17 +404,6 @@ class FixSession:
         self._store.set_seq_num(new_seq_num - 1, remote=True)
 
     async def _handle_logon(self, msg):
-        """
-        Handle a Logon <A> message sent from server. The only
-        action that needs to be taken is when we have set
-        ResetSeqNumFlag <141> to 'Y' in our own Logon <A> message.
-        In that case, we have initiated a new session,
-        the server has reset it's own sequence
-        numbers and we need reflect that change in the store.
-
-        :param msg:
-        :return:
-        """
         heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
         if heartbeat_interval != self._config['FIX_HEARTBEAT_INTERVAL']:
             await self._send_reject(
