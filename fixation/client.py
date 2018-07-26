@@ -206,6 +206,16 @@ class FixClient(object):
             loop=self.loop
         )
 
+        @self.session.on_recv_message
+        def print_incoming_to_console(msg):
+            send_time = msg.get(self.TAGS.SendingTime)
+            print('{}: {} <--'.format(send_time, msg))
+
+        @self.session.on_send_message
+        def print_outgoing_to_console(msg):
+            send_time = msg.get(self.TAGS.SendingTime)
+            print('{}: {} -->'.format(send_time, msg))
+
         while True:
             try:
                 async with self.session.connect():

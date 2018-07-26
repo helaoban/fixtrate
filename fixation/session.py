@@ -210,8 +210,6 @@ class FixSession:
         if not skip_headers:
             seq_num = await self._store.get_seq_num()
             self._append_standard_header(msg, seq_num)
-        if self._debug:
-            self._print_msg_to_console(msg)
         await self._store.incr_seq_num()
         await self._store.store_message(msg)
 
@@ -348,8 +346,6 @@ class FixSession:
                 break
             self._parser.append_buffer(data)
         if msg:
-            if self._debug:
-                self._print_msg_to_console(msg, remote=True)
             await self._handle_message(msg)
         return msg
 
@@ -516,8 +512,3 @@ class FixSession:
     def _is_gap_fill(self, msg):
         gf_flag = msg.get(self._tags.GapFillFlag)
         return gf_flag == fc.GapFillFlag.YES
-
-    def _print_msg_to_console(self, msg, remote=False):
-        send_time = msg.get(self._tags.SendingTime)
-        direction = '<--' if remote else '-->'
-        print('{}: {} {}'.format(send_time, msg.msg_type, direction))
