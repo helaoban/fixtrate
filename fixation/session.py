@@ -167,6 +167,9 @@ class FixSession:
 
         self._is_initiator = utils.Tristate(None)
 
+        self.on_recv_msg_funcs = []
+        self.on_send_msg_funcs = []
+
     def __aiter__(self):
         return self
 
@@ -211,8 +214,20 @@ class FixSession:
             self._print_msg_to_console(msg)
         await self._store.incr_seq_num()
         await self._store.store_message(msg)
+
+        for func in self.on_send_msg_funcs:
+            await utils.maybe_await(func, msg)
+
         await self._conn.write(msg.encode())
         await self._reset_heartbeat_timer()
+
+    def on_recv_message(self, f):
+        self.on_recv_msg_funcs.append(f)
+        return f
+
+    def on_send_message(self, f):
+        self.on_send_msg_funcs.append(f)
+        return f
 
     async def _close(self):
         await self._cancel_heartbeat_timer()
@@ -341,6 +356,9 @@ class FixSession:
     async def _handle_message(self, msg):
 
         await self._store.store_message(msg, remote=True)
+
+        for func in self.on_recv_msg_funcs:
+            await utils.maybe_await(func, msg)
 
         try:
             await self._check_sequence_integrity(msg)
