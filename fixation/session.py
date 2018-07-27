@@ -62,9 +62,11 @@ class FixConnection(object):
             data = await self._reader.read(4096)
         except ConnectionError as error:
             logger.error(error)
+            await self.close()
             raise
         if data == b'':
             logger.error('Peer closed the connection!')
+            await self.close()
             raise ConnectionAbortedError
         return data
 
