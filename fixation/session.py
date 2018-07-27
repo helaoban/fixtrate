@@ -332,7 +332,6 @@ class FixSession:
                     await self._reset_sequence(
                         new_seq_num=gf_new_seq_num)
                     gf_seq_num, gf_new_seq_num = None, None
-
                 msg.append_pair(
                     self._tags.PossDupFlag,
                     fc.PossDupFlag.YES,
@@ -379,7 +378,6 @@ class FixSession:
                 await self.close()
                 raise
         except fe.SequenceGap as error:
-
             sequence_gap.send(self, exc=error)
 
             if msg.msg_type == fc.FixMsgType.Logon:
@@ -388,18 +386,15 @@ class FixSession:
                     start=error.expected + 1,
                     end=0
                 )
-
             if msg.msg_type == fc.FixMsgType.Logout:
                 # TODO handle logout sequence gap case
                 pass
-
             if msg.msg_type == fc.FixMsgType.ResendRequest:
                 await self._handle_resend_request(msg)
                 await self._request_resend(
                     start=error.expected + 1,
                     end=0
                 )
-
             if msg.msg_type == fc.FixMsgType.SequenceReset:
                 if self._is_gap_fill(msg):
                     await self._request_resend(
