@@ -6,8 +6,9 @@ import logging
 from fixation import (
     constants as fc,
     utils, exceptions as fe, parse,
-    store as fix_store, config
+    store as fix_store
 )
+from .config import Config
 from fixation.factories import fix42
 from .signals import message_received, message_sent, sequence_gap
 
@@ -114,8 +115,8 @@ class FixConnectionContextManager(Coroutine):
         self._coro.close()
 
     async def _connect(self, tries=5, retry_wait=5):
-        host = self._config.get('FIX_HOST', '127.0.0.1')
-        port = self._config.get('FIX_PORT', 4000)
+        host = self._config.get('HOST', '127.0.0.1')
+        port = self._config.get('PORT', 4000)
         tried = 1
         while tried <= tries:
             try:
@@ -153,11 +154,10 @@ class FixSession:
         loop=None,
         debug=False
     ):
-        conf = conf or config.get_config_from_env()
-        config.validate_config(conf)
+        conf = conf or Config.from_env()
         self._config = conf
 
-        self._tags = getattr(fc.FixTag, self._config['FIX_VERSION'].name)
+        self._tags = getattr(fc.FixTag, self._config['VERSION'].name)
         self._store = store or fix_store.FixMemoryStore()
         self._parser = parse.FixParser(self._config)
         self._fix_dict = dictionary
@@ -166,7 +166,7 @@ class FixSession:
         self._conn = None
         self._hearbeat_cb = None
         self._loop = loop or asyncio.get_event_loop()
-        self._debug = self._config.get('FIX_DEBUG', debug)
+        self._debug = self._config.get('DEBUG', debug)
 
         self._is_initiator = utils.Tristate(None)
 
@@ -249,9 +249,9 @@ class FixSession:
         seq_num,
         timestamp=None
     ):
-        version = self._config['FIX_VERSION']
-        sender_id = self._config['FIX_SENDER_COMP_ID']
-        target_id = self._config['FIX_TARGET_COMP_ID']
+        version = self._config['VERSION']
+        sender_id = self._config['SENDER_COMP_ID']
+        target_id = self._config['TARGET_COMP_ID']
 
         pairs = (
             (self._tags.BeginString, version),
@@ -303,7 +303,7 @@ class FixSession:
             self._is_initiator = utils.Tristate(None)
 
         login_msg = fix42.logon(
-            heartbeat_interval=self._config['FIX_HEARTBEAT_INTERVAL'],
+            heartbeat_interval=self._config['HEARTBEAT_INTERVAL'],
             reset_sequence=reset
         )
         await self.send_message(login_msg)
@@ -433,18 +433,18 @@ class FixSession:
 
     async def _handle_logon(self, msg):
         heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
-        if heartbeat_interval != self._config['FIX_HEARTBEAT_INTERVAL']:
+        if heartbeat_interval != self._config['HEARTBEAT_INTERVAL']:
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.HeartBtInt,
                 rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='HeartBtInt must be {}'.format(
-                    self._config['FIX_HEARTBEAT_INTERVAL'])
+                    self._config['HEARTBEAT_INTERVAL'])
             )
             return
 
         target_comp_id = msg.get(self._tags.TargetCompID)
-        if target_comp_id != self._config['FIX_SENDER_COMP_ID']:
+        if target_comp_id != self._config['SENDER_COMP_ID']:
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.TargetCompID,
@@ -500,7 +500,7 @@ class FixSession:
 
     async def _set_heartbeat_timer(self):
         try:
-            interval = self._config['FIX_HEARTBEAT_INTERVAL']
+            interval = self._config['HEARTBEAT_INTERVAL']
             await asyncio.sleep(interval)
             await self._send_heartbeat()
         except asyncio.CancelledError:

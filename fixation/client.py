@@ -4,19 +4,20 @@ import collections
 import aioredis
 
 from fixation import (
-    config, session,
+    session,
     rpc, constants as fc,
     utils, store as fs,
     signals
 )
+from .config import Config
 from fixation.factories import fix42
 
 
 class FixClient(object):
 
     def __init__(self, conf=None):
-        conf = conf or config.get_config_from_env()
-        config.validate_config(conf)
+        conf = conf or Config.from_env()
+        conf.validate(conf)
         self._config = conf
         self._session = None
         self._rpc_server = None
