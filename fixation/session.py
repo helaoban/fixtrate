@@ -313,7 +313,7 @@ class FixSession:
         await self.send_message(msg)
 
     async def _reset_sequence(self, new_seq_num):
-        await self._store.set_remote_sequence_number(new_seq_num - 1)
+        await self._store.set_remote_sequence_number(new_seq_num)
         msg = fix42.sequence_reset(new_seq_num)
         await self.send_message(msg)
 
