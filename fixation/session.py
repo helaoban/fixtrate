@@ -190,13 +190,13 @@ class FixSession:
         return FixConnectionContextManager(
             self._config, self._on_connect, self._on_disconnect)
 
-    def listen(self, reader, writer):
+    async def listen(self, reader, writer):
         conn = FixConnection(
             reader=reader,
             writer=writer,
             on_disconnect=self._on_disconnect
         )
-        self._on_connect(conn)
+        await self._on_connect(conn)
 
     async def logon(self, reset=False):
         await self._send_login(reset)
