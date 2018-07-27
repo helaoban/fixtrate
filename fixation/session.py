@@ -481,13 +481,13 @@ class FixSession:
         await self._send_heartbeat(test_request_id=test_request_id)
 
     async def _handle_reject(self, msg):
-        reject_reason = msg.get(self._tags.Text)
-        print('Reject: {}'.format(reject_reason))
+        reason = msg.get(self._tags.Text)
+        print('Reject: {}'.format(reason))
 
     async def _handle_resend_request(self, msg):
-        start_sequence_number = int(msg.get(self._tags.BeginSeqNo))
-        end_sequence_number = int(msg.get(self._tags.EndSeqNo))
-        await self._resend_messages(start_sequence_number, end_sequence_number)
+        start = msg.get(self._tags.BeginSeqNo)
+        end = msg.get(self._tags.EndSeqNo)
+        await self._resend_messages(int(start), int(end))
 
     async def _handle_sequence_reset(self, msg):
         if not self._is_gap_fill(msg):
