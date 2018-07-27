@@ -2,7 +2,8 @@ import sys
 import uuid
 
 import simplefix
-from fixation import utils, constants as fc
+
+from . import utils, constants as fc
 
 
 @utils.monkeypatch_module(simplefix.message)

@@ -3,13 +3,15 @@ from collections.abc import Coroutine
 import datetime as dt
 import logging
 
-from fixation import (
+from . import (
     constants as fc,
-    utils, exceptions as fe, parse,
-    store as fix_store
+    exceptions as fe,
+    parse,
+    store as fix_store,
+    utils,
 )
 from .config import Config
-from fixation.factories import fix42
+from .factories import fix42
 from .signals import message_received, message_sent, sequence_gap
 
 

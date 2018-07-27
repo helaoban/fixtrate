@@ -8,7 +8,7 @@ import socket
 import time
 import uuid
 
-from fixation import exceptions, utils
+from . import exceptions, utils
 
 
 logger = logging.getLogger(__name__)

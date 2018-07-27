@@ -6,7 +6,7 @@ import socket
 import sys
 import uuid
 
-from fixation import utils, client
+from . import utils, client
 
 
 logger = logging.getLogger(__name__)

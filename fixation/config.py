@@ -1,7 +1,7 @@
 from distutils.util import strtobool
 import os
 
-from fixation import utils, constants
+from . import utils, constants
 
 REQUIRED = [
     ('VERSION', constants.FixVersion),

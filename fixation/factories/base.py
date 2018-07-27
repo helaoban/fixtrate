@@ -1,7 +1,7 @@
 import datetime as dt
 from importlib import import_module
 
-from fixation import constants as fc
+from .. import constants as fc
 
 
 class FixMessageFactory:

@@ -1,13 +1,11 @@
-from fixation import (
-    constants as fc, message as fm,
-    utils
-)
+from fixation import constants as fc, utils
+from fixation.message import FixMessage
 
 TAGS = fc.FixTag.FIX42
 
 
 def heartbeat(test_request_id=None):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.Heartbeat,
@@ -19,7 +17,7 @@ def heartbeat(test_request_id=None):
 
 
 def test_request(test_request_id=None):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.TestRequest,
@@ -32,7 +30,7 @@ def test_request(test_request_id=None):
 
 
 def logoff():
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.Logout,
@@ -46,7 +44,7 @@ def logon(
         heartbeat_interval=30,
         reset_sequence=False
 ):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.Logon,
@@ -66,7 +64,7 @@ def logon(
 
 
 def resend_request(start_sequence, end_sequence):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.ResendRequest,
@@ -81,7 +79,7 @@ def sequence_reset(
         new_sequence_number,
         gap_fill=fc.GapFillFlag.YES
 ):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.SequenceReset,
@@ -93,7 +91,7 @@ def sequence_reset(
 
 
 def security_list():
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.SecurityListRequest,
@@ -116,7 +114,7 @@ def market_data_request(
     update_type=fc.MDUpdateType.FULL_REFRESH,
 ):
 
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.MarketDataRequest,
@@ -187,7 +185,7 @@ def new_order(
         customer_or_firm=fc.CustomerOrFirm.Customer,
         time_in_force=None
 ):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.NewOrderSingle,
@@ -236,7 +234,7 @@ def cancel_replace(
     price=None,
     handle_inst=2,
 ):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.OrderCancelReplaceRequest,
@@ -267,7 +265,7 @@ def cancel(
     quantity,
     cl_order_id=None,
 ):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.OrderCancelRequest,
@@ -288,7 +286,7 @@ def cancel(
 def order_status(
     cl_order_id='*',
 ):
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.OrderStatusRequest,
@@ -314,7 +312,7 @@ def reject(
     :return:
     """
 
-    msg = fm.FixMessage()
+    msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
         fc.FixMsgType.Reject,

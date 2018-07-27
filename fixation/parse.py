@@ -1,5 +1,5 @@
 import simplefix
-from fixation import message as fm, config
+from . import message as fm, config
 
 
 def _convert(msg, uid=None):

@@ -5,7 +5,7 @@ import hashlib
 
 from sortedcontainers import SortedDict
 
-from fixation import parse as fp
+from .parse import FixParser
 
 
 class FixStore(metaclass=abc.ABCMeta):
@@ -137,7 +137,7 @@ class FixRedisStore(FixStore):
 
     @staticmethod
     def decode_message(msg, uid=None):
-        parser = fp.FixParser()
+        parser = FixParser()
         parser.append_buffer(msg)
         return parser.get_message(uid)
 

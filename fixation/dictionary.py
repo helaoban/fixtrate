@@ -6,7 +6,7 @@ import logging
 
 import untangle
 
-from fixation import constants as fc, exceptions
+from . import constants as fc, exceptions
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

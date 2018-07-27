@@ -3,14 +3,16 @@ import collections
 
 import aioredis
 
-from fixation import (
+from . import (
+    constants as fc,
+    rpc,
     session,
-    rpc, constants as fc,
-    utils, store as fs,
-    signals
+    signals,
+    store as fs,
+    utils,
 )
 from .config import Config
-from fixation.factories import fix42
+from .factories import fix42
 
 
 class FixClient(object):
