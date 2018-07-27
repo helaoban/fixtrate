@@ -367,13 +367,11 @@ class FixSession:
         except fe.FatalSequenceGap as error:
             if msg.is_duplicate:
                 return
-
             elif msg.msg_type == fc.FixMsgType.Logon:
                 reset_seq = msg.get(self._tags.ResetSeqNumFlag)
                 is_reset = reset_seq == fc.ResetSeqNumFlag.YES
                 if is_reset:
                     await self._handle_logon(msg)
-
             elif msg.msg_type == fc.FixMsgType.SequenceReset:
                 if not self._is_gap_fill(msg):
                     await self._handle_sequence_reset(msg)
