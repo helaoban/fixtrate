@@ -8,6 +8,16 @@ TAGS = fc.FixTag.FIX42
 
 
 @pytest.mark.asyncio
+async def test_with_context_manager(fix_session, test_server):
+
+    await fix_session.connect()
+    await fix_session.logon()
+    msg = await fix_session._recv_msg()
+    assert msg.msg_type == fc.FixMsgType.Logon
+    await fix_session.close()
+
+
+@pytest.mark.asyncio
 async def test_successful_login(fix_session, test_server):
     async with fix_session.connect():
         await fix_session.logon()
