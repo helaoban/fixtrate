@@ -368,9 +368,7 @@ class FixSession:
             if msg.is_duplicate:
                 return
             elif msg.msg_type == fc.FixMsgType.Logon:
-                reset_seq = msg.get(self._tags.ResetSeqNumFlag)
-                is_reset = reset_seq == fc.ResetSeqNumFlag.YES
-                if is_reset:
+                if self._is_reset(msg):
                     await self._handle_logon(msg)
             elif msg.msg_type == fc.FixMsgType.SequenceReset:
                 if not self._is_gap_fill(msg):
@@ -460,9 +458,7 @@ class FixSession:
             )
             return
 
-        reset_seq = msg.get(self._tags.ResetSeqNumFlag)
-        is_reset = reset_seq == fc.ResetSeqNumFlag.YES
-
+        is_reset = self._is_reset(msg)
         if is_reset:
             await self._store.set_seq_num(1)
             await self._store.set_seq_num(1, remote=True)
@@ -518,3 +514,7 @@ class FixSession:
     def _is_gap_fill(self, msg):
         gf_flag = msg.get(self._tags.GapFillFlag)
         return gf_flag == fc.GapFillFlag.YES
+
+    def _is_reset(self, msg):
+        reset_seq = msg.get(self._tags.ResetSeqNumFlag)
+        return reset_seq == fc.ResetSeqNumFlag.YES
