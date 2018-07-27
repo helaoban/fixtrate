@@ -41,8 +41,7 @@ class MockFixServer(object):
     async def handle_client(self, session):
         try:
             async for msg in session:
-                # print('SERVER RECEIVED: {}'.format(msg))
-                pass
+                print('SERVER RECEIVED: {}'.format(msg))
         except asyncio.CancelledError:
             pass
         finally:
@@ -54,11 +53,7 @@ class MockFixServer(object):
             store=self.store,
             loop=self.loop
         )
-        fix_session.listen(reader, writer)
-
-        async for msg in fix_session:
-            pass
-
+        await fix_session.listen(reader, writer)
         task = self.loop.create_task(self.handle_client(fix_session))
         self._clients.append((task, fix_session))
 
