@@ -30,7 +30,7 @@ ADMIN_MESSAGES = [
 ]
 
 
-class FixConnection(object):
+class FixConnection:
 
     def __init__(
         self,
