@@ -4,7 +4,7 @@ import logging
 from fixation import (
     constants as fc,
     store as fix_store,
-    session, utils
+    session
 )
 
 logger = logging.getLogger(__name__)

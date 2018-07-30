@@ -2,7 +2,6 @@ import asyncio
 import pytest
 import uuid
 
-
 from async_timeout import timeout
 
 from fixation import constants as fc, message as fm
