@@ -43,7 +43,8 @@ class MockFixServer(object):
             loop=self._loop
         )
         await fix_session.listen(reader, writer)
-        task = self._loop.create_task(self.handle_client(fix_session))
+        task = self._loop.create_task(
+            self.handle_client(fix_session))
         self._clients[task] = fix_session
 
     async def start(self):
