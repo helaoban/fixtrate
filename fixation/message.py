@@ -54,6 +54,13 @@ class FixMessage(simplefix.FixMessage):
         self.uid = uid or str(uuid.uuid4())
         self._cache = {}
 
+    @classmethod
+    def from_pairs(cls, pairs):
+        msg = cls()
+        for tag, val, is_header in pairs:
+            msg.append_pair(tag, val, header=is_header)
+        return msg
+
     def _bust_cache(self, name):
         try:
             del self.__dict__[name]
