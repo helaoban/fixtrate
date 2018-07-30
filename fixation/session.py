@@ -3,6 +3,8 @@ from collections.abc import Coroutine
 import datetime as dt
 import logging
 
+import async_timeout
+
 from . import (
     constants as fc,
     exceptions as fe,
@@ -154,7 +156,8 @@ class FixSession:
         store=None,
         dictionary=None,
         loop=None,
-        debug=False
+        debug=False,
+        receive_timeout=None
     ):
         conf = conf or Config.from_env()
         self._config = conf
@@ -169,7 +172,7 @@ class FixSession:
         self._hearbeat_cb = None
         self._loop = loop or asyncio.get_event_loop()
         self._debug = self._config.get('DEBUG', debug)
-
+        self._receive_timeout = receive_timeout
         self._is_initiator = utils.Tristate(None)
 
         self.on_recv_msg_funcs = []
@@ -200,8 +203,8 @@ class FixSession:
         )
         await self._on_connect(conn)
 
-    async def receive(self):
-        return await self._recv_msg()
+    async def receive(self, timeout=None):
+        return await self._recv_msg(timeout)
 
     async def logon(self, reset=False):
         await self._send_login(reset)
@@ -346,13 +349,19 @@ class FixSession:
         if gf_seq_num is not None:
             await self._reset_sequence(gf_seq_num, gf_new_seq_num)
 
-    async def _recv_msg(self):
+    async def _recv_msg(self, timeout=None):
         while True:
             msg = self._parser.get_message()
             if msg:
                 break
             try:
-                data = await self._conn.read()
+                with async_timeout.timeout(
+                    timeout or self._receive_timeout,
+                    loop=self._loop
+                ):
+                    data = await self._conn.read()
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                raise asyncio.TimeoutError
             except ConnectionError:
                 break
             self._parser.append_buffer(data)

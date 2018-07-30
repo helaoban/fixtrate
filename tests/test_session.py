@@ -11,16 +11,6 @@ TAGS = fc.FixTag.FIX42
 
 
 @pytest.mark.asyncio
-async def test_with_context_manager(fix_session, test_server):
-
-    await fix_session.connect()
-    await fix_session.logon()
-    msg = await fix_session._recv_msg()
-    assert msg.msg_type == fc.FixMsgType.Logon
-    await fix_session.close()
-
-
-@pytest.mark.asyncio
 async def test_successful_login(fix_session, test_server):
     async with fix_session.connect():
         await fix_session.logon()
@@ -29,6 +19,31 @@ async def test_successful_login(fix_session, test_server):
             break
         else:
             raise AssertionError('No message received')
+
+
+@pytest.mark.asyncio
+async def test_receive(fix_session, test_server):
+
+    async with fix_session.connect():
+        await fix_session.logon()
+
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.Logon
+
+        with pytest.raises(asyncio.TimeoutError):
+            msg = await fix_session.receive(timeout=2)
+
+    fix_session._config['HEARTBEAT_INTERVAL'] = 1
+    test_server._config['HEARTBEAT_INTERVAL'] = 1
+
+    async with fix_session.connect():
+        await fix_session.logon()
+
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.Logon
+
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.Heartbeat
 
 
 @pytest.mark.asyncio
