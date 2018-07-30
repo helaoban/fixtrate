@@ -40,10 +40,10 @@ async def test_heartbeat(fix_session, test_server):
     async with fix_session.connect():
         await fix_session.logon()
 
-        msg = await fix_session._recv_msg()
+        msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.Logon
 
-        msg = await fix_session._recv_msg()
+        msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.Heartbeat
 
 

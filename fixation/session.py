@@ -200,6 +200,9 @@ class FixSession:
         )
         await self._on_connect(conn)
 
+    async def receive(self):
+        return await self._recv_msg()
+
     async def logon(self, reset=False):
         await self._send_login(reset)
 
