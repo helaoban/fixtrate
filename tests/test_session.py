@@ -30,6 +30,10 @@ async def test_successful_login(fix_session, test_server):
 
 @pytest.mark.asyncio
 async def test_heartbeat(fix_session, test_server):
+
+    fix_session._config['HEARTBEAT_INTERVAL'] = 1
+    test_server.config['HEARTBEAT_INTERVAL'] = 1
+
     async with fix_session.connect():
         await fix_session.logon()
 

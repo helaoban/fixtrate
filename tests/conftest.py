@@ -24,7 +24,7 @@ def server_config():
         SENDER_COMP_ID='FIXTEST',
         VERSION=fixation.constants.FixVersion.FIX42,
         TARGET_COMP_ID='TESTCLIENT',
-        HEARTBEAT_INTERVAL=1
+        HEARTBEAT_INTERVAL=30
     )
 
 
