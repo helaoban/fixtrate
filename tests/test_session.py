@@ -2,6 +2,9 @@ import asyncio
 import pytest
 import uuid
 
+
+from async_timeout import timeout
+
 from fixation import constants as fc, message as fm
 
 TAGS = fc.FixTag.FIX42
@@ -128,18 +131,16 @@ async def test_message_recovery(fix_session, test_server):
         else:
             raise AssertionError('No message received')
 
-    news_msg = fm.FixMessage()
-    news_msg.append_pair(
-        TAGS.MsgType,
-        fc.FixMsgType.News,
-        header=True
+    pairs = (
+        (TAGS.MsgType, fc.FixMsgType.News, True),
+        (TAGS.Headline, 'BREAKING NEWS', False),
+        (TAGS.LinesOfText, 1, False),
+        (TAGS.Text, 'Government admits turning frogs gay.', False),
     )
-    news_msg.append_pair(TAGS.Headline, 'BREAKING NEWS')
-    news_msg.append_pair(TAGS.LinesOfText, 1)
-    news_msg.append_pair(TAGS.Text, 'Government admits turning frogs gay.')
+    news_msg = fm.FixMessage.from_pairs(pairs)
 
-    _, server_session = test_server._clients[0]
-    await server_session.send_message(news_msg)
+    client_sessions = list(test_server._clients.values())
+    await client_sessions[0].send_message(news_msg)
 
     async with fix_session.connect():
         await fix_session.logon()
@@ -149,9 +150,19 @@ async def test_message_recovery(fix_session, test_server):
         else:
             raise AssertionError('No message received')
 
-        async for msg in fix_session:
-            assert msg.msg_type == fc.FixMsgType.News
-            assert msg.is_duplicate
-            break
-        else:
-            raise AssertionError('No message received')
+        # the news msg
+        msg = await fix_session._recv_msg()
+        assert msg.msg_type == fc.FixMsgType.News
+
+        # gap fill for the second logon msg
+        msg = await fix_session._recv_msg()
+        assert msg.msg_type == fc.FixMsgType.SequenceReset
+
+        # there should be no more messages
+        msg = None
+        try:
+            async with timeout(1):
+                msg = await fix_session._recv_msg()
+        except asyncio.TimeoutError:
+            pass
+        assert msg is None

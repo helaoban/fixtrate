@@ -12,6 +12,7 @@ aenum = "*"
 sortedcontainers = "*"
 aioredis = "*"
 blinker = "*"
+async-timeout = "*"
 
 [dev-packages]
 ipython = "*"

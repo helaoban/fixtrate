@@ -12,6 +12,7 @@ REQUIRES_PYTHON = '>=3.6.5'
 
 REQUIRES = [
     'aenum',
+    'async-timeout',
     'jsonschema',
     'aioredis',
     'blinker',
