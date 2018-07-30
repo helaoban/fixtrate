@@ -13,35 +13,24 @@ logger = logging.getLogger(__name__)
 class MockFixServer(object):
 
     def __init__(self, config=None, loop=None, store=None):
-        self.reader = None
-        self.writer = None
-        self.store = store or fix_store.FixMemoryStore()
-        self.config = config or {
-            'FIX_HOST': 'localhost',
-            'FIX_ACCOUNT': 'U001',
-            'FIX_PORT': 8686,
-            'FIX_SENDER_COMP_ID': 'FIXTEST',
-            'FIX_VERSION': fc.FixVersion.FIX42,
-            'FIX_TARGET_COMP_ID': 'TESTCLIENT',
+        self._store = store or fix_store.FixMemoryStore()
+        self._config = config or {
+            'HOST': 'localhost',
+            'ACCOUNT': 'U001',
+            'PORT': 8686,
+            'SENDER_COMP_ID': 'FIXTEST',
+            'VERSION': fc.FixVersion.FIX42,
+            'TARGET_COMP_ID': 'TESTCLIENT',
         }
-        self.session = None
-        self.loop = loop or asyncio.get_event_loop()
-        self._closing = False
-
-        self._last_message_time = None
-        self._tags = getattr(fc.FixTag, self.config['FIX_VERSION'].name)
-
-        self._hearbeat_cb = None
+        self._loop = loop or asyncio.get_event_loop()
+        self._tags = getattr(fc.FixTag, self._config['VERSION'].name)
         self._server = None
-        self._clients = []
-
-    async def send_message(self, msg):
-        await self.session.send_message(msg)
+        self._clients = {}
 
     async def handle_client(self, session):
         try:
             async for msg in session:
-                print('SERVER RECEIVED: {}'.format(msg))
+                pass
         except asyncio.CancelledError:
             pass
         finally:
@@ -49,17 +38,17 @@ class MockFixServer(object):
 
     async def accept_client(self, reader, writer):
         fix_session = session.FixSession(
-            conf=self.config,
-            store=self.store,
-            loop=self.loop
+            conf=self._config,
+            store=self._store,
+            loop=self._loop
         )
         await fix_session.listen(reader, writer)
-        task = self.loop.create_task(self.handle_client(fix_session))
-        self._clients.append((task, fix_session))
+        task = self._loop.create_task(self.handle_client(fix_session))
+        self._clients[task] = fix_session
 
     async def start(self):
-        host = self.config.get('FIX_HOST', '127.0.0.1')
-        port = self.config.get('FIX_PORT', 4000)
+        host = self._config.get('HOST', '127.0.0.1')
+        port = self._config.get('PORT', 4000)
         self._server = await asyncio.start_server(
             self.accept_client,
             host=host,
@@ -67,7 +56,7 @@ class MockFixServer(object):
         )
 
     async def close(self):
-        for task, fix_session in self._clients:
+        for task, fix_session in self._clients.items():
             task.cancel()
             await task
 
