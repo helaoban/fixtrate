@@ -30,23 +30,14 @@ async def test_successful_login(fix_session, test_server):
 
 @pytest.mark.asyncio
 async def test_heartbeat(fix_session, test_server):
+    async with fix_session.connect():
+        await fix_session.logon()
 
-    async def iter_messages():
-        async with fix_session.connect():
-            await fix_session.logon()
-            async for msg in fix_session:
-                assert msg.msg_type == fc.FixMsgType.Logon
-                break
-            else:
-                raise AssertionError('No message received')
+        msg = await fix_session._recv_msg()
+        assert msg.msg_type == fc.FixMsgType.Logon
 
-            async for msg in fix_session:
-                assert msg.msg_type == fc.FixMsgType.Heartbeat
-                break
-            else:
-                raise AssertionError('No message received')
-
-    await asyncio.wait_for(iter_messages(), timeout=2)
+        msg = await fix_session._recv_msg()
+        assert msg.msg_type == fc.FixMsgType.Heartbeat
 
 
 @pytest.mark.asyncio
