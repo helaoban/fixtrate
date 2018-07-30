@@ -314,15 +314,15 @@ class FixSession:
         msg = fix42.resend_request(start, end)
         await self.send_message(msg)
 
-    async def _reset_sequence(self, new_seq_num):
-        await self._store.set_remote_sequence_number(new_seq_num)
+    async def _reset_sequence(self, seq_num, new_seq_num):
+        await self._store.set_seq_num(new_seq_num, remote=True)
         msg = fix42.sequence_reset(new_seq_num)
-        await self.send_message(msg)
+        self._append_standard_header(msg, seq_num)
+        await self.send_message(msg, skip_headers=True)
 
     async def _resend_messages(self, start, end):
         sent_messages = await self._store.get_messages_by_seq_num(
             start=start, end=end, remote=False)
-
         gf_seq_num,  gf_new_seq_num = None, None
         for seq_num, msg in sent_messages.items():
             if msg.msg_type in ADMIN_MESSAGES:
@@ -331,8 +331,7 @@ class FixSession:
                 gf_new_seq_num = seq_num + 1
             else:
                 if gf_new_seq_num is not None:
-                    await self._reset_sequence(
-                        new_seq_num=gf_new_seq_num)
+                    await self._reset_sequence(gf_seq_num, gf_new_seq_num)
                     gf_seq_num, gf_new_seq_num = None, None
                 msg.append_pair(
                     self._tags.PossDupFlag,
@@ -340,6 +339,9 @@ class FixSession:
                     header=True
                 )
                 await self.send_message(msg, skip_headers=True)
+
+        if gf_seq_num is not None:
+            await self._reset_sequence(gf_seq_num, gf_new_seq_num)
 
     async def _recv_msg(self):
         while True:
@@ -381,11 +383,10 @@ class FixSession:
                 raise
         except fe.SequenceGap as error:
             sequence_gap.send(self, exc=error)
-
             if msg.msg_type == fc.FixMsgType.Logon:
                 await self._handle_logon(msg)
                 await self._request_resend(
-                    start=error.expected + 1,
+                    start=error.expected,
                     end=0
                 )
             if msg.msg_type == fc.FixMsgType.Logout:
@@ -394,13 +395,13 @@ class FixSession:
             if msg.msg_type == fc.FixMsgType.ResendRequest:
                 await self._handle_resend_request(msg)
                 await self._request_resend(
-                    start=error.expected + 1,
+                    start=error.expected,
                     end=0
                 )
             if msg.msg_type == fc.FixMsgType.SequenceReset:
                 if self._is_gap_fill(msg):
                     await self._request_resend(
-                        start=error.expected + 1,
+                        start=error.expected,
                         end=0
                     )
                 else:
