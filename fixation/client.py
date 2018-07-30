@@ -19,12 +19,12 @@ class FixClient(object):
 
     def __init__(self, conf=None):
         conf = conf or Config.from_env()
-        conf.validate(conf)
+        conf.validate()
         self._config = conf
         self._session = None
         self._rpc_server = None
         self._loop = asyncio.get_event_loop()
-        self._tags = getattr(fc.FixTag, self._config['FIX_VERSION'].name)
+        self._tags = getattr(fc.FixTag, self._config['VERSION'].name)
 
     async def send_test_request(self):
         msg = fix42.test_request()
@@ -41,7 +41,7 @@ class FixClient(object):
             ex_destination='SMART',
             time_in_force=None
     ):
-        account = self._config['FIX_ACCOUNT']
+        account = self._config['ACCOUNT']
         if time_in_force is not None:
             time_in_force = fc.TimeInForce[time_in_force]
         msg = fix42.new_order(
@@ -66,7 +66,7 @@ class FixClient(object):
             order_type,
             price=None,
     ):
-        account = self._config['FIX_ACCOUNT']
+        account = self._config['ACCOUNT']
         msg = fix42.cancel_replace(
             account=account,
             orig_cl_order_id=order_id,
@@ -85,7 +85,7 @@ class FixClient(object):
         side,
         quantity
     ):
-        account = self._config['FIX_ACCOUNT']
+        account = self._config['ACCOUNT']
         msg = fix42.cancel(
             account=account,
             orig_cl_order_id=order_id,
@@ -102,7 +102,7 @@ class FixClient(object):
         msg = fix42.order_status(
             cl_order_id=order_id,
         )
-        account = self._config['FIX_ACCOUNT']
+        account = self._config['ACCOUNT']
         msg.append_pair(self._tags.Account, account)
         await self._session.send_message(msg)
 
