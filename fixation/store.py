@@ -61,6 +61,12 @@ class FixMemoryStore(FixStore):
         self._remote = SortedDict()
         self._config = None
 
+    @staticmethod
+    def decode_message(msg, uid=None):
+        parser = FixParser()
+        parser.append_buffer(msg)
+        return parser.get_message(uid)
+
     async def incr_seq_num(self, remote=False):
         if remote:
             self._remote_seq_num += 1
@@ -93,16 +99,26 @@ class FixMemoryStore(FixStore):
         return self._messages.get(uid)
 
     async def get_messages(self):
-        return self._messages
+        return {
+            uid: self.decode_message(msg, uid)
+            for uid, msg in self._messages.items()
+        }
 
-    async def get_messages_by_seq_num(self, start=0, end=-1, remote=False):
+    async def get_messages_by_seq_num(self, start=1, end='inf', remote=False):
+        end = end or 'inf'
         uids_by_seq = self._local
         if remote:
             uids_by_seq = self._remote
+        uids_by_seq = {
+            int(seq_num): uid
+            for seq_num, uid in uids_by_seq.items()
+            if start <= int(seq_num) <= float(end)
+        }
+        msgs = await self.get_messages()
         return SortedDict({
-            seq_num: self._messages[uid]
+            int(seq_num): msgs[uid]
             for seq_num, uid
-            in uids_by_seq
+            in uids_by_seq.items()
         })
 
     async def new_session(self):
@@ -188,7 +204,7 @@ class FixRedisStore(FixStore):
 
     async def get_messages_by_seq_num(
         self,
-        start='-inf',
+        start=1,
         end='inf',
         remote=False
     ):
