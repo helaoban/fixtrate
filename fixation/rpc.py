@@ -33,13 +33,13 @@ class RPCServer(object):
     }
 
     def __init__(self, fix_client, loop=None):
-        self.config_path = '~/.fixation'
-        self.fix_client = fix_client
+        self._config_path = '~/.fixation'
+        self._fix_client = fix_client
         self._socket_server = None
-        self.loop = loop or asyncio.get_event_loop()
+        self._loop = loop or asyncio.get_event_loop()
 
     def make_config_dir(self):
-        path = os.path.expanduser(self.config_path)
+        path = os.path.expanduser(self._config_path)
         if not os.path.exists(path):
             try:
                 os.makedirs(path)
@@ -61,11 +61,11 @@ class RPCServer(object):
 
     def dispatch_socket_command(self, data):
         return {
-            'place_order': self.fix_client.place_order,
-            'cancel_order': self.fix_client.cancel_order,
-            'cancel_replace_order': self.fix_client.cancel_replace_order,
-            'send_test_request': self.fix_client.send_test_request,
-            'order_status': self.fix_client.order_status
+            'place_order': self._fix_client.place_order,
+            'cancel_order': self._fix_client.cancel_order,
+            'cancel_replace_order': self._fix_client.cancel_replace_order,
+            'send_test_request': self._fix_client.send_test_request,
+            'order_status': self._fix_client.order_status
         }.get(data['method'])
 
     async def handle_rpc_request(self, msg):
@@ -139,41 +139,41 @@ class RPCServer(object):
         self._socket_server = await asyncio.start_unix_server(
             self.handle_socket_client,
             sock=sock,
-            loop=self.loop
+            loop=self._loop
         )
 
 
 class RPCClient:
 
     def __init__(self):
-        self.socket = None
-        self.reader = None
-        self.writer = None
+        self._socket = None
+        self._reader = None
+        self._writer = None
 
     async def connect(self, timeout=5):
-        self.socket = socket.socket(
+        self._socket = socket.socket(
             socket.AF_UNIX,
             socket.SOCK_STREAM
         )
-        self.socket.settimeout(timeout)
+        self._socket.settimeout(timeout)
         try:
-            self.socket.connect(
+            self._socket.connect(
                 os.path.expanduser(
                     '~/.fixation/command_socket'
                 )
             )
         except socket.error:
             raise exceptions.RPCCouldNotConnectError
-        self.reader, self.writer = await asyncio.open_connection(
-            sock=self.socket)
+        self._reader, self._writer = await asyncio.open_connection(
+            sock=self._socket)
 
     def close(self):
-        self.writer.close()
-        self.socket.close()
+        self._writer.close()
+        self._socket.close()
 
     async def read(self):
         try:
-            r = await self.reader.read(4096)
+            r = await self._reader.read(4096)
         except socket.error:
             raise exceptions.RPCBadConnectionError
         if r == b'':
@@ -190,8 +190,8 @@ class RPCClient:
             'id': uid
         }
         message = utils.pack_rpc_message(message)
-        self.writer.write(message)
-        await self.writer.drain()
+        self._writer.write(message)
+        await self._writer.drain()
 
         try:
             buf = b''

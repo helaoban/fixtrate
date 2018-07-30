@@ -5,6 +5,12 @@ import uuid
 import pytest
 
 from fixation.rpc import RPCServer
+from fixation.client import FixClient
+
+
+@pytest.fixture
+def fix_client():
+    return FixClient()
 
 
 @pytest.fixture
@@ -23,10 +29,10 @@ def encoded_rpc_request(rpc_request):
 
 
 @pytest.fixture()
-async def rpc_server(fix_session, event_loop):
+async def rpc_server(fix_session, fix_client, event_loop):
     return RPCServer(
-        fix_session=fix_session,
-        loop=event_loop
+        fix_client=fix_client,
+        loop=event_loop,
     )
 
 
