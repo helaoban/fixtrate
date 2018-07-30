@@ -32,120 +32,6 @@ ADMIN_MESSAGES = [
 ]
 
 
-class FixConnection:
-
-    def __init__(
-        self,
-        reader,
-        writer,
-        on_disconnect=None,
-        loop=None
-    ):
-        self._reader = reader
-        self._writer = writer
-        self._on_disconnect = on_disconnect
-        self._loop = loop or asyncio.get_event_loop()
-        self.connected = True
-
-    @property
-    def closed(self):
-        return not self.connected
-
-    async def close(self):
-
-        if not self.connected:
-            return
-
-        self._writer.close()
-        self.connected = False
-
-        if self._on_disconnect is not None:
-            await utils.maybe_await(self._on_disconnect)
-
-    async def read(self):
-        try:
-            data = await self._reader.read(4096)
-        except ConnectionError as error:
-            logger.error(error)
-            await self.close()
-            raise
-        if data == b'':
-            logger.error('Peer closed the connection!')
-            await self.close()
-            raise ConnectionAbortedError
-        return data
-
-    async def write(self, *args, **kwargs):
-        self._writer.write(*args, **kwargs)
-        try:
-            await self._writer.drain()
-        except ConnectionError as error:
-            logger.error(error)
-            await self.close()
-
-
-class FixConnectionContextManager(Coroutine):
-
-    def __init__(
-        self,
-        conf,
-        on_connect=None,
-        on_disconnect=None,
-        loop=None
-    ):
-        self._config = conf
-        self._on_connect = on_connect
-        self._on_disconnect = on_disconnect
-        self._loop = loop or asyncio.get_event_loop()
-        self._coro = self._connect()
-
-    def __await__(self):
-        return self._coro.__await__()
-
-    async def __aenter__(self):
-        self._conn = await self._coro
-        return self._conn
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._conn.close()
-
-    def send(self, arg):
-        self._coro.send(arg)
-
-    def throw(self, typ, val=None, tb=None):
-        self._coro.throw(typ, val, tb)
-
-    def close(self):
-        self._coro.close()
-
-    async def _connect(self, tries=5, retry_wait=5):
-        host = self._config.get('HOST', '127.0.0.1')
-        port = self._config.get('PORT', 4000)
-        tried = 1
-        while tried <= tries:
-            try:
-                reader, writer = await asyncio.open_connection(
-                    host=host,
-                    port=port,
-                    loop=self._loop
-                )
-            except OSError as error:
-                logger.error(error)
-                logger.info('Connection failed, retrying in {} seconds...'
-                            ''.format(retry_wait))
-                tried += 1
-                await asyncio.sleep(retry_wait)
-                continue
-            else:
-                conn = FixConnection(
-                    reader, writer, on_disconnect=self._on_disconnect)
-                await utils.maybe_await(self._on_connect, conn)
-                return conn
-
-        logger.info('Connection tries ({}) exhausted'.format(tries))
-        raise ConnectionError
-
-
 class FixSession:
     """
     FIX Session Manager
@@ -192,11 +78,11 @@ class FixSession:
         return self._conn is None or self._conn.closed
 
     def connect(self):
-        return FixConnectionContextManager(
+        return _FixConnectionContextManager(
             self._config, self._on_connect, self._on_disconnect)
 
     async def listen(self, reader, writer):
-        conn = FixConnection(
+        conn = _FixConnection(
             reader=reader,
             writer=writer,
             on_disconnect=self._on_disconnect
@@ -528,3 +414,117 @@ class FixSession:
     def _is_reset(self, msg):
         reset_seq = msg.get(self._tags.ResetSeqNumFlag)
         return reset_seq == fc.ResetSeqNumFlag.YES
+
+
+class _FixConnection:
+
+    def __init__(
+        self,
+        reader,
+        writer,
+        on_disconnect=None,
+        loop=None
+    ):
+        self._reader = reader
+        self._writer = writer
+        self._on_disconnect = on_disconnect
+        self._loop = loop or asyncio.get_event_loop()
+        self.connected = True
+
+    @property
+    def closed(self):
+        return not self.connected
+
+    async def close(self):
+
+        if not self.connected:
+            return
+
+        self._writer.close()
+        self.connected = False
+
+        if self._on_disconnect is not None:
+            await utils.maybe_await(self._on_disconnect)
+
+    async def read(self):
+        try:
+            data = await self._reader.read(4096)
+        except ConnectionError as error:
+            logger.error(error)
+            await self.close()
+            raise
+        if data == b'':
+            logger.error('Peer closed the connection!')
+            await self.close()
+            raise ConnectionAbortedError
+        return data
+
+    async def write(self, *args, **kwargs):
+        self._writer.write(*args, **kwargs)
+        try:
+            await self._writer.drain()
+        except ConnectionError as error:
+            logger.error(error)
+            await self.close()
+
+
+class _FixConnectionContextManager(Coroutine):
+
+    def __init__(
+        self,
+        conf,
+        on_connect=None,
+        on_disconnect=None,
+        loop=None
+    ):
+        self._config = conf
+        self._on_connect = on_connect
+        self._on_disconnect = on_disconnect
+        self._loop = loop or asyncio.get_event_loop()
+        self._coro = self._connect()
+
+    def __await__(self):
+        return self._coro.__await__()
+
+    async def __aenter__(self):
+        self._conn = await self._coro
+        return self._conn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self._conn.close()
+
+    def send(self, arg):
+        self._coro.send(arg)
+
+    def throw(self, typ, val=None, tb=None):
+        self._coro.throw(typ, val, tb)
+
+    def close(self):
+        self._coro.close()
+
+    async def _connect(self, tries=5, retry_wait=5):
+        host = self._config.get('HOST', '127.0.0.1')
+        port = self._config.get('PORT', 4000)
+        tried = 1
+        while tried <= tries:
+            try:
+                reader, writer = await asyncio.open_connection(
+                    host=host,
+                    port=port,
+                    loop=self._loop
+                )
+            except OSError as error:
+                logger.error(error)
+                logger.info('Connection failed, retrying in {} seconds...'
+                            ''.format(retry_wait))
+                tried += 1
+                await asyncio.sleep(retry_wait)
+                continue
+            else:
+                conn = _FixConnection(
+                    reader, writer, on_disconnect=self._on_disconnect)
+                await utils.maybe_await(self._on_connect, conn)
+                return conn
+
+        logger.info('Connection tries ({}) exhausted'.format(tries))
+        raise ConnectionError
