@@ -68,12 +68,6 @@ class FixMessage(simplefix.FixMessage):
             msg.append_pair(tag, val, header=is_header)
         return msg
 
-    def _bust_cache(self, name):
-        try:
-            del self.__dict__[name]
-        except KeyError:
-            pass
-
     @utils.cached_property
     def seq_num(self):
         """
@@ -167,3 +161,9 @@ class FixMessage(simplefix.FixMessage):
             'pairs': self.to_decoded_pairs(),
             'raw': self.__str__()
         }
+
+    def _bust_cache(self, name):
+        try:
+            del self.__dict__[name]
+        except KeyError:
+            pass
