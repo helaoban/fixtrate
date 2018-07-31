@@ -16,10 +16,7 @@ from .config import Config
 from .factories import fix42
 from .signals import message_received, message_sent, sequence_gap
 
-
-logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 ADMIN_MESSAGES = [
     fc.FixMsgType.Logon,

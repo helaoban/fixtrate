@@ -1,5 +1,6 @@
 import asyncio
 import collections
+import logging
 
 import aioredis
 
@@ -13,6 +14,8 @@ from . import (
 )
 from .config import Config
 from .factories import fix42
+
+logging.basicConfig()
 
 
 class FixClient(object):
