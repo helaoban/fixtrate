@@ -72,14 +72,37 @@ class FixSession:
 
     @property
     def closed(self):
+        """ Read-only property. Returns True fs underlying connection
+        has been closed.
+
+        :return: bool
+        """
         return self._conn is None or self._conn.closed
 
     def connect(self):
+        """
+        Coroutine that waits for a successfuly connection to a FIX peer.
+        Returns a FixConnection object. Can also be used as an async context
+        manager, in which case the connection is automatically closed on
+        exiting the context manager.
+
+        :return: :class:`FixConnection` object
+        :rtype: FixConnection
+        """
         return _FixConnectionContextManager(
             self._config, self._on_connect, self._on_disconnect)
 
     async def listen(self, reader, writer):
-        conn = _FixConnection(
+        """ Listen on a given connection object. Useful for having a FIX session
+        listen on an existing connection (for example when serving many clients
+        from a server).
+
+        :param reader: StreamReader object
+        :type reader: :class:`~asyncio.StreamReader`
+        :param writer: StreamWriter object
+        :type writer: :class:`~asyncio.StreamWriter`
+        """
+        conn = FixConnection(
             reader=reader,
             writer=writer,
             on_disconnect=self._on_disconnect
@@ -87,20 +110,49 @@ class FixSession:
         await self._on_connect(conn)
 
     async def receive(self, timeout=None):
+        """ Coroutine that waits for message from peer and returns it.
+
+        :param timeout: (optional) timeout in seconds. If specified, method
+            will raise asyncio.TimeoutError if message in not
+            received after timeout. Defaults to `None`.
+        :type timeout: float, int or None
+
+        :return: :class:`~fixation.message.FixMessage` object
+        """
         return await self._recv_msg(timeout)
 
     async def logon(self, reset=False):
+        """ Logon to a FIX Session. Sends a Logon<A> message to peer.
+
+        :param reset: Whether to set ResetSeqNumFlag to 'Y' on the
+            Logon<A> message.
+        :type reset: bool
+        """
         await self._send_login(reset)
 
     async def logoff(self):
+        """ Logoff from a FIX Session. Sends a Logout<5> message to peer.
+        """
         msg = fix42.logoff()
         await self.send_message(msg)
 
     async def close(self):
+        """
+        Close the session. Closes the underlying connection and performs
+        cleanup work.
+        """
         if not self.closed:
             await self._close()
 
     async def send_message(self, msg, skip_headers=False):
+        """
+        Send a FIX message to peer.
+
+        :param msg: message to send.
+        :type msg: :class:`~fixation.message.FixMessage`
+        :param bool skip_headers: (optional) If set to `True`, the session will
+            not append the standard header before sending. Defaults to `False`
+        """
         if not skip_headers:
             seq_num = await self._store.get_seq_num()
             self._append_standard_header(msg, seq_num)
@@ -116,10 +168,23 @@ class FixSession:
         await self._reset_heartbeat_timer()
 
     def on_recv_message(self, f):
+        """
+        Decorator that registers a callback to be called when a message
+        is received but before it has been processed by any session internal
+        handlers.
+        :param f: Callback function
+        :return:
+        """
         self.on_recv_msg_funcs.append(f)
         return f
 
     def on_send_message(self, f):
+        """
+        Decorator that registers a callback to be called when a message
+        is about to be sent to peer.
+        :param f:
+        :return:
+        """
         self.on_send_msg_funcs.append(f)
         return f
 
@@ -413,7 +478,7 @@ class FixSession:
         return reset_seq == fc.ResetSeqNumFlag.YES
 
 
-class _FixConnection:
+class FixConnection:
 
     def __init__(
         self,
@@ -518,7 +583,7 @@ class _FixConnectionContextManager(Coroutine):
                 await asyncio.sleep(retry_wait)
                 continue
             else:
-                conn = _FixConnection(
+                conn = FixConnection(
                     reader, writer, on_disconnect=self._on_disconnect)
                 await utils.maybe_await(self._on_connect, conn)
                 return conn
