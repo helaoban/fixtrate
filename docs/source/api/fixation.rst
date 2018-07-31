@@ -11,22 +11,6 @@ Subpackages
 Submodules
 ----------
 
-fixation.cli module
--------------------
-
-.. automodule:: fixation.cli
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-fixation.client module
-----------------------
-
-.. automodule:: fixation.client
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 fixation.config module
 ----------------------
 
@@ -75,13 +59,6 @@ fixation.parse module
     :undoc-members:
     :show-inheritance:
 
-fixation.rpc module
--------------------
-
-.. automodule:: fixation.rpc
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
 fixation.session module
 -----------------------
