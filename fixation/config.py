@@ -15,8 +15,19 @@ REQUIRED = [
 
 
 class Config(dict):
+    """
+    Wraps `dict` and adds some helpful methods for fetching config values
+    from different sources and for validating.
+    """
 
     def validate(self):
+        """
+        Validate config values
+
+        :return:
+        :raises: `ValueError` if incorrect value, `TypeError` if incorrect
+            type.
+        """
         for name, _type in REQUIRED:
             if name not in self:
                 raise ValueError(
@@ -52,6 +63,15 @@ class Config(dict):
 
     @classmethod
     def from_env(cls, namespace='FIX_'):
+        """
+        Build a :class:`~.fixation.config.Config` object from ENV variables.
+        Will only fetch variables prepended with a given namespace string.
+
+        :param namespace: (optional) The namespace used to look for appropriate
+            ENV vars. Defaults to `'FIX_'`.
+        :type namespace: str
+        :return: :class:`~fixation.config.Config` object
+        """
         missing = []
         config = cls()
         for name, _type in REQUIRED:
