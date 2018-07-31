@@ -143,8 +143,8 @@ class FixRedisStore(FixStore):
         self._session_id = self._generate_session_id()
 
     def _generate_session_id(self):
-        sender_id = self._conf['FIX_SENDER_COMP_ID']
-        target_id = self._conf['FIX_TARGET_COMP_ID']
+        sender_id = self._conf['SENDER_COMP_ID']
+        target_id = self._conf['TARGET_COMP_ID']
         key = sender_id + target_id
         return hashlib.sha256(key.encode()).hexdigest()
 
