@@ -15,7 +15,9 @@ from . import (
 from .config import Config
 from .factories import fix42
 
-logging.basicConfig()
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s %(levelname)s %(message)s')
 
 
 class FixClient(object):
