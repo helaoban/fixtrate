@@ -56,6 +56,13 @@ class FixMessage(simplefix.FixMessage):
 
     @classmethod
     def from_pairs(cls, pairs):
+        """ Create message from an iterable of ``(tag, value, is_header)`` tuples.
+
+        :param pairs: An iterable of 3-tuple's ``(tag, value, is_header)``.
+            `is_header` specifies whether the pair should be appended to the
+            standard header or not.
+        :return:
+        """
         msg = cls()
         for tag, val, is_header in pairs:
             msg.append_pair(tag, val, header=is_header)
@@ -69,6 +76,12 @@ class FixMessage(simplefix.FixMessage):
 
     @utils.cached_property
     def seq_num(self):
+        """
+        Read-only property. Returns the value of MsgSeqNum<34>,
+        or `None` if MsgSeqNum<34> is not set.
+
+        :return: `int` or `None`
+        """
         _seq_num = self.get(34)
         if _seq_num is not None:
             _seq_num = int(_seq_num)
@@ -76,6 +89,12 @@ class FixMessage(simplefix.FixMessage):
 
     @utils.cached_property
     def msg_type(self):
+        """
+        Read-only property. Returns the value of the message's
+        MsgType<35> field, or `None` if MsgType<35> is not set.
+
+        :return: :class:`~fixation.constants.FixMsgType` or `None`
+        """
         _msg_type = self.get(35)
         if _msg_type is not None:
             _msg_type = fc.FixMsgType(_msg_type)
@@ -83,6 +102,12 @@ class FixMessage(simplefix.FixMessage):
 
     @utils.cached_property
     def is_duplicate(self):
+        """
+        Read-only property. Returns `True` if the PossDupFlag is set
+        to 'Y'.
+
+        :return: bool
+        """
         poss_dup_flag = self.get(43)
         if poss_dup_flag is None:
             return False
@@ -108,6 +133,12 @@ class FixMessage(simplefix.FixMessage):
             self._bust_cache('msg_type')
 
     def to_decoded_pairs(self):
+        """
+        Return message pairs as list of decoded ``(tag, value)``
+         tuples.
+
+        :return: list of ``(tag, value)`` tuples.
+        """
         pairs = []
         for tag, val in self:
             try:
@@ -118,6 +149,11 @@ class FixMessage(simplefix.FixMessage):
         return pairs
 
     def to_json(self):
+        """
+        Return message as dictionary suitable for encoding to JSON.
+
+        :return: `dict`
+        """
 
         msg_type = self.get(fc.FixTag.FIX42.MsgType)
         msg_type = fc.FixMsgType(msg_type)
