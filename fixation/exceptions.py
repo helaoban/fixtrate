@@ -50,7 +50,14 @@ class FatalSequenceGap(Exception):
 class FixRejectionError(Exception):
     """ Reject<3> message received."""
     def __init__(self, reason):
-        self.reason = reason
+        self._reason = reason
+
+    @property
+    def reason(self):
+        """
+        The rejection reason. From the Text<58> field of the reject message.
+        """
+        return self._reason
 
 
 class UnsupportedVersion(Exception):
