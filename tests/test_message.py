@@ -1,6 +1,6 @@
 import pytest
 
-from fixation import constants as fc, message
+from fixtrate import constants as fc, message
 
 
 def test_reject_empty_value():

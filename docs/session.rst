@@ -1,11 +1,11 @@
-.. _fixation-session:
+.. _fixtrate-session:
 
 Session
 =========
 
 .. module:: session
 
-The page contains all information about fixation Session API:
+The page contains all information about fixtrate Session API:
 
 
 .. toctree::

@@ -1,7 +1,7 @@
 import pytest
 
-import fixation.constants
-from fixation import parse, store, session
+import fixtrate.constants
+from fixtrate import parse, store, session
 from tests.server import MockFixServer
 
 
@@ -22,7 +22,7 @@ def server_config():
         ACCOUNT='U001',
         PORT=8686,
         SENDER_COMP_ID='FIXTEST',
-        VERSION=fixation.constants.FixVersion.FIX42,
+        VERSION=fixtrate.constants.FixVersion.FIX42,
         TARGET_COMP_ID='TESTCLIENT',
         HEARTBEAT_INTERVAL=30
     )

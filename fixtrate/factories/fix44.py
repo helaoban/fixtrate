@@ -1,4 +1,4 @@
-from fixation import (
+from fixtrate import (
     constants as fc, message as fm,
     utils
 )

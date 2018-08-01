@@ -117,7 +117,7 @@ class FixSession:
             received after timeout. Defaults to `None`.
         :type timeout: float, int or None
 
-        :return: :class:`~fixation.message.FixMessage` object
+        :return: :class:`~fixtrate.message.FixMessage` object
         """
         return await self._recv_msg(timeout)
 
@@ -149,7 +149,7 @@ class FixSession:
         Send a FIX message to peer.
 
         :param msg: message to send.
-        :type msg: :class:`~fixation.message.FixMessage`
+        :type msg: :class:`~fixtrate.message.FixMessage`
         :param bool skip_headers: (optional) If set to `True`, the session will
             not append the standard header before sending. Defaults to `False`
         """

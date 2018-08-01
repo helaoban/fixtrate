@@ -4,7 +4,7 @@ import uuid
 
 from async_timeout import timeout
 
-from fixation import constants as fc, message as fm
+from fixtrate import constants as fc, message as fm
 
 TAGS = fc.FixTag.FIX42
 

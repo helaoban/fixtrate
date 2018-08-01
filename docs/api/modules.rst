@@ -1,7 +1,7 @@
-fixation
+fixtrate
 ========
 
 .. toctree::
    :maxdepth: 4
 
-   fixation
+   fixtrate

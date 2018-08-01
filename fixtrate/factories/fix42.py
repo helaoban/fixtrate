@@ -1,5 +1,5 @@
-from fixation import constants as fc, utils
-from fixation.message import FixMessage
+from fixtrate import constants as fc, utils
+from fixtrate.message import FixMessage
 
 TAGS = fc.FixTag.FIX42
 

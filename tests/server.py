@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from fixation import (
+from fixtrate import (
     constants as fc,
     store as fix_store,
     session

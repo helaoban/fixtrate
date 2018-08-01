@@ -3,9 +3,9 @@ from setuptools import find_packages, setup, Command
 from shutil import rmtree
 import sys
 
-NAME = 'fixation'
+NAME = 'fixtrate'
 DESCRIPTION = 'Tools for interacting with the FIX protocol'
-URL = 'github.com/helaoban/fixation',
+URL = 'github.com/helaoban/fixtrate',
 AUTHOR = 'Carlo Holl'
 EMAIL = 'carloholl@gmail.com'
 REQUIRES_PYTHON = '>=3.6.5'
@@ -81,7 +81,7 @@ setup(
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'fixation = fixation.cli:main',
+            'fixtrate = fixtrate.cli:main',
         ],
     },
     license='MIT',

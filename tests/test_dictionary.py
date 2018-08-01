@@ -1,10 +1,10 @@
 import pytest
 
-from fixation import (
+from fixtrate import (
     constants as fc,
     dictionary as fd
 )
-from fixation.factories import fix44
+from fixtrate.factories import fix44
 
 
 @pytest.fixture

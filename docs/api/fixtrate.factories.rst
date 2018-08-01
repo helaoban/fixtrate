@@ -1,29 +1,29 @@
-fixation.factories package
+fixtrate.factories package
 ==========================
 
 Submodules
 ----------
 
-fixation.factories.base module
+fixtrate.factories.base module
 ------------------------------
 
-.. automodule:: fixation.factories.base
+.. automodule:: fixtrate.factories.base
     :members:
     :undoc-members:
     :show-inheritance:
 
-fixation.factories.fix42 module
+fixtrate.factories.fix42 module
 -------------------------------
 
-.. automodule:: fixation.factories.fix42
+.. automodule:: fixtrate.factories.fix42
     :members:
     :undoc-members:
     :show-inheritance:
 
-fixation.factories.fix44 module
+fixtrate.factories.fix44 module
 -------------------------------
 
-.. automodule:: fixation.factories.fix44
+.. automodule:: fixtrate.factories.fix44
     :members:
     :undoc-members:
     :show-inheritance:
@@ -32,7 +32,7 @@ fixation.factories.fix44 module
 Module contents
 ---------------
 
-.. automodule:: fixation.factories
+.. automodule:: fixtrate.factories
     :members:
     :undoc-members:
     :show-inheritance:

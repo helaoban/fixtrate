@@ -12,7 +12,7 @@ Release v\ |version|. (:ref:`Installation <install>`)
 Features
 =========
 
-- Asynchronous :ref:`fixation-session`.
+- Asynchronous :ref:`fixtrate-session`.
 
 
 .. toctree::
