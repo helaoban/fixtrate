@@ -70,9 +70,9 @@ class Publish(Command):
 setup(
     name=NAME,
     version=about['__version__'],
-    author='Carlo Holl',
-    author_email='carloholl@gmail.com',
-    description='A pure-python FIX engine',
+    author=AUTHOR,
+    author_email=EMAIL,
+    description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type='text/markdown',
     packages=find_packages(exclude=('tests',)),
