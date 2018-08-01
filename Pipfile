@@ -21,6 +21,7 @@ pytest-profiling = "*"
 snakeviz = "*"
 sphinx = "*"
 sphinxcontrib-asyncio = "*"
+twine = "*"
 
 [requires]
 python_version = "3.6"
