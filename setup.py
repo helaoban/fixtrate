@@ -4,7 +4,7 @@ from shutil import rmtree
 import sys
 
 NAME = 'fixation'
-DESCRIPTION = 'A pure-python FIX engine'
+DESCRIPTION = 'Tools for interacting with the FIX protocol'
 URL = 'github.com/helaoban/fixation',
 AUTHOR = 'Carlo Holl'
 EMAIL = 'carloholl@gmail.com'
