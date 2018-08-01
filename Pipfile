@@ -16,12 +16,13 @@ async-timeout = "*"
 
 [dev-packages]
 ipython = "*"
-pytest = "*"
 pytest-profiling = "*"
 snakeviz = "*"
 sphinx = "*"
 sphinxcontrib-asyncio = "*"
 twine = "*"
+pytest = "==3.6.3"
+pytest-asyncio = "==0.8.0"
 
 [requires]
 python_version = "3.6"
