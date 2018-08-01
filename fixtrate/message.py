@@ -129,7 +129,7 @@ class FixMessage(simplefix.FixMessage):
     def to_decoded_pairs(self):
         """
         Return message pairs as list of decoded ``(tag, value)``
-         tuples.
+        tuples.
 
         :return: list of ``(tag, value)`` tuples.
         """
