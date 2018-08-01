@@ -82,6 +82,21 @@ class FixMessage(simplefix.FixMessage):
         return _seq_num
 
     @utils.cached_property
+    def version(self):
+        """
+        Read-only property. Returns the FIX version for this message..
+
+        :return: :class:`~fixation.contants.FixVersion` or `None`
+        :raises: `ValueError` if version string is not a valid FIX version or
+            if BeginString<8> is not set on message..
+        """
+        begin_str = self.get(8)
+        if begin_str is not None:
+            return fc.FixVersion(begin_str)
+        raise ValueError('BeginString<8> was not set on this message, '
+                         'so version could not be determined')
+
+    @utils.cached_property
     def msg_type(self):
         """
         Read-only property. Returns the value of the message's
