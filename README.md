@@ -1,3 +1,1 @@
-# Fixation
-
-A pure-python FIX engine
+# Fixation: tools for interacting with the FIX protocol.
