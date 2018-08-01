@@ -148,10 +148,11 @@ class FixMessage(simplefix.FixMessage):
 
         :return: list of ``(tag, value)`` tuples.
         """
+        tags = getattr(fc.FixTag, self.version)
         pairs = []
         for tag, val in self:
             try:
-                tag = fc.FixTag.FIX42(tag).name
+                tag = tags(tag).name
             except ValueError:
                 tag = 'Unknown Tag <{}>'.format(tag)
             pairs.append((tag, val.decode()))
