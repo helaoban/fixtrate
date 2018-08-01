@@ -19,12 +19,13 @@ Begin by importing the session module::
 
     from fixation import session
 
-Now, let's try connecting to a FIX server.::
+Now, let's try connecting to a FIX server::
 
     fix_session = session.FixSession()
 
     async with fix_session.connect():
+        await fix_session.logon()
         async for msg in fix_session:
             print(msg)
 
-Now, we have a :class:`~fixation.session.FixSession` called ``session``.
+Now, we have a :class:`~fixation.session.FixSession` called ``fix_session``.
