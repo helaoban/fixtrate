@@ -171,6 +171,7 @@ class FixMessage(simplefix.FixMessage):
 
         return {
             'uid': self.uid,
+            'version': self.version,
             'seq_num': seq_num,
             'msg_type': msg_type,
             'pairs': self.to_decoded_pairs(),
