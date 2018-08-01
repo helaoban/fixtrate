@@ -61,4 +61,3 @@ class UnsupportedVersion(Exception):
 class InvalidFixDictTag(Exception):
     """ Tag specified in FIX XML dictionary is not a valid FIX tag"""
     pass
-
