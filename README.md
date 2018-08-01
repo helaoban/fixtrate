@@ -1,1 +1,0 @@
-# Fixtrate: tools for interacting with the FIX protocol.

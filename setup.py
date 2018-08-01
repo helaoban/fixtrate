@@ -74,7 +74,7 @@ setup(
     author_email=EMAIL,
     description=DESCRIPTION,
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type='text/x-rst',
     packages=find_packages(exclude=('tests',)),
     install_requires=REQUIRES,
     extras_require=EXTRAS_REQUIRE,
