@@ -41,6 +41,18 @@ with open(os.path.join(here, 'README.md')) as f:
 class Publish(Command):
     """Push to PyPi"""
 
+    description = 'Build and publish package to PyPI.'
+    user_options = [
+        ('test', 't', 'Publish to test.pypi.org'),
+    ]
+    test_url = 'https://test.pypi.org/legacy/'
+
+    def initialize_options(self):
+        self.test = False
+
+    def finalize_options(self):
+        pass
+
     def run(self):
         try:
             rmtree(os.path.join(here, 'dist'))
@@ -48,8 +60,10 @@ class Publish(Command):
             pass
 
         os.system('{} setup.py bdist_wheel --universal'.format(sys.executable))
-        os.system('twine upload dist/*')
-
+        os.system('twine upload {}dist/*'.format(
+            '--repository-url {} '.format(self.test_url)
+            if self.test else ''),
+        )
         sys.exit()
 
 
@@ -79,6 +93,9 @@ setup(
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Development Status :: 2 - Pre-Alpha',
-    ]
+    ],
+    cmdclass={
+        'publish': Publish,
+    },
 )
 
