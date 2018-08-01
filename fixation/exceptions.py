@@ -1,17 +1,46 @@
 class SequenceGap(Exception):
+    """
+    A SequenceGap occured
+    """
     def __init__(self, actual, expected):
         super().__init__('Sequence gap detected, expected {} '
                          'but got {}'.format(expected, actual))
-        self.actual = actual
-        self.expected = expected
+        self._actual = actual
+        self._expected = expected
+
+    @property
+    def actual(self):
+        """ The sequence number of the offending message"""
+        return self._actual
+
+    @property
+    def expected(self):
+        """
+        The excepted sequence number before offended message
+        was received.
+        """
+        return self._expected
 
 
 class FatalSequenceGap(Exception):
     def __init__(self, actual, expected):
         super().__init__('Remote sequence number is lower than expected, '
                          'expected {} but got {}'.format(expected, actual))
-        self.actual = actual
-        self.expected = expected
+        self._actual = actual
+        self._expected = expected
+
+    @property
+    def actual(self):
+        """ The sequence number of the offending message"""
+        return self._actual
+
+    @property
+    def expected(self):
+        """
+        The excepted sequence number before offended message
+        was received.
+        """
+        return self._expected
 
 
 class FixRejection(Exception):
