@@ -1,1 +1,1 @@
-# Fixation: tools for interacting with the FIX protocol.
+# Fixtrate: tools for interacting with the FIX protocol.
