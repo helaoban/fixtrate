@@ -47,7 +47,7 @@ class FatalSequenceGap(Exception):
         return self._expected
 
 
-class FixRejection(Exception):
+class FixRejectionError(Exception):
     """ Reject<3> message received."""
     def __init__(self, reason):
         self.reason = reason
