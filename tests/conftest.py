@@ -58,5 +58,6 @@ def parser(client_config):
 
 
 @pytest.fixture
-async def fix_session(client_config, client_store):
-    return session.FixSession(client_config, store=client_store)
+async def fix_session(client_config, client_store, event_loop):
+    return session.FixSession(
+        client_config, store=client_store, loop=event_loop)
