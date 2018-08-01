@@ -142,7 +142,7 @@ class FixMessage(simplefix.FixMessage):
             pairs.append((tag, val.decode()))
         return pairs
 
-    def to_dict(self):
+    def to_json(self):
         """
         Returns dictionary representation of message.
 
