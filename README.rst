@@ -9,6 +9,14 @@ Fixtrate: Tools for interacting with the FIX protocol.
 Getting Started
 ================
 
+Installing
+-----------
+
+.. code-block:: text
+
+    pip install fixtrate
+
+
 Session
 --------
 
