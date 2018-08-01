@@ -23,6 +23,10 @@ class SequenceGap(Exception):
 
 
 class FatalSequenceGap(Exception):
+    """
+    A fatal sequence gap occured (remote sequence number
+    is lower than expected).
+    """
     def __init__(self, actual, expected):
         super().__init__('Remote sequence number is lower than expected, '
                          'expected {} but got {}'.format(expected, actual))
@@ -44,14 +48,17 @@ class FatalSequenceGap(Exception):
 
 
 class FixRejection(Exception):
+    """ Reject<3> message received."""
     def __init__(self, reason):
         self.reason = reason
 
 
 class UnsupportedVersion(Exception):
+    """ Unsupported FIX version"""
     pass
 
 
 class InvalidFixDictTag(Exception):
+    """ Tag specified in FIX XML dictionary is not a valid FIX tag"""
     pass
 
