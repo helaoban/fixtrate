@@ -142,22 +142,21 @@ class FixMessage(simplefix.FixMessage):
             pairs.append((tag, val.decode()))
         return pairs
 
-    def to_json(self):
+    def to_dict(self):
         """
-        Return message as dictionary suitable for encoding to JSON.
+        Returns dictionary representation of message.
 
         :return: `dict`
         """
-
-        msg_type = self.get(fc.FixTag.FIX42.MsgType)
-        msg_type = fc.FixMsgType(msg_type)
-        seq_num = int(self.get(fc.FixTag.FIX42.MsgSeqNum))
+        msg_type = self.get(35)
+        seq_num = self.get(34)
+        if seq_num:
+            seq_num = int(seq_num)
 
         return {
             'uid': self.uid,
-            'seqNum': seq_num,
-            'msgType': msg_type,
-            'msgTypeName': msg_type.name,
+            'seq_num': seq_num,
+            'msg_type': msg_type,
             'pairs': self.to_decoded_pairs(),
             'raw': self.__str__()
         }
