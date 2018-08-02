@@ -34,7 +34,7 @@ about = {}
 with open(os.path.join(here, NAME, '__version__.py')) as f:
     exec(f.read(), about)
 
-with open(os.path.join(here, 'README.md')) as f:
+with open(os.path.join(here, 'README.rst')) as f:
     long_description = '\n' + f.read()
 
 
