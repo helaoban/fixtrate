@@ -64,13 +64,13 @@ class Config(dict):
     @classmethod
     def from_env(cls, namespace='FIX_'):
         """
-        Build a :class:`~.fixation.config.Config` object from ENV variables.
+        Build a :class:`~.fixtrate.config.Config` object from ENV variables.
         Will only fetch variables prepended with a given namespace string.
 
         :param namespace: (optional) The namespace used to look for appropriate
             ENV vars. Defaults to `'FIX_'`.
         :type namespace: str
-        :return: :class:`~fixation.config.Config` object
+        :return: :class:`~fixtrate.config.Config` object
         """
         missing = []
         config = cls()

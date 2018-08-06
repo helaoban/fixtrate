@@ -1,5 +1,5 @@
 """
-    fixation.signals
+    fixtrate.signals
 
     AsyncSignal shamelessly taken from:
     https://github.com/jucacrispim/asyncblink/blob/master/asyncblink.py

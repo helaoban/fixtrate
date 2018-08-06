@@ -86,7 +86,7 @@ class FixMessage(simplefix.FixMessage):
         """
         Read-only property. Returns the FIX version for this message..
 
-        :return: :class:`~fixation.contants.FixVersion` or `None`
+        :return: :class:`~fixtrate.contants.FixVersion` or `None`
         :raises: `ValueError` if version string is not a valid FIX version or
             if BeginString<8> is not set on message..
         """
@@ -102,7 +102,7 @@ class FixMessage(simplefix.FixMessage):
         Read-only property. Returns the value of the message's
         MsgType<35> field, or `None` if MsgType<35> is not set.
 
-        :return: :class:`~fixation.constants.FixMsgType` or `None`
+        :return: :class:`~fixtrate.constants.FixMsgType` or `None`
         """
         _msg_type = self.get(35)
         if _msg_type is not None:
