@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "9cef68177d56f8a4cb0857fb307e78c2aa76aeda1ea36800fa7e20885c227682"
+            "sha256": "726bec53f17045955851d0b0c92c8a0958990aa24c913c70c7fae6d5cd1831ea"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -48,10 +48,6 @@
             "index": "pypi",
             "version": "==1.4"
         },
-        "e1839a8": {
-            "editable": true,
-            "path": "."
-        },
         "hiredis": {
             "hashes": [
                 "sha256:ca958e13128e49674aa4a96f02746f5de5973f39b57297b84d59fd44d314d5b5"
@@ -97,14 +93,6 @@
                 "sha256:b63b1f4dc77c074d386752ec4a8a7517600f6c0db8cd42980cae17ab7b3275d7"
             ],
             "version": "==0.7.11"
-        },
-        "appnope": {
-            "hashes": [
-                "sha256:5b26757dc6f79a3b7dc9fab95359328d5747fcb2409d331ea66d0272b90ab2a0",
-                "sha256:8b995ffe925347a2138d7ac0fe77155e4311a0ea6d6da4f5128fe4b3cbe5ed71"
-            ],
-            "markers": "sys_platform == 'darwin'",
-            "version": "==0.1.0"
         },
         "atomicwrites": {
             "hashes": [
@@ -372,11 +360,11 @@
         },
         "snakeviz": {
             "hashes": [
-                "sha256:adc95ec5eb0a04bc2aa8325e8a713b9aa82ccb30425f9efe0e4d7479e2fa3bcb",
-                "sha256:ef58335fe20e71384668159899985e6802bf668d1c82bb5ccd90592aba3b9ec2"
+                "sha256:5fe23667708a4ed04047abfbf209675a8488ea6ea8c038d7de06d8a083fb3531",
+                "sha256:7fd7e27396330319f22ae0944eabf05e5620c5a0088deb3c9a5be8a628da7797"
             ],
             "index": "pypi",
-            "version": "==0.4.2"
+            "version": "==1.0.0"
         },
         "snowballstemmer": {
             "hashes": [
