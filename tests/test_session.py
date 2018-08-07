@@ -126,6 +126,9 @@ async def test_test_request(fix_session, test_server):
 @pytest.mark.asyncio
 async def test_message_recovery(fix_session, test_server):
 
+    fix_session._config['HEARTBEAT_INTERVAL'] = 2
+    test_server._config['HEARTBEAT_INTERVAL'] = 2
+
     async with fix_session.connect():
         await fix_session.logon()
         async for msg in fix_session:
@@ -161,11 +164,6 @@ async def test_message_recovery(fix_session, test_server):
         msg = await fix_session._recv_msg()
         assert msg.msg_type == fc.FixMsgType.SequenceReset
 
-        # there should be no more messages
-        msg = None
-        try:
-            async with timeout(1):
-                msg = await fix_session._recv_msg()
-        except asyncio.TimeoutError:
-            pass
-        assert msg is None
+        # the next message should process fine
+        msg = await fix_session._recv_msg()
+        assert msg.msg_type == fc.FixMsgType.Heartbeat
