@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from fixtrate import (
@@ -6,10 +8,12 @@ from fixtrate import (
 )
 from fixtrate.factories import fix44
 
+here = os.path.dirname(__file__)
+
 
 @pytest.fixture
 def fix_dict():
-    return fd.FixDictionary.from_xml('/Users/carloholl/Downloads/gemini-fix-dictionary.xml')
+    return fd.FixDictionary.from_xml(os.path.join(here, 'gemini-fix-dictionary.xml'))
 
 
 @pytest.fixture
