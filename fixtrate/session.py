@@ -409,8 +409,8 @@ class FixSession:
 
         is_reset = self._is_reset(msg)
         if is_reset:
-            await self._store.set_seq_num(1)
-            await self._store.set_seq_num(1, remote=True)
+            await self._store.set_seq_num(2)
+            await self._store.set_seq_num(2, remote=True)
 
         if self._is_initiator == None:
             self._is_initiator = utils.Tristate(False)
