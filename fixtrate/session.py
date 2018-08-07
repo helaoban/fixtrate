@@ -327,51 +327,42 @@ class FixSession:
 
         try:
             await self._check_sequence_integrity(msg)
-        except fe.FatalSequenceGap as error:
+        except fe.FatalSequenceGap:
+            # TODO make sure this is right. Resent messages must respect seq num order
             if msg.is_duplicate:
                 return
-            elif msg.msg_type == fc.FixMsgType.Logon:
+            if msg.msg_type == fc.FixMsgType.Logon:
                 if self._is_reset(msg):
                     await self._handle_logon(msg)
-            elif msg.msg_type == fc.FixMsgType.SequenceReset:
+                    return
+            if msg.msg_type == fc.FixMsgType.SequenceReset:
                 if not self._is_gap_fill(msg):
                     await self._handle_sequence_reset(msg)
                     return
-            else:
-                logger.exception(error)
-                await self.close()
-                raise
+
+            await self.close()
+            raise
         except fe.SequenceGap as error:
             sequence_gap.send(self, exc=error)
             if msg.msg_type == fc.FixMsgType.Logon:
                 await self._handle_logon(msg)
-                await self._request_resend(
-                    start=error.expected,
-                    end=0
-                )
             if msg.msg_type == fc.FixMsgType.Logout:
                 # TODO handle logout sequence gap case
-                pass
+                return
             if msg.msg_type == fc.FixMsgType.ResendRequest:
                 await self._handle_resend_request(msg)
-                await self._request_resend(
-                    start=error.expected,
-                    end=0
-                )
             if msg.msg_type == fc.FixMsgType.SequenceReset:
-                if self._is_gap_fill(msg):
-                    await self._request_resend(
-                        start=error.expected,
-                        end=0
-                    )
-                else:
+                if not self._is_gap_fill(msg):
                     new_seq_num = int(msg.get(self._tags.NewSeqNo))
                     await self._store.set_seq_num(new_seq_num)
-            return
-        finally:
+                    return
+            await self._request_resend(
+                start=error.expected,
+                end=0
+            )
+        else:
             await self._store.incr_seq_num(remote=True)
-
-        await self._dispatch(msg)
+            await self._dispatch(msg)
 
     async def _check_sequence_integrity(self, msg):
         actual = await self._store.get_seq_num(remote=True)
