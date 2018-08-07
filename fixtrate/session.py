@@ -262,7 +262,12 @@ class FixSession:
             heartbeat_interval=self._config['HEARTBEAT_INTERVAL'],
             reset_sequence=reset
         )
-        await self.send_message(login_msg)
+        if reset:
+            await self._store.set_seq_num(1)
+            self._append_standard_header(login_msg, seq_num=1)
+            await self.send_message(login_msg, skip_headers=True)
+        else:
+            await self.send_message(login_msg)
 
     async def _request_resend(self, start, end):
         msg = fix42.resend_request(start, end)
@@ -409,7 +414,6 @@ class FixSession:
 
         is_reset = self._is_reset(msg)
         if is_reset:
-            await self._store.set_seq_num(2)
             await self._store.set_seq_num(2, remote=True)
 
         if self._is_initiator == None:
