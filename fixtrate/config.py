@@ -87,6 +87,6 @@ class Config(dict):
             config[name] = val
         if missing:
             raise ValueError('The following env vars are not set: {}'
-                             ''.format(missing))
+                             ''.format(['{}{}'.format(namespace, m) for m in missing]))
         config.validate()
         return config
