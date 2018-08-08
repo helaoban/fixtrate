@@ -10,7 +10,7 @@ def heartbeat(test_request_id=None):
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Heartbeat
+        fc.FixMsgType.HEARTBEAT
     )
     if test_request_id:
         msg.append_pair(TAGS.TestReqID, test_request_id)
@@ -21,7 +21,7 @@ def test_request(test_request_id=None):
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.TestRequest
+        fc.FixMsgType.TEST_REQUEST
     )
     if test_request_id is None:
         test_request_id = utils.gen_uuid()
@@ -33,7 +33,7 @@ def logoff():
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Logout,
+        fc.FixMsgType.LOGOUT,
         header=True
     )
     return msg
@@ -47,7 +47,7 @@ def logon(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Logon,
+        fc.FixMsgType.LOGON,
     )
     msg.append_pair(
         TAGS.EncryptMethod,
@@ -67,7 +67,7 @@ def resend_request(start_sequence, end_sequence):
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.ResendRequest
+        fc.FixMsgType.RESEND_REQUEST
     )
     msg.append_pair(TAGS.BeginSeqNo, start_sequence)
     msg.append_pair(TAGS.EndSeqNo, end_sequence)
@@ -81,7 +81,7 @@ def sequence_reset(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.ResendRequest
+        fc.FixMsgType.RESEND_REQUEST
     )
     msg.append_pair(TAGS.NewSeqNo, new_sequence_number)
     msg.append_pair(TAGS.GapFillFlag, gap_fill)
@@ -112,7 +112,7 @@ def market_data_request(
     msg = fm.FixMessage()
     msg.append_pair(
         tags.MsgType,
-        fc.FixMsgType.MarketDataRequest
+        fc.FixMsgType.MARKET_DATA_REQUEST
     )
     msg.append_pair(tags.MDReqID, utils.gen_uuid())
 
@@ -221,7 +221,7 @@ def reject(
     msg = fm.FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Reject
+        fc.FixMsgType.REJECT
     )
     msg.append_pair(TAGS.RefSeqNum, ref_sequence_number)
     msg.append_pair(TAGS.Text, reject_reason)

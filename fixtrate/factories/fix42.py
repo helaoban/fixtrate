@@ -8,7 +8,7 @@ def heartbeat(test_request_id=None):
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Heartbeat,
+        fc.FixMsgType.HEARTBEAT,
         header=True
     )
     if test_request_id:
@@ -20,7 +20,7 @@ def test_request(test_request_id=None):
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.TestRequest,
+        fc.FixMsgType.TEST_REQUEST,
         header=True
     )
     if test_request_id is None:
@@ -33,7 +33,7 @@ def logoff():
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Logout,
+        fc.FixMsgType.LOGOUT,
         header=True
     )
     return msg
@@ -47,7 +47,7 @@ def logon(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Logon,
+        fc.FixMsgType.LOGON,
         header=True
     )
     msg.append_pair(
@@ -67,7 +67,7 @@ def resend_request(start_sequence, end_sequence):
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.ResendRequest,
+        fc.FixMsgType.RESEND_REQUEST,
         header=True
     )
     msg.append_pair(TAGS.BeginSeqNo, start_sequence)
@@ -82,7 +82,7 @@ def sequence_reset(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.SequenceReset,
+        fc.FixMsgType.SEQUENCE_RESET,
         header=True
     )
     msg.append_pair(TAGS.NewSeqNo, new_sequence_number)
@@ -117,7 +117,7 @@ def market_data_request(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.MarketDataRequest,
+        fc.FixMsgType.MARKET_DATA_REQUEST,
         header=True
     )
     msg.append_pair(TAGS.MDReqID, utils.gen_uuid())
@@ -188,7 +188,7 @@ def new_order(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.NewOrderSingle,
+        fc.FixMsgType.NEW_ORDER_SINGLE,
         header=True
     )
     msg.append_pair(TAGS.Account, account)
@@ -237,7 +237,7 @@ def cancel_replace(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.OrderCancelReplaceRequest,
+        fc.FixMsgType.ORDER_CANCEL_REPLACE_REQEUST,
         header=True
     )
     msg.append_pair(TAGS.Account, account)
@@ -268,7 +268,7 @@ def cancel(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.OrderCancelRequest,
+        fc.FixMsgType.ORDER_CANCEL_REQUEST,
         header=True
     )
     msg.append_pair(TAGS.Account, account)
@@ -289,7 +289,7 @@ def order_status(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.OrderStatusRequest,
+        fc.FixMsgType.ORDER_STATUS_REQUEST,
         header=True
     )
     msg.append_pair(TAGS.ClOrdID, cl_order_id)
@@ -315,7 +315,7 @@ def reject(
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,
-        fc.FixMsgType.Reject,
+        fc.FixMsgType.REJECT,
         header=True
     )
     msg.append_pair(TAGS.RefSeqNum, ref_sequence_number)

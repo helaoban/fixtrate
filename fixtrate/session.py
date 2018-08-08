@@ -19,13 +19,13 @@ from .signals import message_received, message_sent, sequence_gap
 logger = logging.getLogger(__name__)
 
 ADMIN_MESSAGES = [
-    fc.FixMsgType.Logon,
-    fc.FixMsgType.Logout,
-    fc.FixMsgType.Heartbeat,
-    fc.FixMsgType.TestRequest,
-    fc.FixMsgType.ResendRequest,
-    fc.FixMsgType.SequenceReset,
-    fc.FixMsgType.Reject,
+    fc.FixMsgType.LOGON,
+    fc.FixMsgType.LOGOUT,
+    fc.FixMsgType.HEARTBEAT,
+    fc.FixMsgType.TEST_REQUEST,
+    fc.FixMsgType.RESEND_REQUEST,
+    fc.FixMsgType.SEQUENCE_RESET,
+    fc.FixMsgType.REJECT,
 ]
 
 
@@ -336,11 +336,11 @@ class FixSession:
             # TODO make sure this is right. Resent messages must respect seq num order
             if msg.is_duplicate:
                 return
-            if msg.msg_type == fc.FixMsgType.Logon:
+            if msg.msg_type == fc.FixMsgType.LOGON:
                 if self._is_reset(msg):
                     await self._handle_logon(msg)
                     return
-            if msg.msg_type == fc.FixMsgType.SequenceReset:
+            if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
                 if not self._is_gap_fill(msg):
                     await self._handle_sequence_reset(msg)
                     return
@@ -349,14 +349,14 @@ class FixSession:
             raise
         except fe.SequenceGap as error:
             sequence_gap.send(self, exc=error)
-            if msg.msg_type == fc.FixMsgType.Logon:
+            if msg.msg_type == fc.FixMsgType.LOGON:
                 await self._handle_logon(msg)
-            if msg.msg_type == fc.FixMsgType.Logout:
+            if msg.msg_type == fc.FixMsgType.LOGOUT:
                 # TODO handle logout sequence gap case
                 return
-            if msg.msg_type == fc.FixMsgType.ResendRequest:
+            if msg.msg_type == fc.FixMsgType.RESEND_REQUEST:
                 await self._handle_resend_request(msg)
-            if msg.msg_type == fc.FixMsgType.SequenceReset:
+            if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
                 if not self._is_gap_fill(msg):
                     new_seq_num = int(msg.get(self._tags.NewSeqNo))
                     await self._store.set_seq_num(new_seq_num)
@@ -380,11 +380,11 @@ class FixSession:
 
     async def _dispatch(self, msg):
         handler = {
-            fc.FixMsgType.Logon: self._handle_logon,
-            fc.FixMsgType.TestRequest: self._handle_test_request,
-            fc.FixMsgType.Reject: self._handle_reject,
-            fc.FixMsgType.ResendRequest: self._handle_resend_request,
-            fc.FixMsgType.SequenceReset: self._handle_sequence_reset,
+            fc.FixMsgType.LOGON: self._handle_logon,
+            fc.FixMsgType.TEST_REQUEST: self._handle_test_request,
+            fc.FixMsgType.REJECT: self._handle_reject,
+            fc.FixMsgType.RESEND_REQUEST: self._handle_resend_request,
+            fc.FixMsgType.SEQUENCE_RESET: self._handle_sequence_reset,
         }.get(msg.msg_type)
 
         if handler is not None:
