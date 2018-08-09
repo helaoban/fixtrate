@@ -16,6 +16,7 @@ from . import (
 from .config import Config
 from .factories import fix42
 from .signals import message_received, message_sent, sequence_gap
+from .fsid import FSID
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ class FixSession:
 
         self._sender_comp_id = sender_comp_id
         self._target_comp_id = target_comp_id
+        self._session_id = FSID(self._sender_comp_id, self._target_comp_id)
         self._heartbeat_interval = heartbeat_interval
 
         self._headers = headers or []
