@@ -68,3 +68,9 @@ class UnsupportedVersion(Exception):
 class InvalidFixDictTag(Exception):
     """ Tag specified in FIX XML dictionary is not a valid FIX tag"""
     pass
+
+
+class InvalidFIXVersion(Exception):
+    def __init__(self, version):
+        super().__init__(
+            '{} is not a valid FIX version'.format(version))
