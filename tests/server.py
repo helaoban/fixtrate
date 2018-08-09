@@ -12,7 +12,13 @@ logger = logging.getLogger(__name__)
 
 class MockFixServer(object):
 
-    def __init__(self, config=None, loop=None, store=None):
+    def __init__(
+        self,
+        config=None,
+        heartbeat_interval=30,
+        loop=None,
+        store=None
+    ):
         self._store = store or fix_store.FixMemoryStore()
         self._config = config or {
             'HOST': 'localhost',
@@ -22,6 +28,7 @@ class MockFixServer(object):
             'VERSION': fc.FixVersion.FIX42,
             'TARGET_COMP_ID': 'TESTCLIENT',
         }
+        self._heartbeat_interval = heartbeat_interval
         self._loop = loop or asyncio.get_event_loop()
         self._tags = getattr(fc.FixTag, self._config['VERSION'].name)
         self._server = None
@@ -38,7 +45,10 @@ class MockFixServer(object):
 
     async def accept_client(self, reader, writer):
         fix_session = session.FixSession(
-            conf=self._config,
+            version=fc.FixVersion.FIX42,
+            sender_comp_id='TESTSERVER',
+            target_comp_id='TESTCLIENT',
+            heartbeat_interval=self._heartbeat_interval,
             store=self._store,
             loop=self._loop
         )

@@ -1,7 +1,13 @@
 import pytest
 
 import fixtrate.constants
-from fixtrate import parse, store, session
+from fixtrate import (
+    constants as c,
+    parse,
+    store,
+    session
+)
+# from fixtrate import parse, store, session
 from tests.server import MockFixServer
 
 
@@ -21,8 +27,8 @@ def server_config():
         HOST='127.0.0.1',
         ACCOUNT='U001',
         PORT=8686,
-        SENDER_COMP_ID='FIXTEST',
-        VERSION=fixtrate.constants.FixVersion.FIX42,
+        SENDER_COMP_ID='TESTSERVER',
+        VERSION=c.FixVersion.FIX42,
         TARGET_COMP_ID='TESTCLIENT',
         HEARTBEAT_INTERVAL=30
     )
@@ -42,22 +48,22 @@ async def test_server(event_loop, server_store, server_config):
 
 
 @pytest.fixture
-def client_config(server_config):
-    return {
-        **server_config,
-        'TARGET_COMP_ID': server_config['SENDER_COMP_ID'],
-        'SENDER_COMP_ID': 'TESTCLIENT',
-        'ACCOUNT': 'account',
-        'RESET_SEQUENCE': True
-    }
+def parser():
+    return parse.FixParser()
 
 
 @pytest.fixture
-def parser(client_config):
-    return parse.FixParser(client_config)
-
-
-@pytest.fixture
-async def fix_session(client_config, client_store, event_loop):
+async def fix_session(client_store, event_loop):
     return session.FixSession(
-        client_config, store=client_store, loop=event_loop)
+        version=c.FixVersion.FIX42,
+        sender_comp_id='TESTCLIENT',
+        target_comp_id='TESTSERVER',
+        heartbeat_interval=30,
+        store=client_store,
+        loop=event_loop
+    )
+
+
+@pytest.fixture
+async def fix_endpoint():
+    return 'localhost', 8686
