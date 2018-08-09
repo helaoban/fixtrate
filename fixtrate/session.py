@@ -32,9 +32,20 @@ ADMIN_MESSAGES = [
 class FixSession:
     """
     FIX Session Manager
+
+    :param sender_comp_id: Identifies the local peer. See
+        http://fixwiki.org/fixwiki/SenderCompID
+    :param target_comp_id: Identifies the remote peer See
+        http://fixwiki.org/fixwiki/TargetCompID
+    :param heartbeat_interval: How often (in seconds) to generate heartbeat
+        messages during periods of inactivity. Default to 30.
     """
     def __init__(
         self,
+        version,
+        sender_comp_id,
+        target_comp_id,
+        heartbeat_interval=30,
         conf=None,
         store=None,
         dictionary=None,
@@ -45,7 +56,16 @@ class FixSession:
         conf = conf or Config.from_env()
         self._config = conf
 
-        self._tags = getattr(fc.FixTag, self._config['VERSION'].name)
+        try:
+            self._version = fc.FixVersion(version)
+        except ValueError:
+            raise fe.InvalidFIXVersion(version)
+
+        self._sender_comp_id = sender_comp_id
+        self._target_comp_id = target_comp_id
+        self._heartbeat_interval = heartbeat_interval
+
+        self._tags = getattr(fc.FixTag, self._version.name)
         self._store = store or fix_store.FixMemoryStore()
         self._parser = parse.FixParser(self._config)
         self._fix_dict = dictionary
@@ -205,14 +225,10 @@ class FixSession:
         seq_num,
         timestamp=None
     ):
-        version = self._config['VERSION']
-        sender_id = self._config['SENDER_COMP_ID']
-        target_id = self._config['TARGET_COMP_ID']
-
         pairs = (
-            (self._tags.BeginString, version),
-            (self._tags.SenderCompID, sender_id),
-            (self._tags.TargetCompID, target_id),
+            (self._tags.BeginString, self._version),
+            (self._tags.SenderCompID, self._sender_comp_id),
+            (self._tags.TargetCompID, self._target_comp_id),
             (self._tags.MsgSeqNum, seq_num),
         )
 
@@ -259,7 +275,7 @@ class FixSession:
             self._is_initiator = utils.Tristate(None)
 
         login_msg = fix42.logon(
-            heartbeat_interval=self._config['HEARTBEAT_INTERVAL'],
+            heartbeat_interval=self._heartbeat_interval,
             reset_sequence=reset
         )
         if reset:
@@ -392,18 +408,18 @@ class FixSession:
 
     async def _handle_logon(self, msg):
         heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
-        if heartbeat_interval != self._config['HEARTBEAT_INTERVAL']:
+        if heartbeat_interval != self._heartbeat_interval:
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.HeartBtInt,
                 rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='HeartBtInt must be {}'.format(
-                    self._config['HEARTBEAT_INTERVAL'])
+                    self._heartbeat_interval)
             )
             return
 
         target_comp_id = msg.get(self._tags.TargetCompID)
-        if target_comp_id != self._config['SENDER_COMP_ID']:
+        if target_comp_id != self._sender_comp_id:
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.TargetCompID,
@@ -458,7 +474,7 @@ class FixSession:
 
     async def _set_heartbeat_timer(self):
         try:
-            interval = self._config['HEARTBEAT_INTERVAL']
+            interval = self._heartbeat_interval
             await asyncio.sleep(interval)
             await self._send_heartbeat()
         except asyncio.CancelledError:
