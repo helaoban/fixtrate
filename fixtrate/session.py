@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import Coroutine
 import datetime as dt
 import logging
+import socket
 
 import async_timeout
 
@@ -99,18 +100,32 @@ class FixSession:
         """
         return self._conn is None or self._conn.closed
 
-    def connect(self):
+    def connect(self, address):
         """
         Coroutine that waits for a successfuly connection to a FIX peer.
         Returns a FixConnection object. Can also be used as an async context
         manager, in which case the connection is automatically closed on
         exiting the context manager.
 
+        :param address: tuple of (ip, port)
         :return: :class:`FixConnection` object
         :rtype: FixConnection
         """
+
+        host, port = address
+
+        try:
+            'localhost' or socket.inet_aton(host)
+        except OSError:
+            raise ValueError('{} is not a legal IP address'.format(host))
+
         return _FixConnectionContextManager(
-            self._config, self._on_connect, self._on_disconnect)
+            host=host,
+            port=port,
+            on_connect=self._on_connect,
+            on_disconnect=self._on_disconnect,
+            loop=self._loop
+        )
 
     async def listen(self, reader, writer):
         """ Listen on a given connection object. Useful for having a FIX session
@@ -545,12 +560,14 @@ class _FixConnectionContextManager(Coroutine):
 
     def __init__(
         self,
-        conf,
+        host='localhost',
+        port=4000,
         on_connect=None,
         on_disconnect=None,
         loop=None
     ):
-        self._config = conf
+        self._host = host
+        self._port = port
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
         self._loop = loop or asyncio.get_event_loop()
@@ -576,14 +593,12 @@ class _FixConnectionContextManager(Coroutine):
         self._coro.close()
 
     async def _connect(self, tries=5, retry_wait=5):
-        host = self._config.get('HOST', '127.0.0.1')
-        port = self._config.get('PORT', 4000)
         tried = 1
         while tried <= tries:
             try:
                 reader, writer = await asyncio.open_connection(
-                    host=host,
-                    port=port,
+                    host=self._host,
+                    port=self._port,
                     loop=self._loop
                 )
             except OSError as error:
