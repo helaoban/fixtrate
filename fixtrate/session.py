@@ -51,10 +51,10 @@ class FixSession:
         conf=None,
         store=None,
         dictionary=None,
-        loop=None,
         debug=False,
-        receive_timeout=None
+        receive_timeout=None,
         headers=None,
+        loop=None,
     ):
         conf = conf or Config.from_env()
         self._config = conf
