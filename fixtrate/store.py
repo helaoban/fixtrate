@@ -137,19 +137,12 @@ class FixMemoryStore(FixStore):
 
 class FixRedisStore(FixStore):
 
-    def __init__(self, redis_pool, conf):
+    def __init__(self, redis_pool, session_id):
         self._redis = redis_pool
-        self._conf = conf
-        self._session_id = self._generate_session_id()
-
-    def _generate_session_id(self):
-        sender_id = self._conf['SENDER_COMP_ID']
-        target_id = self._conf['TARGET_COMP_ID']
-        key = sender_id + target_id
-        return hashlib.sha256(key.encode()).hexdigest()
+        self._session_id = session_id
 
     def _make_namespaced_key(self, key):
-        return self._session_id + ':' + key
+        return str(self._session_id) + ':' + key
 
     @staticmethod
     def decode_message(msg, uid=None):
