@@ -73,7 +73,7 @@ class FixSession:
 
         self._tags = getattr(fc.FixTag, self._version.name)
         self._store = store or fix_store.FixMemoryStore()
-        self._parser = parse.FixParser(self._config)
+        self._parser = parse.FixParser()
         self._fix_dict = dictionary
 
         self._is_resetting = False
