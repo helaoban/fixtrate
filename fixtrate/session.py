@@ -53,6 +53,7 @@ class FixSession:
         loop=None,
         debug=False,
         receive_timeout=None
+        headers=None,
     ):
         conf = conf or Config.from_env()
         self._config = conf
@@ -65,6 +66,8 @@ class FixSession:
         self._sender_comp_id = sender_comp_id
         self._target_comp_id = target_comp_id
         self._heartbeat_interval = heartbeat_interval
+
+        self._headers = headers or []
 
         self._tags = getattr(fc.FixTag, self._version.name)
         self._store = store or fix_store.FixMemoryStore()
@@ -257,6 +260,9 @@ class FixSession:
             precision=6,
             header=True
         )
+
+        for tag, val in self._headers:
+            msg.append_pair(tag, val, header=True)
 
     async def _send_heartbeat(self, test_request_id=None):
         msg = fix42.heartbeat(test_request_id)
