@@ -124,6 +124,35 @@ async def test_test_request(fix_session, fix_endpoint, test_server):
 
 
 @pytest.mark.asyncio
+async def test_sequence_reset(fix_session, fix_endpoint, test_server):
+
+    async with fix_session.connect(fix_endpoint):
+        await fix_session.logon()
+
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.LOGON
+
+        client_session = list(test_server._clients.values())[0]
+
+        pairs = (
+            (TAGS.MsgType, fc.FixMsgType.SEQUENCE_RESET, True),
+            (TAGS.PossDupFlag, 'Y', True),
+            (TAGS.GapFillFlag, 'Y', False),
+            (TAGS.NewSeqNo, 10, False),
+        )
+        seq_reset_msg = fm.FixMessage.from_pairs(pairs)
+
+        await client_session.send_message(seq_reset_msg)
+
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.SEQUENCE_RESET
+
+        new_seq_num = int(msg.get(36))
+        current_seq_num = await fix_session._store.get_seq_num(remote=True)
+        assert current_seq_num == new_seq_num
+
+
+@pytest.mark.asyncio
 async def test_message_recovery(fix_session, fix_endpoint, test_server):
 
     fix_session._heartbeat_interval = 2
