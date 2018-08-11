@@ -461,6 +461,12 @@ class FixSession:
         if self._is_initiator == True:
             self._is_initiator = utils.Tristate(None)
 
+    async def _handle_logout(self, msg):
+        if self._waiting_logout_confirm:
+            await self._close()
+            return
+        await self._send_logout()
+
     async def _handle_test_request(self, msg):
         test_request_id = msg.get(self._tags.TestReqID)
         await self._send_heartbeat(test_request_id=test_request_id)
