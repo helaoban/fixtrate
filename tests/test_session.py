@@ -80,7 +80,7 @@ async def test_incorrect_target_comp_id(fix_session, fix_endpoint, test_server):
 
 
 @pytest.mark.asyncio
-async def test_new_seq_num(fix_session, fix_endpoint, test_server):
+async def test_reset_seq_num(fix_session, fix_endpoint, test_server):
 
     test_id = str(uuid.uuid4())
 
@@ -96,12 +96,14 @@ async def test_new_seq_num(fix_session, fix_endpoint, test_server):
         assert msg.get(112) == test_id
 
         await fix_session.logon(reset=True)
+
         msg = await fix_session.receive()
+        local_seq_num = await fix_session._store.get_seq_num()
+
         assert msg.msg_type == fc.FixMsgType.LOGON
         assert msg.get(TAGS.ResetSeqNumFlag) == fc.ResetSeqNumFlag.YES
         assert msg.seq_num == 1
-        stored_seq_num = await fix_session._store.get_seq_num()
-        assert stored_seq_num == 2
+        assert local_seq_num == 2
 
 
 @pytest.mark.asyncio
