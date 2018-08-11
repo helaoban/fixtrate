@@ -273,11 +273,6 @@ class FixSession:
         msg = fix42.test_request(test_request_id)
         await self.send_message(msg)
 
-    async def _send_sequence_reset(self):
-        seq_num = await self._store.get_seq_num()
-        msg = fix42.sequence_reset(seq_num + 1)
-        await self.send_message(msg)
-
     async def _send_reject(self, msg, tag, rejection_type, reason):
         msg = fix42.reject(
             ref_sequence_number=msg.seq_num,
