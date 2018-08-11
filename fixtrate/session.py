@@ -20,14 +20,13 @@ from .fsid import FSID
 
 logger = logging.getLogger(__name__)
 
+
 ADMIN_MESSAGES = [
     fc.FixMsgType.LOGON,
     fc.FixMsgType.LOGOUT,
     fc.FixMsgType.HEARTBEAT,
     fc.FixMsgType.TEST_REQUEST,
     fc.FixMsgType.RESEND_REQUEST,
-    fc.FixMsgType.SEQUENCE_RESET,
-    fc.FixMsgType.REJECT,
 ]
 
 
