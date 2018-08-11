@@ -1,7 +1,6 @@
 import abc
 import json
 import time
-import hashlib
 
 from sortedcontainers import SortedDict
 
@@ -188,7 +187,8 @@ class FixRedisStore(FixStore):
             return self.decode_message(msg, uid)
 
     async def get_messages(self):
-        msgs = await self._redis.hgetall('messages')
+        msgs = await self._redis.hgetall(
+            self._make_namespaced_key('messages'))
         msgs = msgs or {}
         return {
             uid: self.decode_message(msg, uid.decode())
