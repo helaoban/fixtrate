@@ -10,7 +10,7 @@ class FSID(object):
     ):
 
         key = ''.join([sender_comp_id, target_comp_id])
-        self.__dict__['fsid'] = hashlib.sha256(key.encode())
+        self.__dict__['_fsid'] = hashlib.sha256(key.encode())
 
     def __eq__(self, other):
         if isinstance(other, FSID):
