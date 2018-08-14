@@ -148,7 +148,7 @@ class FixMessage(simplefix.FixMessage):
 
         :return: list of ``(tag, value)`` tuples.
         """
-        tags = getattr(fc.FixTag, self.version)
+        tags = getattr(fc.FixTag, self.version.name)
         pairs = []
         for tag, val in self:
             try:
