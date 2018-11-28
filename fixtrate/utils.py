@@ -47,30 +47,7 @@ async def maybe_await(func, *args, **kwargs):
         return await func(*args, **kwargs)
     else:
         return func(*args, **kwargs)
-
-
-def parse_rpc_message(buf):
-    if len(buf) < 4:
-        return None, buf
-
-    rlen = int(struct.unpack('i', buf[:4])[0])
-    buf = buf[4:]
-
-    if len(buf) < rlen:
-        return None, buf
-
-    return buf[:rlen], buf[rlen:]
-
-
-def pack_rpc_message(message):
-    message = {
-        'jsonrpc': '2.0',
-        **message
-    }
-    message = json.dumps(message).encode()
-    mlen = struct.pack('i', len(message))
-    return mlen + message
-
+		
 
 def print_to_console(val):
     print('\n{}'.format(val))
