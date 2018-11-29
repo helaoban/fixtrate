@@ -11,7 +11,6 @@ REQUIRED = [
     ('TARGET_COMP_ID', str),
     ('ACCOUNT', str),
     ('HEARTBEAT_INTERVAL', int),
-    ('REDIS_URL', str),
 ]
 
 
