@@ -17,6 +17,7 @@ from .config import Config
 from .factories import fix42
 from .signals import message_received, message_sent, sequence_gap
 from .fsid import FSID
+from .utils import maybe_await
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,9 @@ class FixSession:
 
         self.on_recv_msg_funcs = []
         self.on_send_msg_funcs = []
+
+        self._closing = False
+        self._closed = False
 
     def __aiter__(self):
         return self
@@ -235,15 +239,21 @@ class FixSession:
         return f
 
     async def _close(self):
-        await self._cancel_heartbeat_timer()
+        self._closing = True
         logger.info('Shutting down...')
+        await self._cancel_heartbeat_timer()
+        if self._conn is not None and not self._conn.closed:
+	        await self._conn.close()
+
+        self._closed = True
 
     async def _on_connect(self, conn):
         self._conn = conn
         await self._store.store_config(self._config)
 
     async def _on_disconnect(self):
-        await self._close()
+        if not self._closing:
+            await self._close()
 
     def _append_standard_header(
         self,
@@ -371,6 +381,10 @@ class FixSession:
             except ConnectionError:
                 break
             self._parser.append_buffer(data)
+
+        if self._closing or self._closed:
+            return None
+
         if msg:
             await self._handle_message(msg)
         return msg
