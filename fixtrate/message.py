@@ -183,3 +183,6 @@ class FixMessage(simplefix.FixMessage):
             del self.__dict__[name]
         except KeyError:
             pass
+
+    def __repr__(self):
+        return 'FixMessage(msg_type=%r)' % (self.msg_type)
