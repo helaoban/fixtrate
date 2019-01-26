@@ -60,12 +60,6 @@ class FixMemoryStore(FixStore):
         self._remote = SortedDict()
         self._config = None
 
-    @staticmethod
-    def decode_message(msg, uid=None):
-        parser = FixParser()
-        parser.append_buffer(msg)
-        return parser.get_message(uid)
-
     async def incr_seq_num(self, remote=False):
         if remote:
             self._remote_seq_num += 1
@@ -99,7 +93,7 @@ class FixMemoryStore(FixStore):
 
     async def get_messages(self):
         return {
-            uid: self.decode_message(msg, uid)
+            uid: FixMessage.from_raw(msg)
             for uid, msg in self._messages.items()
         }
 
@@ -160,12 +154,6 @@ class FixRedisStore(FixStore):
             key=key
         )
 
-    @staticmethod
-    def decode_message(msg, uid=None):
-        parser = FixParser()
-        parser.append_buffer(msg)
-        return parser.get_message(uid)
-
     async def incr_seq_num(self, remote=False):
         key = 'seq_num_{}'.format('remote' if remote else 'local')
         seq_num = await self._redis.incr(
@@ -201,14 +189,14 @@ class FixRedisStore(FixStore):
         msg = await self._redis.hget(
             self._make_namespaced_key('messages'), uid)
         if msg:
-            return self.decode_message(msg, uid)
+            return FixMessage.from_raw(msg)
 
     async def get_messages(self):
         msgs = await self._redis.hgetall(
             self._make_namespaced_key('messages'))
         msgs = msgs or {}
         return {
-            uid: self.decode_message(msg, uid.decode())
+            uid: FixMessage.from_raw(msg)
             for uid, msg in msgs.items()
         }
 
