@@ -133,15 +133,32 @@ class FixMemoryStore(FixStore):
     async def get_config(self):
         return self._config
 
+    async def __aiter__(self):
+        messages = await self.get_messages()
+        self.__messages = iter(messages.items())
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self.__messages)
+        except StopIteration:
+            self.__messages = None
+            raise StopAsyncIteration
+
 
 class FixRedisStore(FixStore):
 
-    def __init__(self, redis_pool, session_id):
+    def __init__(self, redis_pool, session_id, prefix='fix'):
         self._redis = redis_pool
         self._session_id = session_id
+        self.prefix = prefix
 
     def _make_namespaced_key(self, key):
-        return str(self._session_id) + ':' + key
+        return '{prefix}:{session_id!s}:{key}'.format(
+            prefix=self.prefix,
+            session_id=self._session_id,
+            key=key
+        )
 
     @staticmethod
     def decode_message(msg, uid=None):
