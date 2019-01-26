@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Coroutine
 import datetime as dt
+import hashlib
 import logging
 import socket
 
@@ -16,7 +17,6 @@ from . import (
 from .config import Config
 from .factories import fix42
 from .signals import message_received, message_sent, sequence_gap
-from .fsid import FSID
 from .utils import maybe_await
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,32 @@ ADMIN_MESSAGES = [
     fc.FixMsgType.TEST_REQUEST,
     fc.FixMsgType.RESEND_REQUEST,
 ]
+
+
+class FixSessionId:
+
+    def __init__(
+        self,
+        sender_comp_id,
+        target_comp_id,
+    ):
+
+        key = ''.join([sender_comp_id, target_comp_id])
+        self.__dict__['_fsid'] = hashlib.sha256(key.encode())
+
+    def __eq__(self, other):
+        if isinstance(other, FixSessionId):
+            return self._fsid.hexdigest() == other._fsid.hexdigest()
+        return NotImplemented
+
+    def __str__(self):
+        return self._fsid.hexdigest()
+
+    def __int__(self):
+        return int(self._fsid.hexdigest(), 16)
+
+    def __setattr__(self, name, value):
+        raise TypeError('FixSessionId objects are immutable')
 
 
 class FixSession:
@@ -66,7 +92,8 @@ class FixSession:
 
         self._sender_comp_id = sender_comp_id
         self._target_comp_id = target_comp_id
-        self._session_id = FSID(self._sender_comp_id, self._target_comp_id)
+        self._session_id = FixSessionId(
+            self._sender_comp_id, self._target_comp_id)
         self._heartbeat_interval = heartbeat_interval
 
         self._headers = headers or []
