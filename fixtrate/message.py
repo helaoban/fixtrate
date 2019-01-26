@@ -1,5 +1,6 @@
 import sys
 import simplefix
+from .parse import FixParser
 from . import utils, constants as fc
 
 
@@ -109,3 +110,9 @@ class FixMessage(simplefix.FixMessage):
             'pairs': self.to_decoded_pairs(),
             'raw': self.__str__()
         }
+
+    @classmethod
+    def from_raw(cls, raw_message):
+        parser = FixParser()
+        parser.append_buffer(raw_message)
+        return parser.get_message()
