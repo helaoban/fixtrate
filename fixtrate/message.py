@@ -1,5 +1,4 @@
 import sys
-import uuid
 
 import simplefix
 
@@ -7,10 +6,6 @@ from . import utils, constants as fc
 
 
 class FixMessage(simplefix.FixMessage):
-
-    def __init__(self, uid=None):
-        super().__init__()
-        self.uid = uid or str(uuid.uuid4())
 
     @classmethod
     def from_pairs(cls, pairs):
@@ -110,7 +105,6 @@ class FixMessage(simplefix.FixMessage):
             seq_num = int(seq_num)
 
         return {
-            'uid': self.uid,
             'version': self.version,
             'seq_num': seq_num,
             'msg_type': msg_type,
