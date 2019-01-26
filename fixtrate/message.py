@@ -1,7 +1,5 @@
 import sys
-
 import simplefix
-
 from . import utils, constants as fc
 
 
