@@ -52,7 +52,6 @@ class FixMessage(simplefix.FixMessage):
     def __init__(self, uid=None):
         super().__init__()
         self.uid = uid or str(uuid.uuid4())
-        self._cache = {}
 
     @classmethod
     def from_pairs(cls, pairs):
@@ -68,7 +67,6 @@ class FixMessage(simplefix.FixMessage):
             msg.append_pair(tag, val, header=is_header)
         return msg
 
-    @utils.cached_property
     def seq_num(self):
         """
         Read-only property. Returns the value of MsgSeqNum<34>,
@@ -81,7 +79,6 @@ class FixMessage(simplefix.FixMessage):
             _seq_num = int(_seq_num)
         return _seq_num
 
-    @utils.cached_property
     def version(self):
         """
         Read-only property. Returns the FIX version for this message..
@@ -96,7 +93,6 @@ class FixMessage(simplefix.FixMessage):
         raise ValueError('BeginString<8> was not set on this message, '
                          'so version could not be determined')
 
-    @utils.cached_property
     def msg_type(self):
         """
         Read-only property. Returns the value of the message's
@@ -109,7 +105,6 @@ class FixMessage(simplefix.FixMessage):
             _msg_type = fc.FixMsgType(_msg_type)
         return _msg_type
 
-    @utils.cached_property
     def is_duplicate(self):
         """
         Read-only property. Returns `True` if the PossDupFlag is set
@@ -130,16 +125,6 @@ class FixMessage(simplefix.FixMessage):
         if not raw:
             return val.decode()
         return val
-
-    def append_pair(self, tag, value, header=False):
-        super().append_pair(tag, value, header=header)
-        # TODO need to guarantee that tag is an int, or else
-        # there is posibility of missing a cache clear, which could
-        # be really dangerous
-        if tag == 34:
-            self._bust_cache('seq_num')
-        if tag == 35:
-            self._bust_cache('msg_type')
 
     def to_decoded_pairs(self):
         """
@@ -177,12 +162,3 @@ class FixMessage(simplefix.FixMessage):
             'pairs': self.to_decoded_pairs(),
             'raw': self.__str__()
         }
-
-    def _bust_cache(self, name):
-        try:
-            del self.__dict__[name]
-        except KeyError:
-            pass
-
-    def __repr__(self):
-        return 'FixMessage(msg_type=%r)' % (self.msg_type)
