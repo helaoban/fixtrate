@@ -9,7 +9,7 @@ class FixParser(simplefix.FixParser):
             converted.append_pair(tag, val)
         return converted
 
-    def get_message(self, uid=None):
+    def get_message(self):
         msg = super().get_message()
         if msg is None:
             return msg
