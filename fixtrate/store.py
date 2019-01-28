@@ -35,10 +35,6 @@ class FixStore(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    async def get_messages_by_seq_num(self, start=None, end=None, remote=False):
-        pass
-
-    @abc.abstractmethod
     async def new_session(self):
         pass
 
@@ -97,23 +93,6 @@ class FixMemoryStore(FixStore):
             uid: FixMessage.from_raw(msg)
             for uid, msg in self._messages.items()
         }
-
-    async def get_messages_by_seq_num(self, start=1, end='inf', remote=False):
-        end = end or 'inf'
-        uids_by_seq = self._local
-        if remote:
-            uids_by_seq = self._remote
-        uids_by_seq = {
-            int(seq_num): uid
-            for seq_num, uid in uids_by_seq.items()
-            if start <= int(seq_num) <= float(end)
-        }
-        msgs = await self.get_messages()
-        return SortedDict({
-            int(seq_num): msgs[uid]
-            for seq_num, uid
-            in uids_by_seq.items()
-        })
 
     async def new_session(self):
         self._messages = {}
