@@ -1,4 +1,5 @@
 import abc
+from datetime import datetime
 import json
 import time
 import uuid
@@ -181,28 +182,44 @@ class FixRedisStore(FixStore):
 
     async def get_messages(
         self,
-        start=1,
-        end=INF,
+        start=None,
+        end=None,
+        min=float('-inf'),
+        max=float('inf'),
         direction=None
     ):
 
-        key = self.make_key('messages')
-        async for uid, msg in self._redis.ihscan(key, count=500):
-            msg = FixMessage.from_raw(msg)
-            seq_num = int(msg.get(34))
-            if not start <= seq_num <= end:
-                continue
+        if isinstance(start, datetime):
+            start = start.timestamp()
+        if isinstance(end, datetime):
+            end = end.timestamp()
 
-            if direction is not None:
-                sender = msg.get(49)
-                is_sent = sender == self._session_id.sender_comp_id
+        kwargs = {}
+        if start is not None:
+            kwargs['min'] = start
+        if end is not None:
+            kwargs['max'] = end
 
-                if direction == 'sent' and not is_sent:
+        uids = await self._redis.zrangebyscore(
+            self.make_key('messages_by_time'), **kwargs)
+
+        for chunk in chunked(uids, 500):
+            msgs = await self._redis.hmget(self.make_key('messages'), *chunk)
+            for msg in msgs:
+                msg = FixMessage.from_raw(msg)
+                if not min <= msg.seq_num() <= max:
                     continue
-                if direction == 'received' and is_sent:
-                    continue
 
-            yield msg
+                if direction is not None:
+                    sender = msg.get(49)
+                    is_sent = sender == self._session_id.sender_comp_id
+
+                    if direction == 'sent' and not is_sent:
+                        continue
+                    if direction == 'received' and is_sent:
+                        continue
+
+                yield msg
 
     async def store_config(self, conf):
         jsoned = json.dumps(conf)
