@@ -217,35 +217,6 @@ class FixRedisStore(FixStore):
 
             yield msg
 
-    async def get_messages_by_seq_num(
-        self,
-        start=1,
-        end='inf',
-        remote=False
-    ):
-        direction = 'remote' if remote else 'local'
-        uids_by_seq_num = await self._redis.zrangebyscore(
-            self.make_key(direction),
-            min=start, max=end, withscores=True)
-        msgs = await self.get_messages()
-        return SortedDict({
-            int(seq_num): msgs[uid]
-            for uid, seq_num
-            in uids_by_seq_num
-            if seq_num is not None
-        })
-
-    async def get_messages_by_time(self):
-        uids_by_time = await self._redis.zrange(
-            self.make_key('messages_by_time'),
-            start=0, stop=-1, withscores=True)
-        msgs = await self.get_messages()
-        return SortedDict({
-            timestamp: msgs[uid]
-            for uid, timestamp
-            in uids_by_time
-        })
-
     async def store_config(self, conf):
         jsoned = json.dumps(conf)
         await self._redis.set(self.make_key('config'), jsoned)
