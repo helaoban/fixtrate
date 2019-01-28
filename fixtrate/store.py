@@ -135,14 +135,12 @@ class FixMemoryStore(FixStore):
 
 class FixRedisStore(FixStore):
 
-    def __init__(self, redis_pool, session_id, prefix='fix'):
+    def __init__(self, redis_pool, session_id):
         self._redis = redis_pool
         self._session_id = session_id
-        self.prefix = prefix
 
     def make_key(self, key):
-        return '{prefix}:{session_id!s}:{key}'.format(
-            prefix=self.prefix,
+        return '{session_id!s}:{key}'.format(
             session_id=self._session_id,
             key=key
         )
