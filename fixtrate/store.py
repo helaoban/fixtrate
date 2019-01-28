@@ -8,6 +8,17 @@ from .message import FixMessage
 INF = float('inf')
 
 
+def chunked(iterator, size):
+    chunk = []
+    for item in iterator:
+        chunk.append(item)
+        if len(chunk) == size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+
 class FixStore(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
