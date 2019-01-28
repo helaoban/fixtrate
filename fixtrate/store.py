@@ -1,6 +1,7 @@
 import abc
 import json
 import time
+import uuid
 
 from sortedcontainers import SortedDict
 from .message import FixMessage
