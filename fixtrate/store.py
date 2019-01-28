@@ -34,7 +34,7 @@ class FixStore(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    async def store_message(self, msg, remote=False):
+    async def store_message(self, msg):
         pass
 
     @abc.abstractmethod
@@ -163,18 +163,14 @@ class FixRedisStore(FixStore):
         seq_num = seq_num or await self.incr_seq_num(remote=remote)
         return int(seq_num)
 
-    async def store_message(self, msg, remote=False):
-        direction = 'remote' if remote else 'local'
-        seq_num = msg.get(34)
+    async def store_message(self, msg):
+        uid = uuid.uuid4()
+        store_time = time.time()
+        await self._redis.zadd(
+            self.make_key('messages_by_time'), store_time, uid)
         await self._redis.hset(
-            self.make_key('messages'),
-            msg.uid, msg.encode())
-        await self._redis.zadd(
-            self.make_key(direction),
-            int(seq_num), msg.uid)
-        await self._redis.zadd(
-            self.make_key('messages_by_time'),
-            time.time(), msg.uid)
+            self.make_key('messages'), uid, msg.encode())
+        return uid
 
     async def get_message(self, uid):
         msg = await self._redis.hget(
