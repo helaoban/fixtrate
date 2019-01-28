@@ -3,8 +3,9 @@ import json
 import time
 
 from sortedcontainers import SortedDict
+from .message import FixMessage
 
-from .parse import FixParser
+INF = float('inf')
 
 
 class FixStore(metaclass=abc.ABCMeta):
@@ -191,14 +192,30 @@ class FixRedisStore(FixStore):
         if msg:
             return FixMessage.from_raw(msg)
 
-    async def get_messages(self):
-        msgs = await self._redis.hgetall(
-            self.make_key('messages'))
-        msgs = msgs or {}
-        return {
-            uid: FixMessage.from_raw(msg)
-            for uid, msg in msgs.items()
-        }
+    async def get_messages(
+        self,
+        start=1,
+        end=INF,
+        direction=None
+    ):
+
+        key = self.make_key('messages')
+        async for uid, msg in self._redis.ihscan(key, count=500):
+            msg = FixMessage.from_raw(msg)
+            seq_num = int(msg.get(34))
+            if not start <= seq_num <= end:
+                continue
+
+            if direction is not None:
+                sender = msg.get(49)
+                is_sent = sender == self._session_id.sender_comp_id
+
+                if direction == 'sent' and not is_sent:
+                    continue
+                if direction == 'received' and is_sent:
+                    continue
+
+            yield msg
 
     async def get_messages_by_seq_num(
         self,
