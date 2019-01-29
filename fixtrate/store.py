@@ -8,8 +8,6 @@ from sortedcontainers import SortedDict
 from .message import FixMessage
 from fixtrate.utils import chunked
 
-INF = float('inf')
-
 
 class FixStore(metaclass=abc.ABCMeta):
 
