@@ -1,7 +1,6 @@
 import asyncio
 from collections.abc import Coroutine
 import datetime as dt
-import hashlib
 import logging
 import socket
 
@@ -17,7 +16,6 @@ from . import (
 from .config import Config
 from .factories import fix42
 from .signals import message_received, message_sent, sequence_gap
-from .utils import maybe_await
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +278,7 @@ class FixSession:
         logger.info('Shutting down...')
         await self._cancel_heartbeat_timer()
         if self._conn is not None and not self._conn.closed:
-	        await self._conn.close()
+            await self._conn.close()
 
         self._closed = True
 
