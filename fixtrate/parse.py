@@ -1,8 +1,10 @@
 import simplefix
 from .message import FixMessage
 
+
 class FixParser(simplefix.FixParser):
 
+    @staticmethod
     def _convert(msg):
         converted = FixMessage()
         for tag, val in msg:
@@ -13,4 +15,4 @@ class FixParser(simplefix.FixParser):
         msg = super().get_message()
         if msg is None:
             return msg
-        return _convert(msg)
+        return self._convert(msg)
