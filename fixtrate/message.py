@@ -20,6 +20,7 @@ class FixMessage(simplefix.FixMessage):
             msg.append_pair(tag, val, header=is_header)
         return msg
 
+    @property
     def seq_num(self):
         """
         Read-only property. Returns the value of MsgSeqNum<34>,
@@ -32,6 +33,7 @@ class FixMessage(simplefix.FixMessage):
             _seq_num = int(_seq_num)
         return _seq_num
 
+    @property
     def version(self):
         """
         Read-only property. Returns the FIX version for this message..
@@ -46,6 +48,7 @@ class FixMessage(simplefix.FixMessage):
         raise ValueError('BeginString<8> was not set on this message, '
                          'so version could not be determined')
 
+    @property
     def msg_type(self):
         """
         Read-only property. Returns the value of the message's
@@ -58,6 +61,7 @@ class FixMessage(simplefix.FixMessage):
             _msg_type = fc.FixMsgType(_msg_type)
         return _msg_type
 
+    @property
     def sending_time(self):
         send_time = self.get(52)
         if send_time is None:
@@ -69,6 +73,7 @@ class FixMessage(simplefix.FixMessage):
 
         return send_time
 
+    @property
     def is_duplicate(self):
         """
         Read-only property. Returns `True` if the PossDupFlag is set
