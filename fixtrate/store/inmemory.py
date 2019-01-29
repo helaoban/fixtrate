@@ -1,3 +1,8 @@
+from copy import deepcopy
+import time
+import uuid
+from collections import OrderedDict
+
 from sortedcontainers import SortedDict
 from fixtrate.message import FixMessage
 from fixtrate.store import FixStore
@@ -5,13 +10,14 @@ from fixtrate.store import FixStore
 
 class FixMemoryStore(FixStore):
 
-    def __init__(self):
+    def __init__(self, session_id):
         self._local_seq_num = 1
         self._remote_seq_num = 1
-        self._messages = {}
+        self._messages = OrderedDict()
         self._local = SortedDict()
         self._remote = SortedDict()
         self._config = None
+        self._session_id = session_id
 
     async def incr_seq_num(self, remote=False):
         if remote:
@@ -34,21 +40,33 @@ class FixMemoryStore(FixStore):
             self._local_seq_num = seq_num
 
     async def store_message(self, msg, remote=False):
-        seq_num = msg.get(34)
-        self._messages[msg.uid] = msg.encode()
-        if remote:
-            self._remote[seq_num] = msg.uid
-        else:
-            self._local[seq_num] = msg.uid
+        uid = uuid.uuid4()
+        self._messages[uid] = msg.encode()
+        return uid
 
-    async def get_message(self, uid):
-        return self._messages.get(uid)
+    async def get_messages(
+        self,
+        start=None,
+        end=None,
+        min=float('-inf'),
+        max=float('inf'),
+        direction=None
+    ):
+        msgs = deepcopy(self._messages)
+        for msg in msgs.values():
+            msg = FixMessage.from_raw(msg)
+            if not min <= msg.seq_num <= max:
+                continue
+            if direction is not None:
+                sender = msg.get(49)
+                is_sent = sender == self._session_id.sender_comp_id
 
-    async def get_messages(self):
-        return {
-            uid: FixMessage.from_raw(msg)
-            for uid, msg in self._messages.items()
-        }
+                if direction == 'sent' and not is_sent:
+                    continue
+                if direction == 'received' and is_sent:
+                    continue
+
+            yield msg
 
     async def new_session(self):
         self._messages = {}
