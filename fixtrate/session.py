@@ -35,23 +35,33 @@ class FixSessionId:
 
     def __init__(
         self,
+        begin_string,
         sender_comp_id,
         target_comp_id,
+        session_qualifier=None
     ):
-
-        key = ''.join([sender_comp_id, target_comp_id])
-        self.__dict__['_fsid'] = hashlib.sha256(key.encode())
+        self.__dict__['begin_string'] = begin_string
+        self.__dict__['sender_comp_id'] = sender_comp_id
+        self.__dict__['target_comp_id'] = target_comp_id
+        self.__dict__['session_qualifier'] = session_qualifier
 
     def __eq__(self, other):
         if isinstance(other, FixSessionId):
-            return self._fsid.hexdigest() == other._fsid.hexdigest()
+            return self.__str__() == other.__str__()
         return NotImplemented
 
     def __str__(self):
-        return self._fsid.hexdigest()
 
-    def __int__(self):
-        return int(self._fsid.hexdigest(), 16)
+        parts = [
+            self.begin_string,
+            self.sender_comp_id,
+            self.target_comp_id
+        ]
+
+        if self.session_qualifier is not None:
+            parts.append(self.session_qualifier)
+
+        return ':'.join(parts)
 
     def __setattr__(self, name, value):
         raise TypeError('FixSessionId objects are immutable')
@@ -93,7 +103,7 @@ class FixSession:
         self._sender_comp_id = sender_comp_id
         self._target_comp_id = target_comp_id
         self._session_id = FixSessionId(
-            self._sender_comp_id, self._target_comp_id)
+            self._version, self._sender_comp_id, self._target_comp_id)
         self._heartbeat_interval = heartbeat_interval
 
         self._headers = headers or []
