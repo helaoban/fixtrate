@@ -26,11 +26,3 @@ class FixStore(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def new_session(self):
         pass
-
-    @abc.abstractmethod
-    async def store_config(self, conf):
-        pass
-
-    @abc.abstractmethod
-    async def get_config(self):
-        pass

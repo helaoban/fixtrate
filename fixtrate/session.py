@@ -82,7 +82,6 @@ class FixSession:
         sender_comp_id,
         target_comp_id,
         heartbeat_interval=30,
-        conf=None,
         store=None,
         dictionary=None,
         debug=False,
@@ -90,8 +89,6 @@ class FixSession:
         headers=None,
         loop=None,
     ):
-        conf = conf or Config.from_env()
-        self._config = conf
 
         try:
             self._version = fc.FixVersion(version)
@@ -115,7 +112,6 @@ class FixSession:
         self._conn = None
         self._hearbeat_cb = None
         self._loop = loop or asyncio.get_event_loop()
-        self._debug = self._config.get('DEBUG', debug)
         self._receive_timeout = receive_timeout
         self._is_initiator = utils.Tristate(None)
 
@@ -281,7 +277,6 @@ class FixSession:
 
     async def _on_connect(self, conn):
         self._conn = conn
-        await self._store.store_config(self._config)
 
     async def _on_disconnect(self):
         await self.close()

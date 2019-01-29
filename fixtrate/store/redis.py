@@ -1,5 +1,4 @@
 from datetime import datetime
-import json
 import time
 import uuid
 
@@ -87,14 +86,6 @@ class FixRedisStore(FixStore):
                         continue
 
                 yield msg
-
-    async def store_config(self, conf):
-        jsoned = json.dumps(conf)
-        await self._redis.set(self.make_key('config'), jsoned)
-
-    async def get_config(self):
-        conf = await self._redis.get(self.make_key('config'))
-        return json.loads(conf.decode())
 
     async def new_session(self):
         for key in ['messages', 'remote', 'local', 'messages_by_time']:

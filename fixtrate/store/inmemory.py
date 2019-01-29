@@ -75,12 +75,6 @@ class FixMemoryStore(FixStore):
         self.set_seq_num(1)
         self.set_seq_num(1, remote=True)
 
-    async def store_config(self, conf):
-        self._config = conf
-
-    async def get_config(self):
-        return self._config
-
     async def __aiter__(self):
         messages = await self.get_messages()
         self.__messages = iter(messages.items())
