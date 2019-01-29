@@ -2,13 +2,25 @@ import enum
 
 
 @enum.unique
-class FixVersion(str, enum.Enum):
+class BaseIntEnum(int, enum.Enum):
+    def __str__(self):
+        return str(int(self))
+
+
+@enum.unique
+class BaseStrEnum(str, enum.Enum):
+    def __str__(self):
+        return str(self.value)
+
+
+@enum.unique
+class FixVersion(BaseStrEnum):
     FIX42 = 'FIX.4.2'
     FIX44 = 'FIX.4.4'
 
 
 @enum.unique
-class FixMsgType(str, enum.Enum):
+class FixMsgType(BaseStrEnum):
     HEARTBEAT = '0'
     TEST_REQUEST = '1'
     RESEND_REQUEST = '2'
@@ -128,7 +140,7 @@ class FixMsgType(str, enum.Enum):
 
 
 @enum.unique
-class MDEntryType(str, enum.Enum):
+class MDEntryType(BaseStrEnum):
     BID = '0'
     OFFER = '1'
     TRADE = '2'
@@ -168,26 +180,26 @@ class MDEntryType(str, enum.Enum):
 
 
 @enum.unique
-class SubscriptionRequestType(str, enum.Enum):
+class SubscriptionRequestType(BaseStrEnum):
     SNAPSHOT = '0'
     SNAPSHOT_PLUS_UPDATES = '1'
     DISABLE_PREVIOUS_SNAPSHOT_PLUS_UPDATE_REQUEST = '2'
 
 
 @enum.unique
-class MDUpdateType(str, enum.Enum):
+class MDUpdateType(BaseStrEnum):
     FULL_REFRESH = '0'
     INCREMENTAL_REFRESH = '1'
 
 
 @enum.unique
-class MarketDepth(str, enum.Enum):
+class MarketDepth(BaseStrEnum):
     FULL_BOOK = '0'
     TOP_OF_BOOK = '1'
 
 
 @enum.unique
-class EncryptMethod(str, enum.Enum):
+class EncryptMethod(BaseStrEnum):
     PKCS = '1'
     DES = '2'
     PKCS_DES = '3'
@@ -198,13 +210,13 @@ class EncryptMethod(str, enum.Enum):
 
 
 @enum.unique
-class GapFillFlag(str, enum.Enum):
+class GapFillFlag(BaseStrEnum):
     NO = 'N'
     YES = 'Y'
 
 
 @enum.unique
-class BusinessRejectReason(str, enum.Enum):
+class BusinessRejectReason(BaseStrEnum):
     OTHER = '0'
     UNKNOWN_ID = '1'
     UNKNOWN_SECURITY = '2'
@@ -217,7 +229,7 @@ class BusinessRejectReason(str, enum.Enum):
 
 
 @enum.unique
-class TimeInForce(str, enum.Enum):
+class TimeInForce(BaseStrEnum):
     DAY = '0'
     GOOD_TILL_CANCEL = '1'
     AT_THE_OPENING = '2'
@@ -231,7 +243,7 @@ class TimeInForce(str, enum.Enum):
 
 
 @enum.unique
-class OrdStatus(str, enum.Enum):
+class OrdStatus(BaseStrEnum):
     NEW = '0'
     PARTIALLY_FILLED = '1'
     FILLED = '2'
@@ -250,7 +262,7 @@ class OrdStatus(str, enum.Enum):
 
 
 @enum.unique
-class OrdType(str, enum.Enum):
+class OrdType(BaseStrEnum):
     MARKET = '1'
     LIMIT = '2'
     STOP = '3'
@@ -278,13 +290,13 @@ class OrdType(str, enum.Enum):
 
 
 @enum.unique
-class Side(str, enum.Enum):
+class Side(BaseStrEnum):
     BUY = '1'
     SELL = '2'
 
 
 @enum.unique
-class ExecInst(str, enum.Enum):
+class ExecInst(BaseStrEnum):
     STAY_ON_OFFERSIDE = '0'
     NOT_HELD = '1'
     WORK = '2'
@@ -344,7 +356,7 @@ class ExecInst(str, enum.Enum):
 
 
 @enum.unique
-class SessionRejectReason(str, enum.Enum):
+class SessionRejectReason(BaseStrEnum):
     INVALID_TAG_NUMBER = '0'
     REQUIRED_TAG_MISSING = '1'
     SENDINGTIME_ACCURACY_PROBLEM = '10'
@@ -367,13 +379,13 @@ class SessionRejectReason(str, enum.Enum):
 
 
 @enum.unique
-class ResetSeqNumFlag(str, enum.Enum):
+class ResetSeqNumFlag(BaseStrEnum):
     NO = 'N'
     YES = 'Y'
 
 
 @enum.unique
-class ExecTransType(str, enum.Enum):
+class ExecTransType(BaseStrEnum):
     NEW = '0'
     CANCEL = '1'
     CORRECT = '2'
@@ -381,7 +393,7 @@ class ExecTransType(str, enum.Enum):
 
 
 @enum.unique
-class ExecType(str, enum.Enum):
+class ExecType(BaseStrEnum):
     NEW = '0'
     PARTIAL_FILL = '1'
     FILL = '2'
@@ -404,7 +416,7 @@ class ExecType(str, enum.Enum):
 
 
 @enum.unique
-class PossDupFlag(str, enum.Enum):
+class PossDupFlag(BaseStrEnum):
     YES = 'Y'
     NO = 'N'
 
@@ -412,8 +424,7 @@ class PossDupFlag(str, enum.Enum):
 class FixTag:
     # TODO do we lose nice __str__ if we inherit from int?
 
-    @enum.unique
-    class FIX42(enum.IntEnum):
+    class FIX42(BaseIntEnum):
         Account = 1
         AdvId = 2
         AdvRefID = 3
@@ -820,8 +831,7 @@ class FixTag:
         EncodedListStatusTextLen = 445
         EncodedListStatusText = 446
 
-    @enum.unique
-    class FIX44(enum.IntEnum):
+    class FIX44(BaseIntEnum):
         Account = 1
         AdvId = 2
         AdvRefID = 3
@@ -1781,4 +1791,3 @@ class FixTag:
 class CustomerOrFirm(int, enum.Enum):
     Customer = 0
     Firm = 1
-
