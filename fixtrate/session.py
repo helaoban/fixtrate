@@ -107,7 +107,7 @@ class FixSession:
         self._headers = headers or []
 
         self._tags = getattr(fc.FixTag, self._version.name)
-        self._store = store or fix_store.FixMemoryStore()
+        self._store = store or fix_store.FixMemoryStore(self._session_id)
         self._parser = parse.FixParser()
         self._fix_dict = dictionary
 
@@ -126,15 +126,14 @@ class FixSession:
         self.on_recv_msg_funcs = []
         self.on_send_msg_funcs = []
 
-        self._closing = False
-        self._closed = False
-
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        msg = await self._recv_msg()
-        if msg is None:
+        try:
+            msg = await self._recv_msg()
+        except (asyncio.TimeoutError, ConnectionError) as error:
+            logger.error(error)
             raise StopAsyncIteration
         return msg
 
@@ -146,6 +145,10 @@ class FixSession:
         :return: bool
         """
         return self._conn is None or self._conn.closed
+
+    @property
+    def _closing(self):
+        return self._conn.closing
 
     def connect(self, address):
         """
@@ -215,16 +218,19 @@ class FixSession:
     async def logoff(self):
         """ Logoff from a FIX Session. Sends a Logout<5> message to peer.
         """
-        msg = fix42.logoff()
-        await self.send_message(msg)
+        await self._send_logoff()
 
     async def close(self):
         """
         Close the session. Closes the underlying connection and performs
         cleanup work.
         """
-        if not self.closed:
-            await self._close()
+        if self.closed or self._closing:
+            return
+        logger.info('Shutting down...')
+        await self._cancel_heartbeat_timer()
+        await self._conn.close()
+        self._conn = None
 
     async def send_message(self, msg, skip_headers=False):
         """
@@ -273,22 +279,12 @@ class FixSession:
         self.on_send_msg_funcs.append(f)
         return f
 
-    async def _close(self):
-        self._closing = True
-        logger.info('Shutting down...')
-        await self._cancel_heartbeat_timer()
-        if self._conn is not None and not self._conn.closed:
-            await self._conn.close()
-
-        self._closed = True
-
     async def _on_connect(self, conn):
         self._conn = conn
         await self._store.store_config(self._config)
 
     async def _on_disconnect(self):
-        if not self._closing:
-            await self._close()
+        await self.close()
 
     def _append_standard_header(
         self,
@@ -354,7 +350,7 @@ class FixSession:
         else:
             await self.send_message(login_msg)
 
-    async def _send_logout(self):
+    async def _send_logoff(self):
         if self._waiting_logout_confirm:
             # TODO what happends if Logout<5> sent twice?
             return
@@ -366,30 +362,50 @@ class FixSession:
         msg = fix42.resend_request(start, end)
         await self.send_message(msg)
 
-    async def _send_sequence_reset(self, seq_num, new_seq_num):
+    async def _reset_sequence(self, seq_num, new_seq_num):
         msg = fix42.sequence_reset(new_seq_num)
         self._append_standard_header(msg, seq_num)
         await self.send_message(msg, skip_headers=True)
 
     async def _resend_messages(self, start, end):
+        """ Used internally by Fixtrate to handle the re-transmission of
+        messages as a result of a Resend Request <2> message.
+
+        The range of messages to be resent is requested from the
+        store and iterated over. Each message is appended with a
+        PossDupFlag tag set to 'Y' (Yes) and resent to the client,
+        except for admin messages.
+
+        Admin messages must not be resent. Contiguous sequences of
+        admin messages are ignored, and a Sequence Reset <4> Gap Fill
+        message is sent to instruct the client to increment the
+        the next expected sequence number to the sequence number
+        of the next non-admin message to be resent (represented by
+        the value of NewSeqNo <36> in the Sequence Reset <4> message).
+
+        For more information, see:
+        https://www.onixs.biz/fix-dictionary/4.2/msgtype_2_2.html
+
+        """
         # TODO support for end=0 must either be enforced here or in
         # the store!
-
         # TODO support for skipping the resend of certain business messages
         # based on config options (eg. stale order requests)
 
-        gf_seq_num,  gf_new_seq_num = None, None
-        async for msg in await self._store.get_messages(
+        gap_start = None
+        gap_end = None
+
+        async for msg in self._store.get_messages(
                 min=start, max=end, direction='sent'):
-            seq_num = msg.get(32)
+
             if msg.msg_type in ADMIN_MESSAGES:
-                if gf_seq_num is None:
-                    gf_seq_num = seq_num
-                gf_new_seq_num = seq_num + 1
+                if gap_start is None:
+                    gap_start = msg.seq_num
+                gap_end = msg.seq_num + 1
             else:
-                if gf_new_seq_num is not None:
-                    await self._send_sequence_reset(gf_seq_num, gf_new_seq_num)
-                    gf_seq_num, gf_new_seq_num = None, None
+                if gap_end is not None:
+                    await self._reset_sequence(gap_start, gap_end)
+                    gap_start, gap_end = None, None
                 msg.append_pair(
                     self._tags.PossDupFlag,
                     fc.PossDupFlag.YES,
@@ -397,19 +413,18 @@ class FixSession:
                 )
                 await self.send_message(msg, skip_headers=True)
 
-        if gf_seq_num is not None:
-            await self._send_sequence_reset(gf_seq_num, gf_new_seq_num)
+        if gap_start is not None:
+            await self._reset_sequence(gap_start, gap_end)
 
     async def _recv_msg(self, timeout=None):
+        if timeout is None:
+            timeout = self._receive_timeout
         while True:
             msg = self._parser.get_message()
             if msg:
                 break
             try:
-                with async_timeout.timeout(
-                    timeout or self._receive_timeout,
-                    loop=self._loop
-                ):
+                with async_timeout.timeout(timeout):
                     data = await self._conn.read()
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 raise asyncio.TimeoutError
@@ -417,9 +432,8 @@ class FixSession:
                 break
             self._parser.append_buffer(data)
 
-        if self._closing or self._closed:
-            return None
-
+        if self.closed or self._closing:
+            raise ConnectionAbortedError
         if msg:
             await self._handle_message(msg)
         return msg
@@ -500,7 +514,7 @@ class FixSession:
             # scenarios to content with
             if msg.msg_type == fc.FixMsgType.LOGOUT:
                 if self._waiting_logout_confirm:
-                    await self._close()
+                    await self.close()
                     return
                 self._logout_after_resend = True
 
@@ -556,19 +570,20 @@ class FixSession:
                     # sequence gap, then we must honor the Logout after
                     # resend is complete
                     if self._logout_after_resend:
-                        await self._send_logout()
+                        await self._send_logoff()
                         return
 
             await self._dispatch(msg)
 
     async def _check_sequence_integrity(self, msg):
         actual = await self._store.get_seq_num(remote=True)
-        diff = msg.seq_num - actual
+        seq_num = msg.seq_num
+        diff = seq_num - actual
         if diff == 0:
             return
         if diff >= 1:
-            raise fe.SequenceGap(msg.seq_num, actual)
-        raise fe.FatalSequenceGap(msg.seq_num, actual)
+            raise fe.SequenceGap(seq_num, actual)
+        raise fe.FatalSequenceGap(seq_num, actual)
 
     async def _dispatch(self, msg):
         handler = {
@@ -617,9 +632,9 @@ class FixSession:
 
     async def _handle_logout(self, msg):
         if self._waiting_logout_confirm:
-            await self._close()
+            await self.close()
             return
-        await self._send_logout()
+        await self._send_logoff()
 
     async def _handle_test_request(self, msg):
         test_request_id = msg.get(self._tags.TestReqID)
@@ -630,9 +645,12 @@ class FixSession:
         print('Reject: {}'.format(reason))
 
     async def _handle_resend_request(self, msg):
-        start = msg.get(self._tags.BeginSeqNo)
-        end = msg.get(self._tags.EndSeqNo)
-        await self._resend_messages(int(start), int(end))
+        start = int(msg.get(self._tags.BeginSeqNo))
+        end = int(msg.get(self._tags.EndSeqNo))
+        if end == 0:
+            # EndSeqNo of 0 means infinity
+            end = float('inf')
+        await self._resend_messages(start, end)
 
     async def _handle_sequence_reset(self, msg):
         if not self._is_gap_fill(msg):
@@ -684,22 +702,31 @@ class FixConnection:
         self._writer = writer
         self._on_disconnect = on_disconnect
         self._loop = loop or asyncio.get_event_loop()
-        self.connected = True
+        self._connected = True
+        self._closing = False
 
     @property
     def closed(self):
-        return not self.connected
+        return not self._connected
+
+    @property
+    def closing(self):
+        return self._closing
 
     async def close(self):
 
-        if not self.connected:
+        if not self.closed:
             return
 
+        self._closing = True
+
         self._writer.close()
-        self.connected = False
 
         if self._on_disconnect is not None:
             await utils.maybe_await(self._on_disconnect)
+
+        self._closing = False
+        self._connected = False
 
     async def read(self):
         try:
