@@ -155,16 +155,14 @@ async def test_sequence_reset(fix_session, fix_endpoint, test_server):
 @pytest.mark.asyncio
 async def test_message_recovery(fix_session, fix_endpoint, test_server):
 
-    fix_session._heartbeat_interval = 2
-    test_server._heartbeat_interval = 2
+    fix_session._heartbeat_interval = 1
+    test_server._heartbeat_interval = 1
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
-        async for msg in fix_session:
-            assert msg.msg_type == fc.FixMsgType.LOGON
-            break
-        else:
-            raise AssertionError('No message received')
+
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.LOGON
 
     pairs = (
         (TAGS.MsgType, fc.FixMsgType.NEWS, True),
@@ -174,25 +172,24 @@ async def test_message_recovery(fix_session, fix_endpoint, test_server):
     )
     news_msg = fm.FixMessage.from_pairs(pairs)
 
-    client_sessions = list(test_server._clients.values())
-    await client_sessions[0].send_message(news_msg)
+    server_sessions = list(test_server._clients.values())
+    await server_sessions[0].send_message(news_msg)
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
-        async for msg in fix_session:
-            assert msg.msg_type == fc.FixMsgType.LOGON
-            break
-        else:
-            raise AssertionError('No message received')
+
+        # the logon msg
+        msg = await fix_session.receive()
+        assert msg.msg_type == fc.FixMsgType.LOGON
 
         # the news msg
-        msg = await fix_session._recv_msg()
+        msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.NEWS
 
         # gap fill for the second logon msg
-        msg = await fix_session._recv_msg()
+        msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.SEQUENCE_RESET
 
         # the next message should process fine
-        msg = await fix_session._recv_msg()
+        msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.HEARTBEAT

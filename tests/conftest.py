@@ -10,15 +10,35 @@ from fixtrate import (
 # from fixtrate import parse, store, session
 from tests.server import MockFixServer
 
-
-@pytest.fixture
-def client_store():
-    return store.FixMemoryStore()
+VERSION = c.FixVersion.FIX42
 
 
 @pytest.fixture
-def server_store():
-    return store.FixMemoryStore()
+def client_session_id():
+    return session.FixSessionId(
+        begin_string=VERSION,
+        sender_comp_id='TESTCLIENT',
+        target_comp_id='TESTSERVER'
+    )
+
+
+@pytest.fixture
+def server_session_id():
+    return session.FixSessionId(
+        begin_string=VERSION,
+        sender_comp_id='TESTSERVER',
+        target_comp_id='TESTCLIENT'
+    )
+
+
+@pytest.fixture
+def client_store(client_session_id):
+    return store.FixMemoryStore(client_session_id)
+
+
+@pytest.fixture
+def server_store(server_session_id):
+    return store.FixMemoryStore(server_session_id)
 
 
 @pytest.fixture
