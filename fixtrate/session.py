@@ -427,7 +427,7 @@ class FixSession:
         return msg
 
     async def _handle_message(self, msg):
-        await self._store.store_message(msg, remote=True)
+        await self._store.store_message(msg)
 
         for func in self.on_recv_msg_funcs:
             await utils.maybe_await(func, msg)
