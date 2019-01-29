@@ -20,10 +20,6 @@ class FixStore(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    async def get_message(self, uid):
-        pass
-
-    @abc.abstractmethod
     async def get_messages(self):
         pass
 

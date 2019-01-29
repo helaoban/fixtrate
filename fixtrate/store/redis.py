@@ -47,12 +47,6 @@ class FixRedisStore(FixStore):
             self.make_key('messages'), uid, msg.encode())
         return uid
 
-    async def get_message(self, uid):
-        msg = await self._redis.hget(
-            self.make_key('messages'), uid)
-        if msg:
-            return FixMessage.from_raw(msg)
-
     async def get_messages(
         self,
         start=None,
