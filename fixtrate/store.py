@@ -6,19 +6,9 @@ import uuid
 
 from sortedcontainers import SortedDict
 from .message import FixMessage
+from fixtrate.utils import chunked
 
 INF = float('inf')
-
-
-def chunked(iterator, size):
-    chunk = []
-    for item in iterator:
-        chunk.append(item)
-        if len(chunk) == size:
-            yield chunk
-            chunk = []
-    if chunk:
-        yield chunk
 
 
 class FixStore(metaclass=abc.ABCMeta):
