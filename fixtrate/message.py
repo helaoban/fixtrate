@@ -1,4 +1,7 @@
 import sys
+
+from dateutil import parser as dateparser
+import pytz
 import simplefix
 from simplefix import FixParser
 from . import utils, constants as fc
@@ -57,6 +60,17 @@ class FixMessage(simplefix.FixMessage):
         if _msg_type is not None:
             _msg_type = fc.FixMsgType(_msg_type)
         return _msg_type
+
+    def sending_time(self):
+        send_time = self.get(52)
+        if send_time is None:
+            return send_time
+
+        send_time = dateparser.parse(send_time)
+        if send_time.tzinfo is None:
+            send_time.replace(tzinfo=pytz.utc)
+
+        return send_time
 
     def is_duplicate(self):
         """
