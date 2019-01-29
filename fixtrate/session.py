@@ -370,10 +370,10 @@ class FixSession:
         # TODO support for skipping the resend of certain business messages
         # based on config options (eg. stale order requests)
 
-        sent_messages = await self._store.get_messages_by_seq_num(
-            start=start, end=end, remote=False)
         gf_seq_num,  gf_new_seq_num = None, None
-        for seq_num, msg in sent_messages.items():
+        async for msg in await self._store.get_messages(
+                min=start, max=end, direction='sent'):
+            seq_num = msg.get(32)
             if msg.msg_type in ADMIN_MESSAGES:
                 if gf_seq_num is None:
                     gf_seq_num = seq_num
