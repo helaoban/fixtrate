@@ -1,10 +1,7 @@
-import sys
-
 from dateutil import parser as dateparser
 import pytz
 import simplefix
-from simplefix import FixParser
-from . import utils, constants as fc
+from fixtrate import constants as fc
 
 
 class FixMessage(simplefix.FixMessage):
@@ -127,7 +124,7 @@ class FixMessage(simplefix.FixMessage):
 
     @classmethod
     def from_raw(cls, raw_message):
-        parser = FixParser()
+        parser = simplefix.FixParser()
         parser.append_buffer(raw_message)
         msg = parser.get_message()
         if msg is None:
