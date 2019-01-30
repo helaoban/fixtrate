@@ -22,7 +22,3 @@ class FixStore(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def get_messages(self):
         pass
-
-    @abc.abstractmethod
-    async def new_session(self):
-        pass

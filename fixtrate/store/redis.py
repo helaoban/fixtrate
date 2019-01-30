@@ -86,9 +86,3 @@ class FixRedisStore(FixStore):
                         continue
 
                 yield msg
-
-    async def new_session(self):
-        for key in ['messages', 'remote', 'local', 'messages_by_time']:
-            await self._redis.delete(key)
-        await self.set_seq_num(1)
-        await self.set_seq_num(1, remote=True)

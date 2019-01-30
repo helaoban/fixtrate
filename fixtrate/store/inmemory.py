@@ -68,13 +68,6 @@ class FixMemoryStore(FixStore):
 
             yield msg
 
-    async def new_session(self):
-        self._messages = {}
-        self._local = SortedDict()
-        self._remote = SortedDict()
-        self.set_seq_num(1)
-        self.set_seq_num(1, remote=True)
-
     async def __aiter__(self):
         messages = await self.get_messages()
         self.__messages = iter(messages.items())
