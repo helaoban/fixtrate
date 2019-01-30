@@ -85,7 +85,7 @@ class FixSession:
         store=None,
         dictionary=None,
         debug=False,
-        receive_timeout=None,
+        timeout=None,
         headers=None,
         loop=None,
     ):
@@ -112,7 +112,7 @@ class FixSession:
         self._conn = None
         self._hearbeat_cb = None
         self._loop = loop or asyncio.get_event_loop()
-        self._receive_timeout = receive_timeout
+        self._timeout = timeout
         self._is_initiator = utils.Tristate(None)
 
         self._waiting_resend = False
@@ -413,7 +413,7 @@ class FixSession:
 
     async def _recv_msg(self, timeout=None):
         if timeout is None:
-            timeout = self._receive_timeout
+            timeout = self._timeout
         while True:
             msg = self._parser.get_message()
             if msg:
