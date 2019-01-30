@@ -9,8 +9,8 @@ from fixtrate.utils import chunked
 
 class FixRedisStore(FixStore):
 
-    def __init__(self, redis_pool, session_id):
-        self._redis = redis_pool
+    def __init__(self, redis, session_id):
+        self._redis = redis
         self._session_id = session_id
 
     def make_key(self, key):
