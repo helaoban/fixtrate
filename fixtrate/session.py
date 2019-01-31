@@ -48,7 +48,6 @@ class FixSession:
         dictionary=None,
         timeout=None,
         headers=None,
-        loop=None,
     ):
 
         self.config = Config(default_config)
@@ -64,7 +63,6 @@ class FixSession:
         self._is_resetting = False
         self._conn = None
         self._hearbeat_cb = None
-        self._loop = loop or asyncio.get_event_loop()
         self._timeout = timeout
         self._is_initiator = Tristate(None)
 
@@ -137,7 +135,6 @@ class FixSession:
             port=port,
             on_connect=self._on_connect,
             on_disconnect=self._on_disconnect,
-            loop=self._loop
         )
 
     async def listen(self, reader, writer):
@@ -645,8 +642,9 @@ class FixSession:
             self._hearbeat_cb = None
 
     async def _reset_heartbeat_timer(self):
+        loop = asyncio.get_event_loop()
         await self._cancel_heartbeat_timer()
-        self._hearbeat_cb = self._loop.create_task(
+        self._hearbeat_cb = loop.create_task(
             self._set_heartbeat_timer())
 
     async def _set_heartbeat_timer(self):
@@ -673,12 +671,10 @@ class FixConnection:
         reader,
         writer,
         on_disconnect=None,
-        loop=None
     ):
         self._reader = reader
         self._writer = writer
         self._on_disconnect = on_disconnect
-        self._loop = loop or asyncio.get_event_loop()
         self._connected = True
         self._closing = False
 
@@ -735,13 +731,11 @@ class _FixConnectionContextManager(Coroutine):
         port=4000,
         on_connect=None,
         on_disconnect=None,
-        loop=None
     ):
         self._host = host
         self._port = port
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
-        self._loop = loop or asyncio.get_event_loop()
         self._coro = self._connect()
 
     def __await__(self):
@@ -770,7 +764,6 @@ class _FixConnectionContextManager(Coroutine):
                 reader, writer = await asyncio.open_connection(
                     host=self._host,
                     port=self._port,
-                    loop=self._loop
                 )
             except OSError as error:
                 logger.error(error)
