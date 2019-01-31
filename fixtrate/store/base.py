@@ -34,7 +34,7 @@ class FixStore(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     async def get_messages(
         self,
-        sid,
+        session,
         start=None,
         end=None,
         min=float('-inf'),
