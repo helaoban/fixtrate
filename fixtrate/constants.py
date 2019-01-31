@@ -1,13 +1,11 @@
 import enum
 
 
-@enum.unique
 class BaseIntEnum(int, enum.Enum):
     def __str__(self):
         return str(int(self))
 
 
-@enum.unique
 class BaseStrEnum(str, enum.Enum):
     def __str__(self):
         return str(self.value)
@@ -424,6 +422,7 @@ class PossDupFlag(BaseStrEnum):
 class FixTag:
     # TODO do we lose nice __str__ if we inherit from int?
 
+    @enum.unique
     class FIX42(BaseIntEnum):
         Account = 1
         AdvId = 2
@@ -831,6 +830,7 @@ class FixTag:
         EncodedListStatusTextLen = 445
         EncodedListStatusText = 446
 
+    @enum.unique
     class FIX44(BaseIntEnum):
         Account = 1
         AdvId = 2
