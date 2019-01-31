@@ -12,13 +12,12 @@ REQUIRES_PYTHON = '>=3.6.5'
 
 REQUIRES = [
     'aenum>=2.1.2',
-    'async-timeout>=3.0.1',
-    'aioredis>=1.2.0',
+    'async-timeout>=2.0',
+    'aioredis>=1.1.0',
     'blinker>=1.4',
-    'jsonschema>=2.6.0',
     'simplefix>=1.0.12',
-    'sortedcontainers>=2.1.0',
     'untangle>=1.1.1',
+    'python-dateutil>=2.6.1'
 ]
 
 EXTRAS_REQUIRE = {
@@ -97,4 +96,3 @@ setup(
         'publish': Publish,
     },
 )
-
