@@ -1,57 +1,36 @@
 import pytest
 
-import fixtrate.constants
-from fixtrate import (
-    constants as c,
-    parse,
-    store,
-    session
-)
-# from fixtrate import parse, store, session
+from fixtrate.config import Config, default_config
+from fixtrate.constants import FixVersion
+from fixtrate.parse import FixParser
 from tests.server import MockFixServer
+from fixtrate.session import FixSession
+from fixtrate.store import FixMemoryStore
 
-VERSION = c.FixVersion.FIX42
-
-
-@pytest.fixture
-def client_session_id():
-    return session.FixSessionId(
-        begin_string=VERSION,
-        sender_comp_id='TESTCLIENT',
-        target_comp_id='TESTSERVER'
-    )
+VERSION = FixVersion.FIX42
 
 
 @pytest.fixture
-def server_session_id():
-    return session.FixSessionId(
-        begin_string=VERSION,
-        sender_comp_id='TESTSERVER',
-        target_comp_id='TESTCLIENT'
-    )
+def client_store():
+    return FixMemoryStore()
 
 
 @pytest.fixture
-def client_store(client_session_id):
-    return store.FixMemoryStore(client_session_id)
-
-
-@pytest.fixture
-def server_store(server_session_id):
-    return store.FixMemoryStore(server_session_id)
+def server_store():
+    return FixMemoryStore()
 
 
 @pytest.fixture
 def server_config():
-    return dict(
-        HOST='127.0.0.1',
-        ACCOUNT='U001',
-        PORT=8686,
-        SENDER_COMP_ID='TESTSERVER',
-        VERSION=c.FixVersion.FIX42,
-        TARGET_COMP_ID='TESTCLIENT',
-        HEARTBEAT_INTERVAL=30
-    )
+    config = Config(default_config)
+    config['VERSION'] = VERSION
+    config['SENDER_COMP_ID'] = 'TESTSERVER'
+    config['TARGET_COMP_ID'] = 'TESTCLIENT'
+    config['HEARTBEAT_INTERVAL'] = 30
+    config['HOST'] = '127.0.0.1'
+    config['PORT'] = 8686
+    config['ACCOUNT'] = 'U001'
+    return config
 
 
 @pytest.fixture
@@ -59,8 +38,7 @@ def server_config():
 async def test_server(event_loop, server_store, server_config):
     server = MockFixServer(
         config=server_config,
-        loop=event_loop,
-        store=server_store
+        store=server_store,
     )
     await server.start()
     yield server
@@ -69,19 +47,25 @@ async def test_server(event_loop, server_store, server_config):
 
 @pytest.fixture
 def parser():
-    return parse.FixParser()
+    return FixParser()
 
 
 @pytest.fixture
-async def fix_session(client_store, event_loop):
-    return session.FixSession(
-        version=c.FixVersion.FIX42,
-        sender_comp_id='TESTCLIENT',
-        target_comp_id='TESTSERVER',
-        heartbeat_interval=30,
-        store=client_store,
-        loop=event_loop
-    )
+def client_config():
+    config = Config(default_config)
+    config['VERSION'] = VERSION
+    config['SENDER_COMP_ID'] = 'TESTCLIENT'
+    config['TARGET_COMP_ID'] = 'TESTSERVER'
+    config['HEARTBEAT_INTERVAL'] = 30
+    return config
+
+
+@pytest.fixture
+async def fix_session(client_config, client_store, event_loop):
+    session = FixSession()
+    session.config = client_config
+    session.store = client_store
+    return session
 
 
 @pytest.fixture

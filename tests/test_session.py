@@ -30,8 +30,8 @@ async def test_receive(fix_session, fix_endpoint, test_server):
         with pytest.raises(asyncio.TimeoutError):
             msg = await fix_session.receive(timeout=2)
 
-    fix_session._heartbeat_interval = 1
-    test_server._heartbeat_interval = 1
+    fix_session.config['HEARTBEAT_INTERVAL'] = 1
+    test_server.config['HEARTBEAT_INTERVAL'] = 1
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
@@ -46,8 +46,8 @@ async def test_receive(fix_session, fix_endpoint, test_server):
 @pytest.mark.asyncio
 async def test_heartbeat(fix_session, fix_endpoint, test_server):
 
-    fix_session._heartbeat_interval = 1
-    test_server._heartbeat_interval = 1
+    fix_session.config['HEARTBEAT_INTERVAL'] = 1
+    test_server.config['HEARTBEAT_INTERVAL'] = 1
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
@@ -61,7 +61,7 @@ async def test_heartbeat(fix_session, fix_endpoint, test_server):
 
 @pytest.mark.asyncio
 async def test_incorrect_heartbeat_int(fix_session, fix_endpoint, test_server):
-    fix_session._heartbeat_interval = 90
+    fix_session.config['HEARTBEAT_INTERVAL'] = 90
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
@@ -71,7 +71,7 @@ async def test_incorrect_heartbeat_int(fix_session, fix_endpoint, test_server):
 
 @pytest.mark.asyncio
 async def test_incorrect_target_comp_id(fix_session, fix_endpoint, test_server):
-    fix_session._target_comp_id = 'not-a-correct-id'
+    fix_session.config['TARGET_COMP_ID'] = 'not-a-correct-id'
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
@@ -98,7 +98,7 @@ async def test_reset_seq_num(fix_session, fix_endpoint, test_server):
         await fix_session.logon(reset=True)
 
         msg = await fix_session.receive()
-        local_seq_num = await fix_session._store.get_seq_num()
+        local_seq_num = await fix_session.get_local_sequence()
 
         assert msg.msg_type == fc.FixMsgType.LOGON
         assert msg.get(TAGS.ResetSeqNumFlag) == fc.ResetSeqNumFlag.YES
@@ -132,7 +132,7 @@ async def test_sequence_reset(fix_session, fix_endpoint, test_server):
         msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.LOGON
 
-        client_session = list(test_server._clients.values())[0]
+        client_session = list(test_server.clients.values())[0]
 
         pairs = (
             (TAGS.MsgType, fc.FixMsgType.SEQUENCE_RESET, True),
@@ -148,15 +148,15 @@ async def test_sequence_reset(fix_session, fix_endpoint, test_server):
         assert msg.msg_type == fc.FixMsgType.SEQUENCE_RESET
 
         new_seq_num = int(msg.get(36))
-        current_seq_num = await fix_session._store.get_seq_num(remote=True)
+        current_seq_num = await fix_session.get_remote_sequence()
         assert current_seq_num == new_seq_num
 
 
 @pytest.mark.asyncio
 async def test_message_recovery(fix_session, fix_endpoint, test_server):
 
-    fix_session._heartbeat_interval = 1
-    test_server._heartbeat_interval = 1
+    fix_session.config['HEARTBEAT_INTERVAL'] = 1
+    test_server.config['HEARTBEAT_INTERVAL'] = 1
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()
@@ -172,7 +172,7 @@ async def test_message_recovery(fix_session, fix_endpoint, test_server):
     )
     news_msg = fm.FixMessage.from_pairs(pairs)
 
-    server_sessions = list(test_server._clients.values())
+    server_sessions = list(test_server.clients.values())
     await server_sessions[0].send_message(news_msg)
 
     async with fix_session.connect(fix_endpoint):
