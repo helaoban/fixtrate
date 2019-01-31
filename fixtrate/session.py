@@ -6,16 +6,14 @@ import socket
 
 import async_timeout
 
-from . import (
-    constants as fc,
-    exceptions as fe,
-    parse,
-    store as fix_store,
-    utils,
-)
-from .config import Config
+from . import constants as fc
+from .config import Config, default_config
+from .exceptions import SequenceGap, FatalSequenceGap
 from .factories import fix42
+from .parse import FixParser
+from .store import FixMemoryStore
 from .signals import message_received, message_sent, sequence_gap
+from .utils import maybe_await, Tristate
 
 logger = logging.getLogger(__name__)
 
@@ -29,42 +27,6 @@ ADMIN_MESSAGES = [
 ]
 
 
-class FixSessionId:
-
-    def __init__(
-        self,
-        begin_string,
-        sender_comp_id,
-        target_comp_id,
-        session_qualifier=None
-    ):
-        self.__dict__['begin_string'] = begin_string
-        self.__dict__['sender_comp_id'] = sender_comp_id
-        self.__dict__['target_comp_id'] = target_comp_id
-        self.__dict__['session_qualifier'] = session_qualifier
-
-    def __eq__(self, other):
-        if isinstance(other, FixSessionId):
-            return self.__str__() == other.__str__()
-        return NotImplemented
-
-    def __str__(self):
-
-        parts = [
-            self.begin_string,
-            self.sender_comp_id,
-            self.target_comp_id
-        ]
-
-        if self.session_qualifier is not None:
-            parts.append(self.session_qualifier)
-
-        return ':'.join(parts)
-
-    def __setattr__(self, name, value):
-        raise TypeError('FixSessionId objects are immutable')
-
-
 class FixSession:
     """
     FIX Session Manager
@@ -76,36 +38,27 @@ class FixSession:
     :param heartbeat_interval: How often (in seconds) to generate heartbeat
         messages during periods of inactivity. Default to 30.
     """
+
+    store = FixMemoryStore()
+
+    parser = FixParser()
+
     def __init__(
         self,
-        version,
-        sender_comp_id,
-        target_comp_id,
-        heartbeat_interval=30,
-        store=None,
         dictionary=None,
-        debug=False,
         timeout=None,
         headers=None,
         loop=None,
     ):
 
-        try:
-            self._version = fc.FixVersion(version)
-        except ValueError:
-            raise fe.InvalidFIXVersion(version)
-
-        self._sender_comp_id = sender_comp_id
-        self._target_comp_id = target_comp_id
-        self._session_id = FixSessionId(
-            self._version, self._sender_comp_id, self._target_comp_id)
-        self._heartbeat_interval = heartbeat_interval
-
+        self.config = Config(default_config)
         self._headers = headers or []
 
-        self._tags = getattr(fc.FixTag, self._version.name)
-        self._store = store or fix_store.FixMemoryStore(self._session_id)
-        self._parser = parse.FixParser()
+        version = fc.FixVersion(self.config.get('VERSION'))
+        self._tags = getattr(
+            fc.FixTag,
+            version.name)
+
         self._fix_dict = dictionary
 
         self._is_resetting = False
@@ -113,7 +66,7 @@ class FixSession:
         self._hearbeat_cb = None
         self._loop = loop or asyncio.get_event_loop()
         self._timeout = timeout
-        self._is_initiator = utils.Tristate(None)
+        self._is_initiator = Tristate(None)
 
         self._waiting_resend = False
         self._waiting_logout_confirm = False
@@ -133,6 +86,15 @@ class FixSession:
             raise StopAsyncIteration
         return msg
 
+    def history(self, *args, **kwargs):
+        return self.store.get_messages(self, *args, **kwargs)
+
+    async def get_local_sequence(self):
+        return await self.store.get_local(self)
+
+    async def get_remote_sequence(self):
+        return await self.store.get_remote(self)
+
     @property
     def closed(self):
         """ Read-only property. Returns True fs underlying connection
@@ -146,7 +108,7 @@ class FixSession:
     def _closing(self):
         return self._conn.closing
 
-    def connect(self, address):
+    def connect(self, address=None):
         """
         Coroutine that waits for a successfuly connection to a FIX peer.
         Returns a FixConnection object. Can also be used as an async context
@@ -157,6 +119,11 @@ class FixSession:
         :return: :class:`FixConnection` object
         :rtype: FixConnection
         """
+
+        self.config.validate()
+
+        if address is None:
+            address = self.config['HOST'], self.config['PORT']
 
         host, port = address
 
@@ -238,16 +205,16 @@ class FixSession:
             not append the standard header before sending. Defaults to `False`
         """
         if not skip_headers:
-            seq_num = await self._store.get_seq_num()
+            seq_num = await self.get_local_sequence()
             self._append_standard_header(msg, seq_num)
 
         if not msg.is_duplicate and not self._is_gap_fill(msg):
-            await self._store.incr_seq_num()
+            await self._incr_local_sequence()
 
-        await self._store.store_message(msg)
+        await self._store_message(msg)
 
         for func in self.on_send_msg_funcs:
-            await utils.maybe_await(func, msg)
+            await maybe_await(func, msg)
 
         message_sent.send(self, msg=msg)
 
@@ -281,6 +248,21 @@ class FixSession:
     async def _on_disconnect(self):
         await self.close()
 
+    async def _incr_local_sequence(self):
+        return await self.store.incr_local(self)
+
+    async def _incr_remote_sequence(self):
+        return await self.store.incr_remote(self)
+
+    async def _set_local_sequence(self, new_seq_num):
+        return await self.store.set_local(self, new_seq_num)
+
+    async def _set_remote_sequence(self, new_seq_num):
+        return await self.store.set_remote(self, new_seq_num)
+
+    async def _store_message(self, msg):
+        await self.store.store_message(self, msg)
+
     def _append_standard_header(
         self,
         msg,
@@ -288,9 +270,9 @@ class FixSession:
         timestamp=None
     ):
         pairs = (
-            (self._tags.BeginString, self._version),
-            (self._tags.SenderCompID, self._sender_comp_id),
-            (self._tags.TargetCompID, self._target_comp_id),
+            (self._tags.BeginString, self.config.get('VERSION')),
+            (self._tags.SenderCompID, self.config.get('SENDER_COMP_ID')),
+            (self._tags.TargetCompID, self.config.get('TARGET_COMP_ID')),
             (self._tags.MsgSeqNum, seq_num),
         )
 
@@ -329,17 +311,17 @@ class FixSession:
     async def _send_login(self, reset=False):
 
         if self._is_initiator == None:
-            self._is_initiator = utils.Tristate(True)
+            self._is_initiator = Tristate(True)
 
         if self._is_initiator == False:
-            self._is_initiator = utils.Tristate(None)
+            self._is_initiator = Tristate(None)
 
         login_msg = fix42.logon(
-            heartbeat_interval=self._heartbeat_interval,
+            heartbeat_interval=self.config.get('HEARTBEAT_INTERVAL'),
             reset_sequence=reset
         )
         if reset:
-            await self._store.set_seq_num(1)
+            await self._set_local_sequence(1)
             self._append_standard_header(login_msg, seq_num=1)
             await self.send_message(login_msg, skip_headers=True)
         else:
@@ -390,7 +372,7 @@ class FixSession:
         gap_start = None
         gap_end = None
 
-        async for msg in self._store.get_messages(
+        async for msg in self.history(
                 min=start, max=end, direction='sent'):
 
             if msg.msg_type in ADMIN_MESSAGES:
@@ -415,7 +397,7 @@ class FixSession:
         if timeout is None:
             timeout = self._timeout
         while True:
-            msg = self._parser.get_message()
+            msg = self.parser.get_message()
             if msg:
                 break
             try:
@@ -425,7 +407,7 @@ class FixSession:
                 raise asyncio.TimeoutError
             except ConnectionError:
                 break
-            self._parser.append_buffer(data)
+            self.parser.append_buffer(data)
 
         if self.closed or self._closing:
             raise ConnectionAbortedError
@@ -434,16 +416,16 @@ class FixSession:
         return msg
 
     async def _handle_message(self, msg):
-        await self._store.store_message(msg)
+        await self._store_message(msg)
 
         for func in self.on_recv_msg_funcs:
-            await utils.maybe_await(func, msg)
+            await maybe_await(func, msg)
 
         message_received.send(self, msg=msg)
 
         try:
             await self._check_sequence_integrity(msg)
-        except fe.FatalSequenceGap:
+        except FatalSequenceGap:
             # a SeqReset<4>-Reset message should be processed
             # without deference to the MsgSeqNum
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
@@ -466,7 +448,7 @@ class FixSession:
             # the session and raise the error.
             await self.close()
             raise
-        except fe.SequenceGap as error:
+        except SequenceGap as error:
             sequence_gap.send(self, exc=error)
 
             # Always honor a ResendRequest<2> no matter what, even
@@ -520,7 +502,7 @@ class FixSession:
                 # seq number to the NewSeqNo(36) value of the msg
                 if not self._is_gap_fill(msg):
                     new_seq_num = int(msg.get(self._tags.NewSeqNo))
-                    await self._store.set_seq_num(new_seq_num)
+                    await self._set_local_sequence(new_seq_num)
                     return
 
             await self._request_resend(
@@ -532,7 +514,7 @@ class FixSession:
             # sequence number
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
                 new = int(msg.get(self._tags.NewSeqNo))
-                expected = await self._store.get_seq_num(remote=True)
+                expected = await self.get_remote_sequence()
                 if new < expected:
                     return
 
@@ -541,7 +523,7 @@ class FixSession:
             # handler tries to set remote seq number to a lower number
             # as a result of this incr. Is this even possible? Need to
             # investigate.
-            await self._store.incr_seq_num(remote=True)
+            await self._incr_remote_sequence()
 
             if msg.is_duplicate:
                 # if the msg is a duplicate and also an admin message,
@@ -571,14 +553,14 @@ class FixSession:
             await self._dispatch(msg)
 
     async def _check_sequence_integrity(self, msg):
-        actual = await self._store.get_seq_num(remote=True)
+        actual = await self.get_remote_sequence()
         seq_num = msg.seq_num
         diff = seq_num - actual
         if diff == 0:
             return
         if diff >= 1:
-            raise fe.SequenceGap(seq_num, actual)
-        raise fe.FatalSequenceGap(seq_num, actual)
+            raise SequenceGap(seq_num, actual)
+        raise FatalSequenceGap(seq_num, actual)
 
     async def _dispatch(self, msg):
         handler = {
@@ -590,22 +572,22 @@ class FixSession:
         }.get(msg.msg_type)
 
         if handler is not None:
-            await utils.maybe_await(handler, msg)
+            await maybe_await(handler, msg)
 
     async def _handle_logon(self, msg):
         heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
-        if heartbeat_interval != self._heartbeat_interval:
+        if heartbeat_interval != self.config.get('HEARTBEAT_INTERVAL'):
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.HeartBtInt,
                 rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='HeartBtInt must be {}'.format(
-                    self._heartbeat_interval)
+                    self.config.get('HEARTBEAT_INTERVAL'))
             )
             return
 
         target_comp_id = msg.get(self._tags.TargetCompID)
-        if target_comp_id != self._sender_comp_id:
+        if target_comp_id != self.config.get('SENDER_COMP_ID'):
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.TargetCompID,
@@ -616,14 +598,14 @@ class FixSession:
 
         is_reset = self._is_reset(msg)
         if is_reset:
-            await self._store.set_seq_num(2, remote=True)
+            await self._set_remote_sequence(2)
 
         if self._is_initiator == None:
-            self._is_initiator = utils.Tristate(False)
+            self._is_initiator = Tristate(False)
             await self._send_login(reset=is_reset)
 
         if self._is_initiator == True:
-            self._is_initiator = utils.Tristate(None)
+            self._is_initiator = Tristate(None)
 
     async def _handle_logout(self, msg):
         if self._waiting_logout_confirm:
@@ -651,7 +633,7 @@ class FixSession:
         if not self._is_gap_fill(msg):
             pass
         new_seq_num = int(msg.get(self._tags.NewSeqNo))
-        await self._store.set_seq_num(new_seq_num, remote=True)
+        await self._set_remote_sequence(new_seq_num)
 
     async def _cancel_heartbeat_timer(self):
         if self._hearbeat_cb is not None:
@@ -669,7 +651,7 @@ class FixSession:
 
     async def _set_heartbeat_timer(self):
         try:
-            interval = self._heartbeat_interval
+            interval = self.config.get('HEARTBEAT_INTERVAL')
             await asyncio.sleep(interval)
             await self._send_heartbeat()
         except asyncio.CancelledError:
@@ -718,7 +700,7 @@ class FixConnection:
         self._writer.close()
 
         if self._on_disconnect is not None:
-            await utils.maybe_await(self._on_disconnect)
+            await maybe_await(self._on_disconnect)
 
         self._closing = False
         self._connected = False
@@ -800,7 +782,7 @@ class _FixConnectionContextManager(Coroutine):
             else:
                 conn = FixConnection(
                     reader, writer, on_disconnect=self._on_disconnect)
-                await utils.maybe_await(self._on_connect, conn)
+                await maybe_await(self._on_connect, conn)
                 return conn
 
         logger.info('Connection tries ({}) exhausted'.format(tries))
