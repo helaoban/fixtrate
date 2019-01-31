@@ -35,7 +35,7 @@ def server_config():
 
 @pytest.fixture
 @pytest.mark.asyncio
-async def test_server(event_loop, server_store, server_config):
+async def test_server(server_store, server_config):
     server = MockFixServer(
         config=server_config,
         store=server_store,
@@ -61,7 +61,7 @@ def client_config():
 
 
 @pytest.fixture
-async def fix_session(client_config, client_store, event_loop):
+async def fix_session(client_config, client_store):
     session = FixSession()
     session.config = client_config
     session.store = client_store
