@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
 
     fixtrate.factories
+    fixtrate.store
 
 Submodules
 ----------
@@ -67,12 +68,6 @@ fixtrate.signals module
     :members:
     :undoc-members:
 
-fixtrate.store module
----------------------
-
-.. automodule:: fixtrate.store
-    :members:
-    :undoc-members:
 
 fixtrate.utils module
 ---------------------

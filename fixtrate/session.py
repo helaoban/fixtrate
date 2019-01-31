@@ -85,12 +85,25 @@ class FixSession:
         return msg
 
     def history(self, *args, **kwargs):
+        """ Return all messages sent and received in the
+        current session.
+
+        :rtype AsyncIterator[:class:`~fixtrate.message.FixMessage`]
+        """
         return self.store.get_messages(self, *args, **kwargs)
 
     async def get_local_sequence(self):
+        """ Return the current local sequence number.
+
+        :rtype int
+        """
         return await self.store.get_local(self)
 
     async def get_remote_sequence(self):
+        """ Return the current remote sequence number.
+
+        :rtype int
+        """
         return await self.store.get_remote(self)
 
     @property
