@@ -420,7 +420,6 @@ class PossDupFlag(BaseStrEnum):
 
 
 class FixTag:
-    # TODO do we lose nice __str__ if we inherit from int?
 
     @enum.unique
     class FIX42(BaseIntEnum):
