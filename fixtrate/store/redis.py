@@ -20,8 +20,9 @@ class FixRedisStore(FixStore):
             'TARGET_COMP_ID',
             'SESSION_QUALIFIER'
         )
-        return ':'.join(filter(
+        sid = ':'.join(filter(
             None, (session.config.get(p) for p in parts)))
+        return ':'.join(filter(None, (self._prefix, sid, key)))
 
     async def get_local(self, session):
         seq_num = await self._redis.get(
@@ -98,7 +99,7 @@ class FixRedisStore(FixStore):
                 self.make_redis_key(session, 'messages'), *chunk)
             for msg in msgs:
                 msg = FixMessage.from_raw(msg)
-                if not min <= msg.seq_num() <= max:
+                if not min <= msg.seq_num <= max:
                     continue
 
                 if direction is not None:
