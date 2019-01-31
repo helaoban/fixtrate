@@ -47,7 +47,6 @@ class FixMemoryStore(FixStore):
         max=float('inf'),
         direction=None
     ):
-        sid = session.config.get_sid()
         msgs = deepcopy(self._messages)
         for msg in msgs.values():
             msg = FixMessage.from_raw(msg)
@@ -55,7 +54,7 @@ class FixMemoryStore(FixStore):
                 continue
             if direction is not None:
                 sender = msg.get(49)
-                is_sent = sender == sid.sender_comp_id
+                is_sent = sender == session.config['SENDER_COMP_ID']
 
                 if direction == 'sent' and not is_sent:
                     continue

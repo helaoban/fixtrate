@@ -5,39 +5,6 @@ from .utils import validate_ip_address, validate_port
 from .constants import FixVersion
 
 
-class FixSessionId:
-
-    def __init__(
-        self,
-        begin_string,
-        sender_comp_id,
-        target_comp_id,
-        qualifier=None
-    ):
-        self.__dict__['begin_string'] = begin_string
-        self.__dict__['sender_comp_id'] = sender_comp_id
-        self.__dict__['target_comp_id'] = target_comp_id
-        self.__dict__['qualifier'] = qualifier
-
-    def __eq__(self, other):
-        if isinstance(other, FixSessionId):
-            return self.__str__() == other.__str__()
-        return NotImplemented
-
-    def __str__(self):
-        components = (
-            'begin_string',
-            'sender_comp_id',
-            'target_comp_id',
-            'qualifier'
-        )
-        return ':'.join(filter(
-            None, (self.__dict__[c] for c in components)))
-
-    def __setattr__(self, name, value):
-        raise TypeError('FixSessionId objects are immutable')
-
-
 default_config = {
     'VERSION': FixVersion.FIX42,
     'HEARTBEAT_INTERVAL': 30,
@@ -62,15 +29,6 @@ class Config(dict):
 
     def __init__(self, defaults=None):
         dict.__init__(self, defaults or {})
-
-    def get_sid(self):
-        self.validate()
-        return FixSessionId(
-            begin_string=self['VERSION'],
-            sender_comp_id=self['SENDER_COMP_ID'],
-            target_comp_id=self['TARGET_COMP_ID'],
-            qualifier=self.get('SESSION_QUALIFIER')
-        )
 
     def validate(self):
         """
