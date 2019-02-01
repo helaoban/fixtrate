@@ -27,13 +27,13 @@ class FixRedisStore(FixStore):
     async def get_local(self, session):
         seq_num = await self._redis.get(
             self.make_redis_key(session, 'seq_num_local'))
-        seq_num = seq_num or await self.incr_local()
+        seq_num = seq_num or await self.incr_local(session)
         return int(seq_num)
 
     async def get_remote(self, session):
         seq_num = await self._redis.get(
             self.make_redis_key(session, 'seq_num_remote'))
-        seq_num = seq_num or await self.incr_remote()
+        seq_num = seq_num or await self.incr_remote(session)
         return int(seq_num)
 
     async def incr_local(self, session):
