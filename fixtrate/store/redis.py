@@ -57,7 +57,7 @@ class FixRedisStore(FixStore):
             str(new_seq_num))
 
     async def store_message(self, session, msg):
-        uid = uuid.uuid4()
+        uid = str(uuid.uuid4())
         store_time = time.time()
         await self._redis.zadd(
             self.make_redis_key(session, 'messages_by_time'),
