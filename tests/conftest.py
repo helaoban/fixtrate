@@ -1,23 +1,33 @@
 import pytest
+import aioredis
 
 from fixtrate.config import Config, default_config
 from fixtrate.constants import FixVersion
 from fixtrate.parse import FixParser
 from tests.server import MockFixServer
 from fixtrate.session import FixSession
-from fixtrate.store import FixMemoryStore
+from fixtrate.store import FixMemoryStore, FixRedisStore
 
 VERSION = FixVersion.FIX42
 
 
-@pytest.fixture
-def client_store():
-    return FixMemoryStore()
+@pytest.fixture(params=['inmemory', 'redis'])
+async def store(request):
+    if request.param == 'redis':
+        url = 'redis://localhost:6379'
+        redis = await aioredis.create_redis(url)
 
+        yield FixRedisStore(redis, prefix='fix_test:')
 
-@pytest.fixture
-def server_store():
-    return FixMemoryStore()
+        # cleanup
+        to_delete = await redis.keys('fix_test:*')
+        if len(to_delete) > 0:
+            await redis.delete(*to_delete)
+
+        redis.close()
+        await redis.wait_closed()
+    else:
+        yield FixMemoryStore()
 
 
 @pytest.fixture
@@ -35,10 +45,10 @@ def server_config():
 
 @pytest.fixture
 @pytest.mark.asyncio
-async def test_server(server_store, server_config):
+async def test_server(store, server_config):
     server = MockFixServer(
         config=server_config,
-        store=server_store,
+        store=store,
     )
     await server.start()
     yield server
@@ -61,10 +71,10 @@ def client_config():
 
 
 @pytest.fixture
-async def fix_session(client_config, client_store):
+async def fix_session(client_config, store):
     session = FixSession()
     session.config = client_config
-    session.store = client_store
+    session.store = store
     return session
 
 
