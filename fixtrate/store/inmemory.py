@@ -1,6 +1,6 @@
 from copy import deepcopy
 import uuid
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 from fixtrate.message import FixMessage
 from fixtrate.store import FixStore
@@ -9,33 +9,61 @@ from fixtrate.store import FixStore
 class FixMemoryStore(FixStore):
 
     def __init__(self):
-        self._local_seq_num = 1
-        self._remote_seq_num = 1
-        self._messages = OrderedDict()
+        self._data = {}
+        self._local_seq_num = defaultdict(lambda: 1)
+        self._remote_seq_num = defaultdict(lambda: 1)
+        self._messages = defaultdict(OrderedDict)
+
+    def make_key(self, session, key):
+        parts = (
+            'VERSION',
+            'SENDER_COMP_ID',
+            'TARGET_COMP_ID',
+            'SESSION_QUALIFIER'
+        )
+        sid = ':'.join(filter(
+            None, (session.config.get(p) for p in parts)))
+        return ':'.join((sid, key))
 
     async def incr_local(self, session):
-        self._local_seq_num += 1
-        return self._local_seq_num
+        key = self.make_key(session, 'seq_num_local')
+        self._data[key] = self._data.get(key, 1) + 1
+        return self._data[key]
 
     async def incr_remote(self, session):
-        self._remote_seq_num += 1
-        return self._remote_seq_num
+        key = self.make_key(session, 'seq_num_remote')
+        self._data[key] = self._data.get(key, 1) + 1
+        return self._data[key]
 
     async def get_local(self, session):
-        return self._local_seq_num or self.incr_local()
+        key = self.make_key(session, 'seq_num_local')
+        seq_num = self._data.get(key)
+        if seq_num is None:
+            seq_num = await self.incr_local(session)
+        return seq_num
 
     async def get_remote(self, session):
-        return self._remote_seq_num or self.incr_remote()
+        key = self.make_key(session, 'seq_num_remote')
+        seq_num = self._data.get(key)
+        if seq_num is None:
+            seq_num = await self.incr_remote(session)
+        return seq_num
 
     async def set_local(self, session, new_seq_num):
-        self._local_seq_num = new_seq_num
+        key = self.make_key(session, 'seq_num_local')
+        self._data[key] = new_seq_num
 
     async def set_remote(self, session, new_seq_num):
-        self._remote_seq_num = new_seq_num
+        key = self.make_key(session, 'seq_num_remote')
+        self._data[key] = new_seq_num
 
     async def store_message(self, session, msg):
-        uid = uuid.uuid4()
-        self._messages[uid] = msg.encode()
+        key = self.make_key(session, 'messages')
+        uid = str(uuid.uuid4())
+        try:
+            self._data[key][uid] = msg.encode()
+        except KeyError:
+            self._data[key] = OrderedDict(((uid, msg.encode()),))
         return uid
 
     async def get_messages(
@@ -47,8 +75,13 @@ class FixMemoryStore(FixStore):
         max=float('inf'),
         direction=None
     ):
-        msgs = deepcopy(self._messages)
-        for msg in msgs.values():
+        key = self.make_key(session, 'messages')
+        try:
+            msgs = self._data[key]
+        except KeyError:
+            self._data[key] = msgs = OrderedDict()
+
+        for msg in deepcopy(msgs).values():
             msg = FixMessage.from_raw(msg)
             if not min <= msg.seq_num <= max:
                 continue
