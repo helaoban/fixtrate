@@ -701,7 +701,7 @@ class FixConnection:
 
     async def close(self):
 
-        if not self.closed:
+        if self.closed:
             return
 
         self._closing = True
