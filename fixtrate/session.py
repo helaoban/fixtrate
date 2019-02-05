@@ -160,6 +160,7 @@ class FixSession:
         :param writer: StreamWriter object
         :type writer: :class:`~asyncio.StreamWriter`
         """
+        self.config.validate()
         conn = FixConnection(
             reader=reader,
             writer=writer,
