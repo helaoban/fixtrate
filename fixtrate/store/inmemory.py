@@ -27,12 +27,12 @@ class FixMemoryStore(FixStore):
 
     async def incr_local(self, session):
         key = self.make_key(session, 'seq_num_local')
-        self._data[key] = self._data.get(key, 1) + 1
+        self._data[key] = self._data.get(key, 0) + 1
         return self._data[key]
 
     async def incr_remote(self, session):
         key = self.make_key(session, 'seq_num_remote')
-        self._data[key] = self._data.get(key, 1) + 1
+        self._data[key] = self._data.get(key, 0) + 1
         return self._data[key]
 
     async def get_local(self, session):
