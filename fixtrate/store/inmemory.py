@@ -10,8 +10,6 @@ class FixMemoryStore(FixStore):
 
     def __init__(self):
         self._data = {}
-        self._local_seq_num = defaultdict(lambda: 1)
-        self._remote_seq_num = defaultdict(lambda: 1)
         self._messages = defaultdict(OrderedDict)
 
     def make_key(self, session, key):
@@ -95,15 +93,3 @@ class FixMemoryStore(FixStore):
                     continue
 
             yield msg
-
-    async def __aiter__(self):
-        messages = await self.get_messages()
-        self.__messages = iter(messages.items())
-        return self
-
-    async def __anext__(self):
-        try:
-            return next(self.__messages)
-        except StopIteration:
-            self.__messages = None
-            raise StopAsyncIteration
