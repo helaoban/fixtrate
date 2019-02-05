@@ -13,7 +13,7 @@ from .factories import fix42
 from .parse import FixParser
 from .store import FixMemoryStore
 from .signals import message_received, message_sent, sequence_gap
-from .utils import maybe_await, Tristate
+from .utils import maybe_await
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,6 @@ class FixSession:
         self._conn = None
         self._hearbeat_cb = None
         self._timeout = timeout
-        self._is_initiator = Tristate(None)
 
         self._waiting_resend = False
         self._waiting_logout_confirm = False
@@ -83,6 +82,13 @@ class FixSession:
             logger.error(error)
             raise StopAsyncIteration
         return msg
+
+    async def get_initiator(self):
+        msgs = [m async for m in self.history(max=1)]
+        if not msgs:
+            return None
+        first = msgs[0]
+        return first.get(49)
 
     def history(self, *args, **kwargs):
         """ Return all messages sent and received in the
@@ -320,13 +326,6 @@ class FixSession:
         await self.send_message(msg)
 
     async def _send_login(self, reset=False):
-
-        if self._is_initiator == None:
-            self._is_initiator = Tristate(True)
-
-        if self._is_initiator == False:
-            self._is_initiator = Tristate(None)
-
         login_msg = fix42.logon(
             heartbeat_interval=self.config.get('HEARTBEAT_INTERVAL'),
             reset_sequence=reset
@@ -611,12 +610,9 @@ class FixSession:
         if is_reset:
             await self._set_remote_sequence(2)
 
-        if self._is_initiator == None:
-            self._is_initiator = Tristate(False)
+        initiator = await self.get_initiator()
+        if initiator != self.config['SENDER_COMP_ID']:
             await self._send_login(reset=is_reset)
-
-        if self._is_initiator == True:
-            self._is_initiator = Tristate(None)
 
     async def _handle_logout(self, msg):
         if self._waiting_logout_confirm:
