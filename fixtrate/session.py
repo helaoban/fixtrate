@@ -2,7 +2,6 @@ import asyncio
 from collections.abc import Coroutine
 import datetime as dt
 import logging
-import socket
 
 import async_timeout
 
@@ -13,7 +12,10 @@ from .factories import fix42
 from .parse import FixParser
 from .store import FixMemoryStore
 from .signals import message_received, message_sent, sequence_gap
+from .utils import urlparse
 from .utils.aio import maybe_await
+from .transport.tcp import TCPTransport
+from .transport.registry import TransportRegistry, default_transports
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,8 @@ ADMIN_MESSAGES = [
     fc.FixMsgType.TEST_REQUEST,
     fc.FixMsgType.RESEND_REQUEST,
 ]
+
+DEFAULT_TRANSPORT = TCPTransport
 
 
 class FixSession:
@@ -43,13 +47,15 @@ class FixSession:
 
     parser = FixParser()
 
+    _registry = TransportRegistry(transports=default_transports)
+
     def __init__(
         self,
         dictionary=None,
         timeout=None,
         headers=None,
+        transport=None
     ):
-
         self.config = Config(default_config)
         self._headers = headers or []
 
@@ -61,7 +67,6 @@ class FixSession:
         self._fix_dict = dictionary
 
         self._is_resetting = False
-        self._conn = None
         self._hearbeat_cb = None
         self._timeout = timeout
 
@@ -71,6 +76,8 @@ class FixSession:
 
         self.on_recv_msg_funcs = []
         self.on_send_msg_funcs = []
+
+        self._transport_cls = transport
 
     def __aiter__(self):
         return self
@@ -112,20 +119,15 @@ class FixSession:
         """
         return await self.store.get_remote(self)
 
-    @property
-    def closed(self):
-        """ Read-only property. Returns True fs underlying connection
-        has been closed.
+    def is_closing(self):
+        """ Returns True if underlying connection
+        is closing or has been closed.
 
         :return: bool
         """
-        return self._conn is None or self._conn.closed
+        return not hasattr(self, '_transport') or self._transport.is_closing()
 
-    @property
-    def _closing(self):
-        return self._conn.closing
-
-    def connect(self, address=None):
+    def connect(self, url):
         """
         Coroutine that waits for a successfuly connection to a FIX peer.
         Returns a FixConnection object. Can also be used as an async context
@@ -139,40 +141,20 @@ class FixSession:
 
         self.config.validate()
 
-        if address is None:
-            address = self.config['HOST'], self.config['PORT']
+        url = urlparse(url)
 
-        host, port = address
-
-        try:
-            'localhost' or socket.inet_aton(host)
-        except OSError:
-            raise ValueError('{} is not a legal IP address'.format(host))
+        if not hasattr(self, '_transport'):
+            if self._transport_cls is None:
+                self._transport_cls = self._registry.get_transport_cls(
+                    url.scheme)
+            self._transport = self._transport_cls()
 
         return _FixSessionContextManager(
-            host=host,
-            port=port,
+            url=url,
+            transport=self._transport,
             on_connect=self._on_connect,
             on_disconnect=self._on_disconnect,
         )
-
-    async def listen(self, reader, writer):
-        """ Listen on a given connection object. Useful for having a FIX session
-        listen on an existing connection (for example when serving many clients
-        from a server).
-
-        :param reader: StreamReader object
-        :type reader: :class:`~asyncio.StreamReader`
-        :param writer: StreamWriter object
-        :type writer: :class:`~asyncio.StreamWriter`
-        """
-        self.config.validate()
-        conn = FixConnection(
-            reader=reader,
-            writer=writer,
-            on_disconnect=self._on_disconnect
-        )
-        await self._on_connect(conn)
 
     async def receive(self, timeout=None):
         """ Coroutine that waits for message from peer and returns it.
@@ -205,14 +187,14 @@ class FixSession:
         Close the session. Closes the underlying connection and performs
         cleanup work.
         """
-        if self.closed or self._closing:
+        if self.is_closing():
             return
         logger.info('Shutting down...')
         await self._cancel_heartbeat_timer()
-        await self._conn.close()
-        self._conn = None
+        await self._transport.close()
+        self._transport = None
 
-    async def send(self, msg, skip_headers=False):
+    async def send(self, msg, skip_headers=False, **options):
         """
         Send a FIX message to peer.
 
@@ -235,7 +217,7 @@ class FixSession:
 
         message_sent.send(self, msg=msg)
 
-        await self._conn.write(msg.encode())
+        await self._transport.write(msg.encode(), **options)
         await self._reset_heartbeat_timer()
 
     def on_recv_message(self, f):
@@ -260,7 +242,7 @@ class FixSession:
         return f
 
     async def _on_connect(self, conn):
-        self._conn = conn
+        pass
 
     async def _on_disconnect(self):
         await self.close()
@@ -412,14 +394,14 @@ class FixSession:
                 break
             try:
                 with async_timeout.timeout(timeout):
-                    data = await self._conn.read()
+                    data = await self._transport.read()
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 raise asyncio.TimeoutError
             except ConnectionError:
                 break
             self.parser.append_buffer(data)
 
-        if self.closed or self._closing:
+        if self.is_closing():
             raise ConnectionAbortedError
         if msg:
             await self._handle_message(msg)
@@ -673,77 +655,22 @@ class FixSession:
         reset_seq = msg.get(self._tags.ResetSeqNumFlag)
         return reset_seq == fc.ResetSeqNumFlag.YES
 
-
-class FixConnection:
-
-    def __init__(
-        self,
-        reader,
-        writer,
-        on_disconnect=None,
-    ):
-        self._reader = reader
-        self._writer = writer
-        self._on_disconnect = on_disconnect
-        self._connected = True
-        self._closing = False
-
-    @property
-    def closed(self):
-        return not self._connected
-
-    @property
-    def closing(self):
-        return self._closing
-
-    async def close(self):
-
-        if self.closed:
-            return
-
-        self._closing = True
-
-        self._writer.close()
-
-        if self._on_disconnect is not None:
-            await maybe_await(self._on_disconnect)
-
-        self._closing = False
-        self._connected = False
-
-    async def read(self):
-        try:
-            data = await self._reader.read(4096)
-        except ConnectionError as error:
-            logger.error(error)
-            await self.close()
-            raise
-        if data == b'':
-            logger.error('Peer closed the connection!')
-            await self.close()
-            raise ConnectionAbortedError
-        return data
-
-    async def write(self, *args, **kwargs):
-        self._writer.write(*args, **kwargs)
-        try:
-            await self._writer.drain()
-        except ConnectionError as error:
-            logger.error(error)
-            await self.close()
+    @classmethod
+    def register_scheme(cls, scheme, transport_cls):
+        cls._registry.register_scheme(scheme, transport_cls)
 
 
 class _FixSessionContextManager(Coroutine):
 
     def __init__(
         self,
-        host='localhost',
-        port=4000,
+        url,
+        transport,
         on_connect=None,
         on_disconnect=None,
     ):
-        self._host = host
-        self._port = port
+        self._url = url
+        self._transport = transport
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
         self._coro = self._connect()
@@ -752,11 +679,13 @@ class _FixSessionContextManager(Coroutine):
         return self._coro.__await__()
 
     async def __aenter__(self):
-        self._conn = await self._coro
-        return self._conn
+        await self._coro
+        return self._transport
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._conn.close()
+        await self._transport.close()
+        if self._on_disconnect is not None:
+            await maybe_await(self._on_disconnect)
 
     def send(self, arg):
         self._coro.send(arg)
@@ -767,26 +696,7 @@ class _FixSessionContextManager(Coroutine):
     def close(self):
         self._coro.close()
 
-    async def _connect(self, tries=5, retry_wait=5):
-        tried = 1
-        while tried <= tries:
-            try:
-                reader, writer = await asyncio.open_connection(
-                    host=self._host,
-                    port=self._port,
-                )
-            except OSError as error:
-                logger.error(error)
-                logger.info('Connection failed, retrying in {} seconds...'
-                            ''.format(retry_wait))
-                tried += 1
-                await asyncio.sleep(retry_wait)
-                continue
-            else:
-                conn = FixConnection(
-                    reader, writer, on_disconnect=self._on_disconnect)
-                await maybe_await(self._on_connect, conn)
-                return conn
-
-        logger.info('Connection tries ({}) exhausted'.format(tries))
-        raise ConnectionError
+    async def _connect(self):
+        await self._transport.connect(self._url)
+        if self._on_connect is not None:
+            await maybe_await(self._on_connect)
