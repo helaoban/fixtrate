@@ -149,7 +149,7 @@ class FixSession:
         except OSError:
             raise ValueError('{} is not a legal IP address'.format(host))
 
-        return _FixConnectionContextManager(
+        return _FixSessionContextManager(
             host=host,
             port=port,
             on_connect=self._on_connect,
@@ -733,7 +733,7 @@ class FixConnection:
             await self.close()
 
 
-class _FixConnectionContextManager(Coroutine):
+class _FixSessionContextManager(Coroutine):
 
     def __init__(
         self,
