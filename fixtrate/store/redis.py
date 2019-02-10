@@ -4,7 +4,7 @@ import uuid
 
 from fixtrate.message import FixMessage
 from fixtrate.store import FixStore
-from fixtrate.utils import chunked
+from fixtrate.utils.iterators import chunked
 
 
 class FixRedisStore(FixStore):

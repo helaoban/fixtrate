@@ -1,7 +1,7 @@
 from distutils.util import strtobool
 import os
 
-from .utils import validate_ip_address, validate_port
+from .utils.validators import validate_ip_address, validate_port
 from .constants import FixVersion
 
 
