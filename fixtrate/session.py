@@ -84,7 +84,7 @@ class FixSession:
 
     async def __anext__(self):
         try:
-            msg = await self._recv_msg()
+            msg = await self.receive()
         except (asyncio.TimeoutError, ConnectionError) as error:
             logger.error(error)
             raise StopAsyncIteration
@@ -155,18 +155,6 @@ class FixSession:
             on_connect=self._on_connect,
             on_disconnect=self._on_disconnect,
         )
-
-    async def receive(self, timeout=None):
-        """ Coroutine that waits for message from peer and returns it.
-
-        :param timeout: (optional) timeout in seconds. If specified, method
-            will raise asyncio.TimeoutError if message in not
-            received after timeout. Defaults to `None`.
-        :type timeout: float, int or None
-
-        :return: :class:`~fixtrate.message.FixMessage` object
-        """
-        return await self._recv_msg(timeout)
 
     async def logon(self, reset=False):
         """ Logon to a FIX Session. Sends a Logon<A> message to peer.
@@ -385,7 +373,16 @@ class FixSession:
         if gap_start is not None:
             await self._reset_sequence(gap_start, gap_end)
 
-    async def _recv_msg(self, timeout=None):
+    async def receive(self, timeout=None):
+        """ Coroutine that waits for message from peer and returns it.
+
+        :param timeout: (optional) timeout in seconds. If specified, method
+            will raise asyncio.TimeoutError if message in not
+            received after timeout. Defaults to `None`.
+        :type timeout: float, int or None
+
+        :return: :class:`~fixtrate.message.FixMessage` object
+        """
         if timeout is None:
             timeout = self._timeout
         while True:
