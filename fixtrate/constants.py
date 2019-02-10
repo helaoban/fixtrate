@@ -1787,6 +1787,6 @@ class FixTag:
 
 
 @enum.unique
-class CustomerOrFirm(int, enum.Enum):
+class CustomerOrFirm(BaseIntEnum):
     Customer = 0
     Firm = 1
