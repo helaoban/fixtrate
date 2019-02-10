@@ -142,7 +142,7 @@ async def test_sequence_reset(fix_session, fix_endpoint, test_server):
         )
         seq_reset_msg = fm.FixMessage.from_pairs(pairs)
 
-        await client_session.send_message(seq_reset_msg)
+        await client_session.send(seq_reset_msg)
 
         msg = await fix_session.receive()
         assert msg.msg_type == fc.FixMsgType.SEQUENCE_RESET
@@ -173,7 +173,7 @@ async def test_message_recovery(fix_session, fix_endpoint, test_server):
     news_msg = fm.FixMessage.from_pairs(pairs)
 
     server_sessions = list(test_server.clients.values())
-    await server_sessions[0].send_message(news_msg)
+    await server_sessions[0].send(news_msg)
 
     async with fix_session.connect(fix_endpoint):
         await fix_session.logon()

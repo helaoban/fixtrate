@@ -212,7 +212,7 @@ class FixSession:
         await self._conn.close()
         self._conn = None
 
-    async def send_message(self, msg, skip_headers=False):
+    async def send(self, msg, skip_headers=False):
         """
         Send a FIX message to peer.
 
@@ -309,11 +309,11 @@ class FixSession:
 
     async def _send_heartbeat(self, test_request_id=None):
         msg = fix42.heartbeat(test_request_id)
-        await self.send_message(msg)
+        await self.send(msg)
 
     async def _send_test_request(self, test_request_id):
         msg = fix42.test_request(test_request_id)
-        await self.send_message(msg)
+        await self.send(msg)
 
     async def _send_reject(self, msg, tag, rejection_type, reason):
         msg = fix42.reject(
@@ -323,7 +323,7 @@ class FixSession:
             rejection_type=rejection_type,
             reject_reason=reason,
         )
-        await self.send_message(msg)
+        await self.send(msg)
 
     async def _send_login(self, reset=False):
         login_msg = fix42.logon(
@@ -333,26 +333,26 @@ class FixSession:
         if reset:
             await self._set_local_sequence(1)
             self._append_standard_header(login_msg, seq_num=1)
-            await self.send_message(login_msg, skip_headers=True)
+            await self.send(login_msg, skip_headers=True)
         else:
-            await self.send_message(login_msg)
+            await self.send(login_msg)
 
     async def _send_logoff(self):
         if self._waiting_logout_confirm:
             # TODO what happends if Logout<5> sent twice?
             return
         logout_msg = fix42.logoff()
-        await self.send_message(logout_msg)
+        await self.send(logout_msg)
 
     async def _request_resend(self, start, end):
         self._waiting_resend = True
         msg = fix42.resend_request(start, end)
-        await self.send_message(msg)
+        await self.send(msg)
 
     async def _reset_sequence(self, seq_num, new_seq_num):
         msg = fix42.sequence_reset(new_seq_num)
         self._append_standard_header(msg, seq_num)
-        await self.send_message(msg, skip_headers=True)
+        await self.send(msg, skip_headers=True)
 
     async def _resend_messages(self, start, end):
         """ Used internally by Fixtrate to handle the re-transmission of
@@ -398,7 +398,7 @@ class FixSession:
                     fc.PossDupFlag.YES,
                     header=True
                 )
-                await self.send_message(msg, skip_headers=True)
+                await self.send(msg, skip_headers=True)
 
         if gap_start is not None:
             await self._reset_sequence(gap_start, gap_end)
