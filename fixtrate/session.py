@@ -70,7 +70,6 @@ class FixSession:
         messages during periods of inactivity. Default to 30.
     """
 
-    store = FixMemoryStore()
 
     parser = FixParser()
     def __init__(self, **kwargs):
@@ -189,6 +188,8 @@ class FixSession:
         await self._cancel_heartbeat_timer()
         if self.transport is not None:
             await self.transport.close()
+        if self.store is not None:
+            await self.store.close(self)
 
     async def send(self, msg, skip_headers=False, **options):
         """
@@ -237,8 +238,11 @@ class FixSession:
         self.on_send_msg_funcs.append(f)
         return f
 
-    async def _on_connect(self, conn):
-        pass
+    async def _on_connect(self):
+        if self._store_cls is None:
+            self._store_cls = FixMemoryStore
+        self.store = self._store_cls()
+        await self.store.open(self)
 
     async def _on_disconnect(self):
         await self.close()

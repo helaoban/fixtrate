@@ -4,6 +4,14 @@ import abc
 class FixStore(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
+    async def open(self, session):
+        pass
+
+    @abc.abstractmethod
+    async def close(self, session):
+        pass
+
+    @abc.abstractmethod
     async def incr_local(self, session):
         """ Increment the local sequence number by 1.
 

@@ -23,6 +23,12 @@ class FixMemoryStore(FixStore):
             None, (session.config.get(p) for p in parts)))
         return ':'.join((sid, key))
 
+    async def open(self, session):
+        pass
+
+    async def close(self, session):
+        pass
+
     async def incr_local(self, session):
         key = self.make_key(session, 'seq_num_local')
         self._data[key] = self._data.get(key, 0) + 1

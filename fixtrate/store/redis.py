@@ -2,16 +2,14 @@ from datetime import datetime
 import time
 import uuid
 
+import aioredis
+
 from fixtrate.message import FixMessage
 from fixtrate.store import FixStore
 from fixtrate.utils.iterators import chunked
 
 
 class FixRedisStore(FixStore):
-
-    def __init__(self, redis, prefix='fix:'):
-        self._redis = redis
-        self._prefix = prefix
 
     def make_redis_key(self, session, key):
         parts = (
@@ -20,9 +18,20 @@ class FixRedisStore(FixStore):
             'TARGET_COMP_ID',
             'SESSION_QUALIFIER'
         )
+        store_conf = session.config['store_options']
+        prefix = store_conf.get('prefix', 'fix:')
         sid = ':'.join(filter(
             None, (session.config.get(p) for p in parts)))
-        return ':'.join(filter(None, (self._prefix, sid, key)))
+        return ':'.join(filter(None, (prefix, sid, key)))
+
+    async def open_store(self, session):
+        redis_url = session.config['store_options']['redis_url']
+        self._redis = await aioredis.create_redis(
+            redis_url, minsize=5, maxsize=10)
+
+    async def close_store(self, session):
+        self._redis.close()
+        await self._redis.wait_closed()
 
     async def get_local(self, session):
         seq_num = await self._redis.get(
