@@ -6,7 +6,6 @@ import logging
 import async_timeout
 
 from . import constants as fc
-from .config import Config, default_config
 from .exceptions import SequenceGap, FatalSequenceGap
 from .factories import fix42
 from .parse import FixParser
@@ -29,6 +28,35 @@ ADMIN_MESSAGES = [
 
 DEFAULT_TRANSPORT = TCPTransport
 
+DEFAULT_OPTIONS = {
+    'fix_version': fc.FixVersion.FIX42,
+    'transport': None,
+    'transport_options': [],
+    'store': None,
+    'store_options': None,
+    'heartbeat_interval': 30,
+    'sender_comp_id': None,
+    'target_comp_id': None,
+    'host': None,
+    'port': None,
+    'receive_timeout': None,
+    'fix_dict': None,
+    'headers': []
+}
+
+
+def get_options(**kwargs):
+
+    rv = dict(DEFAULT_OPTIONS)
+    options = dict(**kwargs)
+
+    for key, value in options.items():
+        if key not in rv:
+            raise TypeError("Unknown option %r" % (key,))
+        rv[key] = value
+
+    return rv
+
 
 class FixSession:
     """
@@ -45,29 +73,21 @@ class FixSession:
     store = FixMemoryStore()
 
     parser = FixParser()
+    def __init__(self, **kwargs):
+        self.config = get_options(**kwargs)
 
-    _registry = TransportRegistry(transports=default_transports)
+        version = self.config.get('fix_version')
+        self._tags = {
+            'FIX.4.2': fc.FixTag.FIX42,
+            'FIX.4.4': fc.FixTag.FIX44,
+        }.get(version, fc.FixTag.FIX42)
 
-    def __init__(
-        self,
-        dictionary=None,
-        timeout=None,
-        headers=None,
-        transport=None
-    ):
-        self.config = Config(default_config)
-        self._headers = headers or []
-
-        version = fc.FixVersion(self.config.get('VERSION'))
-        self._tags = getattr(
-            fc.FixTag,
-            version.name)
-
-        self._fix_dict = dictionary
+        self.transport = make_transport(self.config)
+        self._store_cls = self.config['store']
+        self.store = None
 
         self._is_resetting = False
         self._hearbeat_cb = None
-        self._timeout = timeout
 
         self._waiting_resend = False
         self._waiting_logout_confirm = False
@@ -76,7 +96,6 @@ class FixSession:
         self.on_recv_msg_funcs = []
         self.on_send_msg_funcs = []
 
-        self._transport_cls = transport
 
     def __aiter__(self):
         return self
@@ -124,7 +143,7 @@ class FixSession:
 
         :return: bool
         """
-        return not hasattr(self, '_transport') or self._transport.is_closing()
+        return self.transport is None or self.transport.is_closing()
 
     def connect(self, url):
         """
@@ -137,20 +156,10 @@ class FixSession:
         :return: :class:`FixConnection` object
         :rtype: FixConnection
         """
-
-        self.config.validate()
-
-        url = urlparse(url)
-
-        if not hasattr(self, '_transport'):
-            if self._transport_cls is None:
-                self._transport_cls = self._registry.get_transport_cls(
-                    url.scheme)
-            self._transport = self._transport_cls()
-
         return _FixSessionContextManager(
-            url=url,
-            transport=self._transport,
+            host=self.config['host'],
+            port=self.config['port'],
+            transport=self.transport,
             on_connect=self._on_connect,
             on_disconnect=self._on_disconnect,
         )
@@ -178,8 +187,8 @@ class FixSession:
             return
         logger.info('Shutting down...')
         await self._cancel_heartbeat_timer()
-        await self._transport.close()
-        self._transport = None
+        if self.transport is not None:
+            await self.transport.close()
 
     async def send(self, msg, skip_headers=False, **options):
         """
@@ -204,7 +213,7 @@ class FixSession:
 
         message_sent.send(self, msg=msg)
 
-        await self._transport.write(msg.encode(), **options)
+        await self.transport.write(msg.encode(), **options)
         await self._reset_heartbeat_timer()
 
     def on_recv_message(self, f):
@@ -256,9 +265,9 @@ class FixSession:
         timestamp=None
     ):
         pairs = (
-            (self._tags.BeginString, self.config.get('VERSION')),
-            (self._tags.SenderCompID, self.config.get('SENDER_COMP_ID')),
-            (self._tags.TargetCompID, self.config.get('TARGET_COMP_ID')),
+            (self._tags.BeginString, self.config.get('fix_version')),
+            (self._tags.SenderCompID, self.config.get('sender_comp_id')),
+            (self._tags.TargetCompID, self.config.get('target_comp_id')),
             (self._tags.MsgSeqNum, seq_num),
         )
 
@@ -273,7 +282,7 @@ class FixSession:
             header=True
         )
 
-        for tag, val in self._headers:
+        for tag, val in self.config.get('headers'):
             msg.append_pair(tag, val, header=True)
 
     async def _send_heartbeat(self, test_request_id=None):
@@ -296,7 +305,7 @@ class FixSession:
 
     async def _send_login(self, reset=False):
         login_msg = fix42.logon(
-            heartbeat_interval=self.config.get('HEARTBEAT_INTERVAL'),
+            heartbeat_interval=self.config.get('heartbeat_interval'),
             reset_sequence=reset
         )
         if reset:
@@ -383,14 +392,14 @@ class FixSession:
         :return: :class:`~fixtrate.message.FixMessage` object
         """
         if timeout is None:
-            timeout = self._timeout
+            timeout = self.config.get('receive_timeout')
         while True:
             msg = self.parser.get_message()
             if msg:
                 break
             try:
                 with async_timeout.timeout(timeout):
-                    data = await self._transport.read()
+                    data = await self.transport.read()
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 raise asyncio.TimeoutError
             except ConnectionError:
@@ -564,13 +573,13 @@ class FixSession:
 
     async def _handle_logon(self, msg):
         heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
-        if heartbeat_interval != self.config.get('HEARTBEAT_INTERVAL'):
+        if heartbeat_interval != self.config.get('heartbeat_interval'):
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.HeartBtInt,
                 rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='HeartBtInt must be {}'.format(
-                    self.config.get('HEARTBEAT_INTERVAL'))
+                    self.config.get('heartbeat_interval'))
             )
             return
 
@@ -589,7 +598,7 @@ class FixSession:
             await self._set_remote_sequence(2)
 
         initiator = await self.get_initiator()
-        if initiator != self.config['SENDER_COMP_ID']:
+        if initiator != self.config['sender_comp_id']:
             await self._send_login(reset=is_reset)
 
     async def _handle_logout(self, msg):
@@ -637,7 +646,7 @@ class FixSession:
 
     async def _set_heartbeat_timer(self):
         try:
-            interval = self.config.get('HEARTBEAT_INTERVAL')
+            interval = self.config.get('heartbeat_interval')
             await asyncio.sleep(interval)
             await self._send_heartbeat()
         except asyncio.CancelledError:
@@ -660,12 +669,14 @@ class _FixSessionContextManager(Coroutine):
 
     def __init__(
         self,
-        url,
+        host,
+        port,
         transport,
         on_connect=None,
         on_disconnect=None,
     ):
-        self._url = url
+        self._host = host
+        self._port = port
         self._transport = transport
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
