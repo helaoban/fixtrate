@@ -35,8 +35,6 @@ class TCPTransport(Transport):
         self.writer = None
 
     def is_closing(self):
-        if self.writer is None:
-            return True
         return self.writer.transport.is_closing()
 
     async def read(self):
@@ -62,8 +60,6 @@ class TCPTransport(Transport):
         if self.writer is not None:
             if not self.writer.transport.is_closing():
                 self.writer.close()
-        self.writer = None
-        self.reader = None
 
 
 def make_transport(options):

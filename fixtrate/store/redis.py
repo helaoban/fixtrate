@@ -18,14 +18,14 @@ class FixRedisStore(FixStore):
             'TARGET_COMP_ID',
             'SESSION_QUALIFIER'
         )
-        store_conf = session.config['store_options']
-        prefix = store_conf.get('prefix', 'fix')
+        prefix = self.options.get('prefix', 'fix')
         sid = ':'.join(filter(
             None, (session.config.get(p) for p in parts)))
         return ':'.join(filter(None, (prefix, sid, key)))
 
     async def open(self, session):
-        redis_url = session.config['store_options']['redis_url']
+        redis_url = self.options.get(
+            'redis_url', 'redis://localhost:6379')
         self._redis = await aioredis.create_redis(redis_url)
 
     async def close(self, session):

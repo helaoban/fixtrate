@@ -8,7 +8,8 @@ from fixtrate.store import FixStore
 
 class FixMemoryStore(FixStore):
 
-    def __init__(self):
+    def __init__(self, options):
+        super().__init__(options)
         self._data = {}
         self._messages = defaultdict(OrderedDict)
 

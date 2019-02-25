@@ -31,8 +31,8 @@ DEFAULT_OPTIONS = {
     'fix_version': fc.FixVersion.FIX42,
     'transport': None,
     'transport_options': {},
-    'store': None,
-    'store_options': None,
+    'store': FixMemoryStore,
+    'store_options': {},
     'heartbeat_interval': 30,
     'sender_comp_id': None,
     'target_comp_id': None,
@@ -79,8 +79,7 @@ class FixSession:
         }.get(version, fc.FixTag.FIX42)
 
         self.transport = make_transport(self.config)
-        self._store_cls = self.config['store']
-        self.store = None
+        self.store = self._make_store()
 
         self._is_resetting = False
         self._hearbeat_cb = None
@@ -106,6 +105,10 @@ class FixSession:
             logger.error(error)
             raise StopAsyncIteration
         return msg
+
+    def _make_store(self):
+        store_cls = self.config['store']
+        return store_cls(self.config['store_options'])
 
     async def get_initiator(self):
         if self._initiator is None:
@@ -189,10 +192,8 @@ class FixSession:
             return
         logger.info('Shutting down...')
         await self._cancel_heartbeat_timer()
-        if self.transport is not None:
-            await self.transport.close()
-        if self.store is not None:
-            await self.store.close(self)
+        await self.transport.close()
+        await self.store.close(self)
 
     async def send(self, msg, skip_headers=False, **options):
         """
@@ -242,9 +243,6 @@ class FixSession:
         return f
 
     async def _on_connect(self):
-        if self._store_cls is None:
-            self._store_cls = FixMemoryStore
-        self.store = self._store_cls()
         await self.store.open(self)
 
     async def _on_disconnect(self):

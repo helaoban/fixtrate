@@ -1,17 +1,14 @@
-import abc
+class FixStore:
 
+    def __init__(self, options):
+        self.options = options
 
-class FixStore(metaclass=abc.ABCMeta):
-
-    @abc.abstractmethod
     async def open(self, session):
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def close(self, session):
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def incr_local(self, session):
         """ Increment the local sequence number by 1.
 
@@ -19,9 +16,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :type session: :class:`~fixtrate.session.FixSession`
 
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def incr_remote(self, session):
         """ Increment the remote sequence number by 1.
 
@@ -29,9 +25,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :type session: :class:`~fixtrate.session.FixSession`
 
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def get_local(self, session):
         """ Get the local sequence number.
 
@@ -39,9 +34,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :type session: :class:`~fixtrate.session.FixSession`
 
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def get_remote(self, session):
         """ Get the remote sequence number.
 
@@ -49,9 +43,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :type session: :class:`~fixtrate.session.FixSession`
 
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def set_local(self, session, new_seq_num):
         """ Set the local sequence number to a new number.
 
@@ -62,9 +55,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :type new_seq_num: int
 
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def set_remote(self, session, new_seq_num):
         """ Set the remote sequence number to a new number.
 
@@ -75,9 +67,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :type new_seq_num: int
 
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def store_message(self, session, msg):
         """ Store a message in the store.
 
@@ -87,9 +78,8 @@ class FixStore(metaclass=abc.ABCMeta):
         :param msg: The message to store.
         :type msg: :class:`~fixtrate.message.FixMessage`
         """
-        pass
+        raise NotImplementedError
 
-    @abc.abstractmethod
     async def get_messages(
         self,
         session,
@@ -126,4 +116,4 @@ class FixStore(metaclass=abc.ABCMeta):
 
             :rtype AsyncIterator[:class:`FixMessage`]
         """
-        pass
+        raise NotImplementedError
