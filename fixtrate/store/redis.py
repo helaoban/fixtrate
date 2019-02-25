@@ -13,10 +13,10 @@ class FixRedisStore(FixStore):
 
     def make_redis_key(self, session, key):
         parts = (
-            'VERSION',
-            'SENDER_COMP_ID',
-            'TARGET_COMP_ID',
-            'SESSION_QUALIFIER'
+            'fix_version',
+            'sender_comp_id',
+            'target_comp_id',
+            'session_qualifier'
         )
         prefix = self.options.get('prefix', 'fix')
         sid = ':'.join(filter(
@@ -112,7 +112,7 @@ class FixRedisStore(FixStore):
 
                 if direction is not None:
                     sender = msg.get(49)
-                    is_sent = sender == session.config['SENDER_COMP_ID']
+                    is_sent = sender == session.config['sender_comp_id']
 
                     if direction == 'sent' and not is_sent:
                         continue
