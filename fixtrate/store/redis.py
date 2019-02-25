@@ -19,7 +19,7 @@ class FixRedisStore(FixStore):
             'SESSION_QUALIFIER'
         )
         store_conf = session.config['store_options']
-        prefix = store_conf.get('prefix', 'fix:')
+        prefix = store_conf.get('prefix', 'fix')
         sid = ':'.join(filter(
             None, (session.config.get(p) for p in parts)))
         return ':'.join(filter(None, (prefix, sid, key)))
