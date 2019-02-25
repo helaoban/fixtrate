@@ -11,7 +11,6 @@ from .factories import fix42
 from .parse import FixParser
 from .store import FixMemoryStore
 from .signals import message_received, message_sent, sequence_gap
-from .utils import urlparse
 from .utils.aio import maybe_await
 from .transport import TCPTransport, make_transport
 
