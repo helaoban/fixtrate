@@ -14,8 +14,7 @@ from .store import FixMemoryStore
 from .signals import message_received, message_sent, sequence_gap
 from .utils import urlparse
 from .utils.aio import maybe_await
-from .transport.tcp import TCPTransport
-from .transport.registry import TransportRegistry, default_transports
+from .transport import TCPTransport, make_transport
 
 logger = logging.getLogger(__name__)
 
