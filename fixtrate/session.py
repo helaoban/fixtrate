@@ -93,6 +93,8 @@ class FixSession:
         self.on_recv_msg_funcs = []
         self.on_send_msg_funcs = []
 
+        self._initiator = None
+
         self.parser = FixParser()
 
     def __aiter__(self):
@@ -107,11 +109,13 @@ class FixSession:
         return msg
 
     async def get_initiator(self):
-        msgs = [m async for m in self.history(max=1)]
-        if not msgs:
-            return None
-        first = msgs[0]
-        return first.get(49)
+        if self._initiator is None:
+            msgs = [m async for m in self.history(max=1)]
+            if not msgs:
+                return None
+            first = msgs[0]
+            self._initiator = first.get(49)
+        return self._initiator
 
     def history(self, *args, **kwargs):
         """ Return all messages sent and received in the
