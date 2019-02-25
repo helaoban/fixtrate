@@ -116,6 +116,15 @@ class FixSession:
             self._initiator = first.get(49)
         return self._initiator
 
+    @property
+    def closed(self):
+        """ Returns True if underlying connection
+        is closing or has been closed.
+
+        :return: bool
+        """
+        return self.transport.is_closing()
+
     def history(self, *args, **kwargs):
         """ Return all messages sent and received in the
         current session.
@@ -137,14 +146,6 @@ class FixSession:
         :rtype int
         """
         return await self.store.get_remote(self)
-
-    def is_closing(self):
-        """ Returns True if underlying connection
-        is closing or has been closed.
-
-        :return: bool
-        """
-        return self.transport is None or self.transport.is_closing()
 
     def connect(self):
         """
@@ -184,7 +185,7 @@ class FixSession:
         Close the session. Closes the underlying connection and performs
         cleanup work.
         """
-        if self.is_closing():
+        if self.closed:
             return
         logger.info('Shutting down...')
         await self._cancel_heartbeat_timer()
@@ -408,11 +409,9 @@ class FixSession:
                     data = await self.transport.read()
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 raise asyncio.TimeoutError
-            except ConnectionError:
-                break
             self.parser.append_buffer(data)
 
-        if self.is_closing():
+        if self.closed:
             raise ConnectionAbortedError
         if msg:
             await self._handle_message(msg)
