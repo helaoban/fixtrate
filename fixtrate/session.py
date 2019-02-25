@@ -147,7 +147,7 @@ class FixSession:
         """
         return self.transport is None or self.transport.is_closing()
 
-    def connect(self, url):
+    def connect(self):
         """
         Coroutine that waits for a successfuly connection to a FIX peer.
         Returns a FixConnection object. Can also be used as an async context
