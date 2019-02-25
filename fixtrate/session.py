@@ -70,8 +70,6 @@ class FixSession:
         messages during periods of inactivity. Default to 30.
     """
 
-
-    parser = FixParser()
     def __init__(self, **kwargs):
         self.config = get_options(**kwargs)
 
@@ -95,6 +93,7 @@ class FixSession:
         self.on_recv_msg_funcs = []
         self.on_send_msg_funcs = []
 
+        self.parser = FixParser()
 
     def __aiter__(self):
         return self
