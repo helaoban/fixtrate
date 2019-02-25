@@ -30,7 +30,7 @@ DEFAULT_TRANSPORT = TCPTransport
 DEFAULT_OPTIONS = {
     'fix_version': fc.FixVersion.FIX42,
     'transport': None,
-    'transport_options': [],
+    'transport_options': {},
     'store': None,
     'store_options': None,
     'heartbeat_interval': 30,
