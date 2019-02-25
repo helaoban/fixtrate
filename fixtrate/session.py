@@ -590,13 +590,33 @@ class FixSession:
             )
             return
 
-        target_comp_id = msg.get(self._tags.TargetCompID)
-        if target_comp_id != self.config.get('SENDER_COMP_ID'):
+        target = msg.get(self._tags.TargetCompID)
+        excepted_target = self.config.get('sender_comp_id')
+
+        if target != excepted_target:
             await self._send_reject(
                 msg=msg,
                 tag=self._tags.TargetCompID,
                 rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
                 reason='Target Comp ID is incorrect.'
+            )
+            return
+
+        sender = msg.get(self._tags.SenderCompID)
+        expected_sender = self.config.get('target_comp_id')
+
+        if expected_sender is None:
+            # if target_comp_id is not set in the config,
+            # then we are implicitly allowing any target, so we
+            # set target_comp_id to the target's send_comp_id.
+            self.config['target_comp_id'] = expected_sender = sender
+
+        if sender != expected_sender:
+            await self._send_reject(
+                msg=msg,
+                tag=self._tags.TargetCompID,
+                rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                reason='Sender Comp ID is incorrect.'
             )
             return
 
