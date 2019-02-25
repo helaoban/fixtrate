@@ -730,6 +730,6 @@ class _FixSessionContextManager(Coroutine):
         self._coro.close()
 
     async def _connect(self):
-        await self._transport.connect(self._url)
+        await self._transport.connect(self._host, self._port)
         if self._on_connect is not None:
             await maybe_await(self._on_connect)
