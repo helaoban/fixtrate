@@ -26,8 +26,7 @@ class FixRedisStore(FixStore):
 
     async def open(self, session):
         redis_url = session.config['store_options']['redis_url']
-        self._redis = await aioredis.create_redis(
-            redis_url, minsize=5, maxsize=10)
+        self._redis = await aioredis.create_redis(redis_url)
 
     async def close(self, session):
         self._redis.close()
