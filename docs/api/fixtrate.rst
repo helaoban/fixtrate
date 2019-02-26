@@ -61,14 +61,6 @@ fixtrate.session module
     :members:
     :undoc-members:
 
-fixtrate.signals module
------------------------
-
-.. automodule:: fixtrate.signals
-    :members:
-    :undoc-members:
-
-
 fixtrate.utils module
 ---------------------
 

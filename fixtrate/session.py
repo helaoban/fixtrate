@@ -10,7 +10,6 @@ from .exceptions import SequenceGap, FatalSequenceGap
 from .factories import fix42
 from .parse import FixParser
 from .store import FixMemoryStore
-from .signals import message_received, message_sent, sequence_gap
 from .utils.aio import maybe_await
 from .transport import TCPTransport, make_transport
 
@@ -87,9 +86,6 @@ class FixSession:
         self._waiting_resend = False
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
-
-        self.on_recv_msg_funcs = []
-        self.on_send_msg_funcs = []
 
         self._initiator = None
 
@@ -212,35 +208,8 @@ class FixSession:
             await self._incr_local_sequence()
 
         await self._store_message(msg)
-
-        for func in self.on_send_msg_funcs:
-            await maybe_await(func, msg)
-
-        message_sent.send(self, msg=msg)
-
         await self.transport.write(msg.encode(), **options)
         await self._reset_heartbeat_timer()
-
-    def on_recv_message(self, f):
-        """
-        Decorator that registers a callback to be called when a message
-        is received but before it has been processed by any session internal
-        handlers.
-        :param f: Callback function
-        :return:
-        """
-        self.on_recv_msg_funcs.append(f)
-        return f
-
-    def on_send_message(self, f):
-        """
-        Decorator that registers a callback to be called when a message
-        is about to be sent to peer.
-        :param f:
-        :return:
-        """
-        self.on_send_msg_funcs.append(f)
-        return f
 
     async def _on_connect(self):
         await self.store.open(self)
@@ -418,11 +387,6 @@ class FixSession:
     async def _handle_message(self, msg):
         await self._store_message(msg)
 
-        for func in self.on_recv_msg_funcs:
-            await maybe_await(func, msg)
-
-        message_received.send(self, msg=msg)
-
         try:
             await self._check_sequence_integrity(msg)
         except FatalSequenceGap:
@@ -449,8 +413,6 @@ class FixSession:
             await self.close()
             raise
         except SequenceGap as error:
-            sequence_gap.send(self, exc=error)
-
             # Always honor a ResendRequest<2> no matter what, even
             # if we are currently waiting on resend ourselves. This takes
             # care of an edge case that can occur when both sides detect a

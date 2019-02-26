@@ -14,7 +14,6 @@ REQUIRES = [
     'aenum>=2.1.2',
     'async-timeout>=2.0',
     'aioredis>=1.1.0',
-    'blinker>=1.4',
     'simplefix>=1.0.12',
     'untangle>=1.1.1',
     'python-dateutil>=2.6.1'
