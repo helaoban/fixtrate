@@ -1,4 +1,4 @@
-class SequenceGap(Exception):
+class SequenceGapError(Exception):
     """
     A SequenceGap occured
     """
@@ -22,7 +22,7 @@ class SequenceGap(Exception):
         return self._expected
 
 
-class FatalSequenceGap(Exception):
+class FatalSequenceGapError(Exception):
     """
     A fatal sequence gap occured (remote sequence number
     is lower than expected).

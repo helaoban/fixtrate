@@ -6,7 +6,7 @@ import logging
 import async_timeout
 
 from . import constants as fc
-from .exceptions import SequenceGap, FatalSequenceGap
+from .exceptions import SequenceGapError, FatalSequenceGapError
 from .factories import fix42
 from .parse import FixParser
 from .store import FixMemoryStore
@@ -389,7 +389,7 @@ class FixSession:
 
         try:
             await self._check_sequence_integrity(msg)
-        except FatalSequenceGap:
+        except FatalSequenceGapError:
             # a SeqReset<4>-Reset message should be processed
             # without deference to the MsgSeqNum
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
@@ -412,7 +412,7 @@ class FixSession:
             # the session and raise the error.
             await self.close()
             raise
-        except SequenceGap as error:
+        except SequenceGapError as error:
             # Always honor a ResendRequest<2> no matter what, even
             # if we are currently waiting on resend ourselves. This takes
             # care of an edge case that can occur when both sides detect a
@@ -521,8 +521,8 @@ class FixSession:
         if diff == 0:
             return
         if diff >= 1:
-            raise SequenceGap(seq_num, actual)
-        raise FatalSequenceGap(seq_num, actual)
+            raise SequenceGapError(seq_num, actual)
+        raise FatalSequenceGapError(seq_num, actual)
 
     async def _dispatch(self, msg):
         handler = {
