@@ -17,8 +17,7 @@ class MockFixServer(object):
         try:
             async with session.connect():
                 async for msg in session:
-                    print(msg)
-                    # pass
+                    pass
         except asyncio.CancelledError:
             pass
 
