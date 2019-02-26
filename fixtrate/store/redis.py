@@ -11,6 +11,10 @@ from fixtrate.utils.iterators import chunked
 
 class FixRedisStore(FixStore):
 
+    def __init__(self, options):
+        super().__init__(options)
+        self._redis = None
+
     def make_redis_key(self, session, key):
         parts = (
             'fix_version',
@@ -29,8 +33,9 @@ class FixRedisStore(FixStore):
         self._redis = await aioredis.create_redis(redis_url)
 
     async def close(self, session):
-        self._redis.close()
-        await self._redis.wait_closed()
+        if self._redis is not None:
+            self._redis.close()
+            await self._redis.wait_closed()
 
     async def get_local(self, session):
         seq_num = await self._redis.get(
