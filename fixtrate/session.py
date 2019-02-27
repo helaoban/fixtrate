@@ -533,10 +533,8 @@ class FixSession:
                         'attempting to set the next expected sequence '
                         'number to %s, this is now allowed.' % (expected, new)
                     )
-                    raise InvalidMessageError(
-                        msg, tag, fc.SessionRejectReason.VALUE_IS_INCORRECT,
-                        error
-                    )
+                    reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
+                    raise InvalidMessageError(msg, tag, reject_type, error)
 
             await self._incr_remote_sequence()
 
