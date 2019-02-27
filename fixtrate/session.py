@@ -389,7 +389,7 @@ class FixSession:
 
         try:
             await self._check_sequence_integrity(msg)
-        except FatalSequenceGapError:
+        except FatalSequenceGapError as error:
             # a SeqReset<4>-Reset message should be processed
             # without deference to the MsgSeqNum
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
@@ -410,6 +410,12 @@ class FixSession:
 
             # This is an unrecoverable scenario, so we terminate
             # the session and raise the error.
+            logger.error(
+                'Unrecoverable sequence gap error. Received msg '
+                '(%s) with seq num %s, but expected seq num %s. '
+                'Terminating the session...' % (
+                    msg.msg_type, msg.seq_num, error.expected)
+            )
             await self.close()
             raise
         except SequenceGapError as error:
