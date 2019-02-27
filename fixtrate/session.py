@@ -520,12 +520,23 @@ class FixSession:
             )
         else:
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-                # Ignore any SeqReset<4> message that attempts
+                # Reject any SeqReset<4> message that attempts
                 # to lower the next expected sequence number
-                new = int(msg.get(self._tags.NewSeqNo))
+                tag = self._tags.NewSeqNo
+                new = int(msg.get(tag))
                 expected = await self.get_remote_sequence()
                 if new < expected:
-                    return
+                    error = (
+                        'SeqReset<4> attempting to decrease next '
+                        'expected sequence number. Current expected '
+                        'sequence number is %s, but SeqReset<4> is '
+                        'attempting to set the next expected sequence '
+                        'number to %s, this is now allowed.' % (expected, new)
+                    )
+                    raise InvalidMessageError(
+                        msg, tag, fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                        error
+                    )
 
             await self._incr_remote_sequence()
 
