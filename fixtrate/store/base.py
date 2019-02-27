@@ -1,13 +1,13 @@
+class FixStoreInterface:
+
+    async def connect(self, engine):
+        raise NotImplementedError
+
+    async def close(self, engine):
+        raise NotImplementedError
+
+
 class FixStore:
-
-    def __init__(self, options):
-        self.options = options
-
-    async def open(self, session):
-        raise NotImplementedError
-
-    async def close(self, session):
-        raise NotImplementedError
 
     async def incr_local(self, session):
         """ Increment the local sequence number by 1.
@@ -116,4 +116,8 @@ class FixStore:
 
             :rtype AsyncIterator[:class:`FixMessage`]
         """
+        raise NotImplementedError
+
+    async def close(self):
+        """Close the store"""
         raise NotImplementedError

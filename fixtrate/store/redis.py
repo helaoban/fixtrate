@@ -5,80 +5,62 @@ import uuid
 import aioredis
 
 from fixtrate.message import FixMessage
-from fixtrate.store import FixStore
+from .base import FixStoreInterface, FixStore
 from fixtrate.utils.iterators import chunked
 
 
-class FixRedisStore(FixStore):
+class RedisStore(FixStore):
 
-    def __init__(self, options):
-        super().__init__(options)
-        self._redis = None
+    def __init__(self, redis, prefix='fix'):
+        self.redis = redis
+        self.prefix = prefix
 
-    def make_redis_key(self, session, key):
-        parts = (
-            'fix_version',
-            'sender_comp_id',
-            'target_comp_id',
-            'session_qualifier'
-        )
-        prefix = self.options.get('prefix', 'fix')
-        sid = ':'.join(filter(
-            None, (session.config.get(p) for p in parts)))
-        return ':'.join(filter(None, (prefix, sid, key)))
-
-    async def open(self, session):
-        redis_url = self.options.get(
-            'redis_url', 'redis://localhost:6379')
-        self._redis = await aioredis.create_redis(redis_url)
-
-    async def close(self, session):
-        if self._redis is not None:
-            self._redis.close()
-            await self._redis.wait_closed()
+    def make_redis_key(self, session_id, key):
+        return ':'.join(filter(None, (
+            self.prefix, session_id, key)))
 
     async def get_local(self, session):
-        seq_num = await self._redis.get(
-            self.make_redis_key(session, 'seq_num_local'))
+        seq_num = await self.redis.get(
+            self.make_redis_key(session.id, 'seq_num_local'))
         seq_num = seq_num or await self.incr_local(session)
         return int(seq_num)
 
     async def get_remote(self, session):
-        seq_num = await self._redis.get(
-            self.make_redis_key(session, 'seq_num_remote'))
+        seq_num = await self.redis.get(
+            self.make_redis_key(session.id, 'seq_num_remote'))
         seq_num = seq_num or await self.incr_remote(session)
         return int(seq_num)
 
     async def incr_local(self, session):
-        seq_num = await self._redis.incr(
-            self.make_redis_key(session, 'seq_num_local'))
+        seq_num = await self.redis.incr(
+            self.make_redis_key(session.id, 'seq_num_local'))
         return int(seq_num)
 
     async def incr_remote(self, session):
-        seq_num = await self._redis.incr(
-            self.make_redis_key(session, 'seq_num_remote'))
+        seq_num = await self.redis.incr(
+            self.make_redis_key(session.id, 'seq_num_remote'))
         return int(seq_num)
 
     async def set_local(self, session, new_seq_num):
-        await self._redis.set(
-            self.make_redis_key(session, 'seq_num_local'),
+        await self.redis.set(
+            self.make_redis_key(session.id, 'seq_num_local'),
             str(new_seq_num))
 
     async def set_remote(self, session, new_seq_num):
-        await self._redis.set(
-            self.make_redis_key(session, 'seq_num_remote'),
+        await self.redis.set(
+            self.make_redis_key(session.id, 'seq_num_remote'),
             str(new_seq_num))
 
     async def store_message(self, session, msg):
         uid = str(uuid.uuid4())
         store_time = time.time()
-        await self._redis.zadd(
-            self.make_redis_key(session, 'messages_by_time'),
+        await self.redis.zadd(
+            self.make_redis_key(session.id, 'messages_by_time'),
             store_time,
             uid
         )
-        await self._redis.hset(
-            self.make_redis_key(session, 'messages'),
+        await self.redis.hset(
+            self.make_redis_key(session.id, 'messages'),
             uid,
             msg.encode()
         )
@@ -104,12 +86,12 @@ class FixRedisStore(FixStore):
         if end is not None:
             kwargs['max'] = end
 
-        uids = await self._redis.zrangebyscore(
-            self.make_redis_key(session, 'messages_by_time'), **kwargs)
+        uids = await self.redis.zrangebyscore(
+            self.make_redis_key(session.id, 'messages_by_time'), **kwargs)
 
         for chunk in chunked(uids, 500):
-            msgs = await self._redis.hmget(
-                self.make_redis_key(session, 'messages'), *chunk)
+            msgs = await self.redis.hmget(
+                self.make_redis_key(session.id, 'messages'), *chunk)
             for msg in msgs:
                 msg = FixMessage.from_raw(msg)
                 if not min <= msg.seq_num <= max:
@@ -125,3 +107,21 @@ class FixRedisStore(FixStore):
                         continue
 
                 yield msg
+
+
+class RedisStoreInterface:
+
+    def __init__(self, redis_url, prefix='fix'):
+        self.redis_url = redis_url
+        self.prefix = prefix
+        self.redis = None
+
+    async def connect(self, engine):
+        if self.redis is not None:
+            self.redis = await aioredis.create_redis_pool(
+                self.redis_url, minsize=5, maxsize=10)
+        return RedisStore(self.redis)
+
+    async def close(self, engine):
+        self.redis.close()
+        await self.redis.wait_closed()

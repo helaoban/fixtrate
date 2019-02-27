@@ -9,87 +9,171 @@ TAGS = fix.FixTag.FIX42
 
 
 @pytest.mark.asyncio
-async def test_successful_login(fix_session, test_server):
-    async with fix_session.connect():
-        await fix_session.logon()
-        async for msg in fix_session:
+async def test_can_get_session(engine, test_server, client_config):
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+
+        msg = await session.receive(timeout=5)
+        assert msg.msg_type == fix.FixMsgType.LOGON
+        assert msg.get(56) == client_config['sender_comp_id']
+
+
+@pytest.mark.asyncio
+async def test_can_iterate(engine, test_server, client_config):
+
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+        async for msg in session:
             assert msg.msg_type == fix.FixMsgType.LOGON
             break
-        else:
-            raise AssertionError('No message received')
+
+        test_id = str(uuid.uuid4())
+        await session._send_test_request(test_id)
+
+        async for msg in session:
+            assert msg.msg_type == fix.FixMsgType.HEARTBEAT
+            assert msg.get(TAGS.TestReqID) == test_id
+            break
 
 
 @pytest.mark.asyncio
-async def test_receive(fix_session, test_server):
+async def test_does_not_allow_second_connection(
+    engine, test_server, client_config
+):
 
-    async with fix_session.connect():
-        await fix_session.logon()
+    host = test_server.config['host']
+    port = test_server.config['port']
+    session = await engine.connect(host, port, client_config)
+    await session.logon()
+    _ = await session.receive()
 
-        msg = await fix_session.receive()
+    with pytest.raises(ConnectionAbortedError):
+        session2 = await engine.connect(host, port, client_config)
+        await session2.logon()
+        _ = await session2.receive()
+
+
+@pytest.mark.asyncio
+async def test_receive_timeout(engine, test_server, client_config):
+
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
-
         with pytest.raises(asyncio.TimeoutError):
-            msg = await fix_session.receive(timeout=0.1)
+            await session.receive(timeout=0.1)
 
 
+@pytest.mark.parametrize(
+    'server_config',
+    [
+        {
+            'client_session_confs': [
+                {
+                    'fix_version': fix.FixVersion.FIX42,
+                    'sender_comp_id': 'TESTSERVER',
+                    'target_comp_id': 'TESTCLIENT',
+                    'heartbeat_interval': 1,
+                }
+            ]
+        }
+    ],
+    indirect=True
+)
 @pytest.mark.asyncio
-async def test_heartbeat(fix_session, test_server):
+async def test_heartbeat(engine, test_server, client_config):
+    client_config['heartbeat_interval'] = 1
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
 
-    fix_session.config['heartbeat_interval'] = 1
-    test_server.update_session_conf({
-        'heartbeat_interval': 1
-    })
-
-    async with fix_session.connect():
-        await fix_session.logon()
-
-        msg = await fix_session.receive()
+        msg = await session.receive(timeout=0.1)
         assert msg.msg_type == fix.FixMsgType.LOGON
-
-        msg = await fix_session.receive()
+        msg = await session.receive(timeout=1.2)
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
 
 
 @pytest.mark.asyncio
-async def test_incorrect_heartbeat_int(fix_session, test_server):
-    fix_session.config['heartbeat_interval'] = 90
-
-    async with fix_session.connect():
-        await fix_session.logon()
-        msg = await fix_session.receive()
+async def test_incorrect_heartbeat_int(engine, test_server, client_config):
+    client_config['heartbeat_interval'] = 90
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+        msg = await session.receive(timeout=0.1)
         assert msg.msg_type == fix.FixMsgType.REJECT
+        assert int(msg.get(TAGS.RefTagID)) == TAGS.HeartBtInt
 
 
 @pytest.mark.asyncio
-async def test_incorrect_target_comp_id(fix_session, test_server):
-    fix_session.config['target_comp_id'] = 'not-a-correct-id'
-
-    async with fix_session.connect():
-        await fix_session.logon()
-        msg = await fix_session.receive()
-        assert msg.msg_type == fix.FixMsgType.REJECT
+async def test_incorrect_target_comp_id(engine, test_server, client_config):
+    client_config['target_comp_id'] = 'not-a-correct-id'
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+        with pytest.raises(ConnectionAbortedError):
+            await session.receive(timeout=0.1)
 
 
 @pytest.mark.asyncio
-async def test_reset_seq_num(fix_session, test_server):
+async def test_incorrect_sender_comp_id(engine, test_server, client_config):
+    client_config['sender_comp_id'] = 'not-a-correct-id'
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+        with pytest.raises(ConnectionAbortedError):
+            await session.receive(timeout=0.1)
+
+
+@pytest.mark.asyncio
+async def test_test_request(engine, test_server, client_config):
 
     test_id = str(uuid.uuid4())
 
-    async with fix_session.connect():
-        await fix_session.logon()
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+        await session._send_test_request(test_id)
 
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
 
-        await fix_session._send_test_request(test_id)
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-        assert msg.get(112) == test_id
+        assert msg.get(TAGS.TestReqID) == test_id
 
-        await fix_session.logon(reset=True)
 
-        msg = await fix_session.receive()
-        local_seq_num = await fix_session.get_local_sequence()
+@pytest.mark.asyncio
+async def test_reset_seq_num(engine, test_server, client_config):
+
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+
+        msg = await session.receive()
+        assert msg.msg_type == fix.FixMsgType.LOGON
+
+        test_id = str(uuid.uuid4())
+        await session._send_test_request(test_id)
+        msg = await session.receive()
+        assert msg.msg_type == fix.FixMsgType.HEARTBEAT
+        assert msg.get(TAGS.TestReqID) == test_id
+        await session.logon(reset=True)
+
+        msg = await session.receive()
+        local_seq_num = await session.get_local_sequence()
 
         assert msg.msg_type == fix.FixMsgType.LOGON
         assert msg.get(TAGS.ResetSeqNumFlag) == fix.ResetSeqNumFlag.YES
@@ -98,90 +182,86 @@ async def test_reset_seq_num(fix_session, test_server):
 
 
 @pytest.mark.asyncio
-async def test_test_request(fix_session, test_server):
+async def test_sequence_reset(engine, test_server, client_config):
 
-    test_id = str(uuid.uuid4())
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
 
-    async with fix_session.connect():
-        await fix_session.logon()
-        await fix_session._send_test_request(test_id)
-
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
 
-        msg = await fix_session.receive()
-        assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-        assert msg.get(112) == test_id
+        # TODO This is dumb, find a better way to test a hard
+        # reset
+        await test_server.client_sessions[0]._set_local_sequence(9)
+        await test_server.client_sessions[0]._send_reset(10)
 
-
-@pytest.mark.asyncio
-async def test_sequence_reset(fix_session, test_server):
-
-    async with fix_session.connect():
-        await fix_session.logon()
-
-        msg = await fix_session.receive()
-        assert msg.msg_type == fix.FixMsgType.LOGON
-
-        client_sessions = list(test_server.client_sessions.values())
-
-        pairs = (
-            (TAGS.MsgType, fix.FixMsgType.SEQUENCE_RESET, True),
-            (TAGS.PossDupFlag, 'Y', True),
-            (TAGS.GapFillFlag, 'Y', False),
-            (TAGS.NewSeqNo, 10, False),
-        )
-        seq_reset_msg = FixMessage.from_pairs(pairs)
-
-        await client_sessions[0].send(seq_reset_msg)
-
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
 
-        new_seq_num = int(msg.get(36))
-        current_seq_num = await fix_session.get_remote_sequence()
-        assert current_seq_num == new_seq_num
+        new_remote_seq_num = int(msg.get(TAGS.NewSeqNo))
+        assert new_remote_seq_num == await session.get_remote_sequence()
+
+        test_id = str(uuid.uuid4())
+        await session._send_test_request(test_id)
+        msg = await session.receive()
+        assert msg.msg_type == fix.FixMsgType.HEARTBEAT
+        assert msg.get(TAGS.TestReqID) == test_id
 
 
+@pytest.mark.parametrize(
+    'server_config',
+    [
+        {
+            'client_session_confs': [
+                {
+                    'fix_version': fix.FixVersion.FIX42,
+                    'sender_comp_id': 'TESTSERVER',
+                    'target_comp_id': 'TESTCLIENT',
+                    'heartbeat_interval': 1,
+                }
+            ]
+        }
+    ],
+    indirect=True
+)
 @pytest.mark.asyncio
-async def test_message_recovery(fix_session, test_server):
+async def test_message_recovery(engine, test_server, client_config):
 
-    fix_session.config['heartbeat_interval'] = 1
-    test_server.update_session_conf({
-        'heartbeat_interval': 1
-    })
+    client_config['heartbeat_interval'] = 1
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
 
-    async with fix_session.connect():
-        await fix_session.logon()
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
 
-    pairs = (
-        (TAGS.MsgType, fix.FixMsgType.NEWS, True),
-        (TAGS.Headline, 'BREAKING NEWS', False),
-        (TAGS.LinesOfText, 1, False),
-        (TAGS.Text, 'Government admits turning frogs gay.', False),
-    )
-    news_msg = FixMessage.from_pairs(pairs)
+        pairs = (
+            (TAGS.MsgType, fix.FixMsgType.NEWS, True),
+            (TAGS.Headline, 'BREAKING NEWS', False),
+            (TAGS.LinesOfText, 1, False),
+            (TAGS.Text, 'Government admits turning frogs gay.', False),
+        )
+        news_msg = FixMessage.from_pairs(pairs)
+        await test_server.client_sessions[0].send(news_msg)
 
-    server_sessions = list(test_server.client_sessions.values())
-    await server_sessions[0].send(news_msg)
-
-    async with fix_session.connect():
-        await fix_session.logon()
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
 
         # the logon msg
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
 
         # the news msg
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.NEWS
 
         # gap fill for the second logon msg
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
 
         # # the next message should process fine
-        msg = await fix_session.receive()
+        msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT

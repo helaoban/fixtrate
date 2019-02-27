@@ -64,6 +64,12 @@ class TCPTransport(Transport):
                 self.writer.close()
 
 
+class TCPListenerTransport(TCPTransport):
+    async def connect(self, reader, writer):
+        self.reader = reader
+        self.writer = writer
+
+
 def make_transport(options):
     transport_cls = options['transport']
     if transport_cls is None:

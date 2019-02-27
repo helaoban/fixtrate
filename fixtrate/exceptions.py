@@ -1,17 +1,13 @@
+from . import constants as fix
+
+
 class FIXError(Exception):
     """A FIX error occured"""
     pass
 
 
-class InvalidMessageError(FIXError):
-    """An invalid message was received"""
-    def __init__(self, fix_msg, tag, rej_type, reason):
-        self.fix_msg = fix_msg
-        self.tag = tag
-        self.rej_type = rej_type
-        self.reason = reason
-
-        super().__init__(reason)
+class FIXAuthenticationError(FIXError):
+    """Unablet to authenticate client"""
 
 
 class SequenceGapError(FIXError):
@@ -91,3 +87,38 @@ class InvalidFIXVersion(FIXError):
     def __init__(self, version):
         super().__init__(
             '{} is not a valid FIX version'.format(version))
+
+
+class InvalidMessageError(FIXError):
+    """An invalid message was received"""
+
+    def __init__(self, msg, fix_msg, tag, reject_type):
+        self.fix_msg = fix_msg
+        self.tag = tag
+        self.reject_type = reject_type
+        super().__init__(msg)
+
+
+class IncorrectTagValueError(InvalidMessageError):
+    """An invalid message was received"""
+    reject_type = fix.SessionRejectReason.VALUE_IS_INCORRECT
+
+    def __init__(self, fix_msg, tag, expected, actual):
+        self.fix_msg = fix_msg
+        error = 'Expected %s for tag %s, instead got %s' % (
+            expected, tag, actual)
+        super().__init__(error, fix_msg, tag, self.reject_type)
+
+
+class InvalidTypeError(InvalidMessageError):
+    """Incorrect data type for value"""
+    reject_type = fix.SessionRejectReason.INCORRECT_DATA_FORMAT_FOR_VALUE
+
+    def __init__(self, fix_msg, tag, value, expected_type):
+        self.fix_msg = fix_msg
+        error = (
+            '%s is not of a valid type for '
+            'tag %s, expected type [%s]' % (
+                value, tag, expected_type.__name__)
+        )
+        super().__init__(error, fix_msg, tag, self.reject_type)

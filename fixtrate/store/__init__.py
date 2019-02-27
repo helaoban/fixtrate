@@ -1,3 +1,2 @@
-from .base import FixStore
-from .inmemory import FixMemoryStore
-from .redis import FixRedisStore
+from .inmemory import MemoryStoreInterface
+from .redis import RedisStoreInterface

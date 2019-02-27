@@ -1,83 +1,58 @@
-import aioredis
+import asyncio
 import pytest
-
-from fixtrate.constants import FixVersion
+from fixtrate import constants as fix
 from tests.server import MockFixServer
-from fixtrate.session import FixSession
-from fixtrate.store import FixMemoryStore, FixRedisStore
-from fixtrate.transport import TCPTransport
-
-VERSION = FixVersion.FIX42
-
-
-class TCPListenerTransport(TCPTransport):
-    async def connect(self, host, port):
-        self.reader = self.options['reader']
-        self.writer = self.options['writer']
+from fixtrate.store import MemoryStoreInterface, RedisStoreInterface
+from fixtrate.engine import FixEngine
 
 
 @pytest.fixture(params=['inmemory', 'redis'])
-async def store_config(request):
-    redis_url = 'redis://localhost:6379'
-    prefix = 'fix-test'
-    yield {
-        'inmemory': {
-            'store': FixMemoryStore,
-            'store_options': {}
-        },
-        'redis': {
-            'store': FixRedisStore,
-            'store_options': {
-                'redis_url': redis_url,
-                'prefix': prefix
-            }
-        }
-    }.get(request.param)
-    redis = await aioredis.create_redis(redis_url)
-    keys = await redis.keys('fix-test:*')
-    if len(keys):
-        await redis.delete(*keys)
+async def store_interface(request):
+    store_interface = MemoryStoreInterface()
+    if request.param == 'redis':
+        url = 'redis://localhost:6379'
+        prefix = 'fix-test'
+        store_interface = RedisStoreInterface(url, prefix)
+    return store_interface
 
 
 @pytest.fixture
-def server_config(store_config):
+def client_config():
     config = {
-        'host': '127.0.0.1',
-        'port': 8686,
-        'session_config': {
-            'fix_version': VERSION,
-            'sender_comp_id': 'TESTSERVER',
-            'target_comp_id': 'TESTCLIENT',
-            'heartbeat_interval': 30,
-            'transport': TCPListenerTransport,
-            **store_config
-        }
-    }    
-    return config
-
-
-@pytest.fixture
-async def test_server(server_config):
-    server = MockFixServer(server_config)
-    await server.start()
-    yield server
-    await server.close()
-
-
-@pytest.fixture
-def client_config(store_config):
-    config = {
-        'fix_version': VERSION,
+        'fix_version': fix.FixVersion.FIX42,
         'sender_comp_id': 'TESTCLIENT',
         'target_comp_id': 'TESTSERVER',
         'heartbeat_interval': 30,
-        'host': '127.0.0.1',
-        'port': 8686,
-        **store_config
     }
     return config
 
 
 @pytest.fixture
-async def fix_session(client_config):
-    yield FixSession(**client_config)
+def server_config(request):
+    overrides = getattr(request, 'param', {})
+    return {
+        'host': '127.0.0.1',
+        'port': 8686,
+        'client_session_confs': [{
+            'fix_version': fix.FixVersion.FIX42,
+            'sender_comp_id': 'TESTSERVER',
+            'target_comp_id': 'TESTCLIENT',
+            'heartbeat_interval': 30,
+        }],
+        **overrides
+    }
+
+
+@pytest.fixture
+async def test_server(request, server_config):
+    server = MockFixServer(server_config)
+    asyncio.get_event_loop().create_task(server.listen())
+    yield server
+    await server.close()
+
+
+@pytest.fixture
+async def engine():
+    engine = FixEngine()
+    yield engine
+    await engine.close()
