@@ -1,4 +1,9 @@
-class SequenceGapError(Exception):
+class FIXError(Exception):
+    """A FIX error occured"""
+    pass
+
+
+class SequenceGapError(FIXError):
     """
     A SequenceGap occured
     """
@@ -22,7 +27,7 @@ class SequenceGapError(Exception):
         return self._expected
 
 
-class FatalSequenceGapError(Exception):
+class FatalSequenceGapError(FIXError):
     """
     A fatal sequence gap occured (remote sequence number
     is lower than expected).
@@ -47,7 +52,7 @@ class FatalSequenceGapError(Exception):
         return self._expected
 
 
-class FixRejectionError(Exception):
+class FixRejectionError(FIXError):
     """ Reject<3> message received."""
     def __init__(self, reason):
         self._reason = reason
@@ -60,17 +65,17 @@ class FixRejectionError(Exception):
         return self._reason
 
 
-class UnsupportedVersion(Exception):
+class UnsupportedVersion(FIXError):
     """ Unsupported FIX version"""
     pass
 
 
-class InvalidFixDictTag(Exception):
+class InvalidFixDictTag(FIXError):
     """ Tag specified in FIX XML dictionary is not a valid FIX tag"""
     pass
 
 
-class InvalidFIXVersion(Exception):
+class InvalidFIXVersion(FIXError):
     def __init__(self, version):
         super().__init__(
             '{} is not a valid FIX version'.format(version))
