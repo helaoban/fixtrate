@@ -39,6 +39,7 @@ DEFAULT_OPTIONS = {
     'heartbeat_interval': 30,
     'sender_comp_id': None,
     'target_comp_id': None,
+    'session_qualifier': None,
     'host': None,
     'port': None,
     'receive_timeout': None,
@@ -118,6 +119,21 @@ class FixSession:
             first = msgs[0]
             self._initiator = first.get(49)
         return self._initiator
+
+    @property
+    def session_id(self):
+        """ Returns the unique identifier for this session
+
+        :return: str
+        """
+        parts = (
+            'fix_version',
+            'sender_comp_id',
+            'target_comp_id',
+            'session_qualifier'
+        )
+        return ':'.join(filter(
+            None, (self.config.get(p) for p in parts)))
 
     @property
     def closed(self):
