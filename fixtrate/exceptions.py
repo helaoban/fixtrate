@@ -3,6 +3,17 @@ class FIXError(Exception):
     pass
 
 
+class InvalidMessageError(FIXError):
+    """An invalid message was received"""
+    def __init__(self, fix_msg, tag, rej_type, reason):
+        self.fix_msg = fix_msg
+        self.tag = tag
+        self.rej_type = rej_type
+        self.reason = reason
+
+        super().__init__(reason)
+
+
 class SequenceGapError(FIXError):
     """
     A SequenceGap occured
@@ -56,6 +67,7 @@ class FixRejectionError(FIXError):
     """ Reject<3> message received."""
     def __init__(self, reason):
         self._reason = reason
+        super().__init__(reason)
 
     @property
     def reason(self):

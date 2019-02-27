@@ -6,7 +6,10 @@ import logging
 import async_timeout
 
 from . import constants as fc
-from .exceptions import SequenceGapError, FatalSequenceGapError
+from .exceptions import (
+    SequenceGapError, FatalSequenceGapError,
+    InvalidMessageError, FixRejectionError
+)
 from .factories import fix42
 from .parse import FixParser
 from .store import FixMemoryStore
@@ -381,8 +384,33 @@ class FixSession:
 
         if self.closed:
             raise ConnectionAbortedError
-        if msg:
+
+        if msg is None:
+            return
+
+        try:
             await self._handle_message(msg)
+        except InvalidMessageError as error:
+            logger.error(
+                'Invalid message was received and rejected: '
+                '%s' % error
+            )
+            await self._send_reject(
+                error.fix_msg, error.tag,
+                error.rej_type, error.reason)
+        except FatalSequenceGapError as error:
+            logger.error(
+                'Unrecoverable sequence gap error. Received msg '
+                '(%s) with seq num %s, but expected seq num %s. '
+                'Terminating the session...' % (
+                    msg.msg_type, msg.seq_num, error.expected)
+            )
+            await self.close()
+            raise
+        except SequenceGapError as error:
+            logger.warning(str(error))
+        except FixRejectionError as error:
+            logger.error(str(error))
         return msg
 
     async def _handle_message(self, msg):
@@ -390,7 +418,7 @@ class FixSession:
 
         try:
             await self._check_sequence_integrity(msg)
-        except FatalSequenceGapError as error:
+        except FatalSequenceGapError:
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
                 if not self._is_gap_fill(msg):
                     # The sequence number of a SeqReset<4> message
@@ -420,13 +448,6 @@ class FixSession:
             # All possible exceptions have been exhausted, and
             # this is now an unrecoverable situation, so we
             # terminate the session and raise the error.
-            logger.error(
-                'Unrecoverable sequence gap error. Received msg '
-                '(%s) with seq num %s, but expected seq num %s. '
-                'Terminating the session...' % (
-                    msg.msg_type, msg.seq_num, error.expected)
-            )
-            await self.close()
             raise
         except SequenceGapError as error:
             if msg.msg_type == fc.FixMsgType.RESEND_REQUEST:
@@ -559,28 +580,24 @@ class FixSession:
             await maybe_await(handler, msg)
 
     async def _handle_logon(self, msg):
-        heartbeat_interval = int(msg.get(self._tags.HeartBtInt))
-        if heartbeat_interval != self.config.get('heartbeat_interval'):
-            await self._send_reject(
-                msg=msg,
-                tag=self._tags.HeartBtInt,
-                rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
-                reason='HeartBtInt must be {}'.format(
-                    self.config.get('heartbeat_interval'))
+        hb_int = int(msg.get(self._tags.HeartBtInt))
+        expected_hb_int = self.config['heartbeat_interval']
+        if hb_int != expected_hb_int:
+            raise InvalidMessageError(
+                msg, self._tags.HeartBtInt,
+                fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                'HeartBtInt must be %s' % expected_hb_int
             )
-            return
 
         target = msg.get(self._tags.TargetCompID)
         excepted_target = self.config.get('sender_comp_id')
 
         if target != excepted_target:
-            await self._send_reject(
-                msg=msg,
-                tag=self._tags.TargetCompID,
-                rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
-                reason='Target Comp ID is incorrect.'
+            raise InvalidMessageError(
+                msg, self._tags.TargetCompID,
+                fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                'Target Comp ID is incorrect.'
             )
-            return
 
         sender = msg.get(self._tags.SenderCompID)
         expected_sender = self.config.get('target_comp_id')
@@ -592,13 +609,11 @@ class FixSession:
             self.config['target_comp_id'] = expected_sender = sender
 
         if sender != expected_sender:
-            await self._send_reject(
-                msg=msg,
-                tag=self._tags.TargetCompID,
-                rejection_type=fc.SessionRejectReason.VALUE_IS_INCORRECT,
-                reason='Sender Comp ID is incorrect.'
+            raise InvalidMessageError(
+                msg, self._tags.SenderCompID,
+                fc.SessionRejectReason.VALUE_IS_INCORRECT,
+                'Sender Comp ID is incorrect.'
             )
-            return
 
         is_reset = self._is_reset(msg)
         if is_reset:
@@ -620,7 +635,7 @@ class FixSession:
 
     async def _handle_reject(self, msg):
         reason = msg.get(self._tags.Text)
-        print('Reject: {}'.format(reason))
+        raise FixRejectionError(reason)
 
     async def _handle_resend_request(self, msg):
         start = int(msg.get(self._tags.BeginSeqNo))
