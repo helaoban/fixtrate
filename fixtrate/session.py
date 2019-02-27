@@ -16,13 +16,14 @@ from .transport import TCPTransport, make_transport
 logger = logging.getLogger(__name__)
 
 
-ADMIN_MESSAGES = [
+ADMIN_MESSAGES = {
     fc.FixMsgType.LOGON,
     fc.FixMsgType.LOGOUT,
     fc.FixMsgType.HEARTBEAT,
     fc.FixMsgType.TEST_REQUEST,
     fc.FixMsgType.RESEND_REQUEST,
-]
+    fc.FixMsgType.SEQUENCE_RESET,
+}
 
 DEFAULT_TRANSPORT = TCPTransport
 
@@ -508,16 +509,16 @@ class FixSession:
             await self._incr_remote_sequence()
 
             if msg.is_duplicate:
-                if msg.msg_type in ADMIN_MESSAGES:
+                if msg.msg_type in ADMIN_MESSAGES.difference({
+                    fc.FixMsgType.SEQUENCE_RESET
+                }):
                     # If the msg is a duplicate and also an admin message,
                     # then this is an erroneously re-sent admin messsage
                     # and should be ignored.
-
-                    # Note SequenceReset<4> is not included in the list
-                    # of admin messages, even though it is an admin message.
-                    # This is because a SequenceReset<4> message should
-                    # still be processed even when PossDupFlag(43) is set
-                    # to 'Y'.
+                    # An exception is made for SequenceReset<4> messages,
+                    # which should always be processesed, even when
+                    # PossDupFlag(43) is set to 'Y'. In fact, PossDupFlag(43)
+                    # should always be set to 'Y' on SequenceReset<4> messages.
                     return
             else:
                 if self._waiting_resend:
