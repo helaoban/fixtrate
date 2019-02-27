@@ -586,9 +586,9 @@ class FixSession:
         expected_sender = self.config.get('target_comp_id')
 
         if expected_sender is None:
-            # if target_comp_id is not set in the config,
+            # If target_comp_id is not set in the config,
             # then we are implicitly allowing any target, so we
-            # set target_comp_id to the target's send_comp_id.
+            # set target_comp_id to the target's sender_comp_id.
             self.config['target_comp_id'] = expected_sender = sender
 
         if sender != expected_sender:
