@@ -29,7 +29,7 @@ def test_request(test_request_id=None):
     return msg
 
 
-def logoff():
+def logout():
     msg = FixMessage()
     msg.append_pair(
         TAGS.MsgType,

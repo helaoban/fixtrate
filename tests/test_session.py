@@ -9,15 +9,31 @@ TAGS = fix.FixTag.FIX42
 
 
 @pytest.mark.asyncio
-async def test_can_get_session(engine, test_server, client_config):
+async def test_can_login_logout(engine, test_server, client_config):
     host = test_server.config['host']
     port = test_server.config['port']
     async with engine.connect(host, port, client_config) as session:
         await session.logon()
-
-        msg = await session.receive(timeout=5)
+        msg = await session.receive(timeout=0.1)
         assert msg.msg_type == fix.FixMsgType.LOGON
         assert msg.get(56) == client_config['sender_comp_id']
+
+        await session.logout()
+        msg = await session.receive(timeout=0.1)
+        assert msg.msg_type == fix.FixMsgType.LOGOUT
+
+
+@pytest.mark.asyncio
+async def test_auto_logs_out(engine, test_server, client_config):
+    host = test_server.config['host']
+    port = test_server.config['port']
+    async with engine.connect(host, port, client_config) as session:
+        await session.logon()
+        msg = await session.receive(timeout=0.1)
+        assert msg.msg_type == fix.FixMsgType.LOGON
+        assert msg.get(56) == client_config['sender_comp_id']
+
+    assert not session.logged_on
 
 
 @pytest.mark.asyncio

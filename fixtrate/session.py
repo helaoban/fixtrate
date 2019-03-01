@@ -80,6 +80,8 @@ class FixSession:
         self._is_resetting = False
         self._hearbeat_cb = None
 
+        self.logged_on = False
+
         self._waiting_resend = False
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
@@ -157,10 +159,10 @@ class FixSession:
                 'a initate a logon')
         await self._send_login(reset)
 
-    async def logoff(self):
-        """ Logoff from a FIX Session. Sends a Logout<5> message to peer.
+    async def logout(self):
+        """ Logout from a FIX Session. Sends a Logout<5> message to peer.
         """
-        await self._send_logoff()
+        await self._send_logout()
 
     async def close(self):
         """
@@ -263,12 +265,11 @@ class FixSession:
         else:
             await self.send(login_msg)
 
-    async def _send_logoff(self):
-        if self._waiting_logout_confirm:
-            # TODO what happends if Logout<5> sent twice?
-            return
-        logout_msg = fix42.logoff()
-        await self.send(logout_msg)
+    async def _send_logout(self):
+        if not self._waiting_logout_confirm:
+            self._waiting_logout_confirm = True
+            logout_msg = fix42.logout()
+            await self.send(logout_msg)
 
     async def _request_resend(self, start, end):
         self._waiting_resend = True
@@ -471,8 +472,9 @@ class FixSession:
                 if self._waiting_logout_confirm:
                     # If we are waiting for a logout confirmation,
                     # then this is the ack for that logout, and we can
+                    # can handle the logout message normally, this will
                     # close the session.
-                    await self.close()
+                    await self._handle_logout(msg)
                     return
                 else:
                     # If we were not waiting for a logout confirmation,
@@ -541,7 +543,7 @@ class FixSession:
                         # If we received a Logout<5> that resulted in a
                         # sequence gap, then we must honor the Logout<5>
                         # after resend is complete.
-                        await self._send_logoff()
+                        await self._send_logout()
                         return
 
             await self._dispatch(msg)
@@ -578,6 +580,7 @@ class FixSession:
     async def _dispatch(self, msg):
         handler = {
             fc.FixMsgType.LOGON: self._handle_logon,
+            fc.FixMsgType.LOGOUT: self._handle_logout,
             fc.FixMsgType.TEST_REQUEST: self._handle_test_request,
             fc.FixMsgType.REJECT: self._handle_reject,
             fc.FixMsgType.RESEND_REQUEST: self._handle_resend_request,
@@ -599,11 +602,16 @@ class FixSession:
         if not self._initiator:
             await self._send_login(reset=is_reset)
 
+        self.logged_on = True
+
     async def _handle_logout(self, msg):
         if self._waiting_logout_confirm:
+            self._waiting_logout_confirm = False
             await self.close()
-            return
-        await self._send_logoff()
+        else:
+            await self._send_logout()
+
+        self.logged_on = False
 
     async def _handle_test_request(self, msg):
         test_request_id = msg.get(self._tags.TestReqID)
