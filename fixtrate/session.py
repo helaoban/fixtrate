@@ -98,15 +98,6 @@ class FixSession:
             raise StopAsyncIteration
         return msg
 
-    # async def get_initiator(self):
-    #     if not hasattr(self, '_initiator'):
-    #         msgs = [m async for m in self.history(max=1)]
-    #         if not msgs:
-    #             return None
-    #         first = msgs[0]
-    #         self._initiator = first.get(49)
-    #     return self._initiator
-
     @property
     def id(self):
         """ Returns the unique identifier for this session
