@@ -93,7 +93,7 @@ class FixSession:
     async def __anext__(self):
         try:
             msg = await self.receive()
-        except (asyncio.TimeoutError, ConnectionError) as error:
+        except asyncio.TimeoutError as error:
             logger.error(error)
             raise StopAsyncIteration
         return msg
