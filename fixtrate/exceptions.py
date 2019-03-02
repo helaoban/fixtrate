@@ -61,16 +61,11 @@ class FatalSequenceGapError(FIXError):
 
 class FixRejectionError(FIXError):
     """ Reject<3> message received."""
-    def __init__(self, reason):
-        self._reason = reason
-        super().__init__(reason)
-
-    @property
-    def reason(self):
-        """
-        The rejection reason. From the Text<58> field of the reject message.
-        """
-        return self._reason
+    def __init__(self, rej_msg, reason):
+        self.rej_msg = rej_msg
+        self.reason = reason
+        msg = 'Peer rejected message: %s' % reason
+        super().__init__(msg)
 
 
 class UnsupportedVersion(FIXError):
@@ -122,3 +117,9 @@ class InvalidTypeError(InvalidMessageError):
                 value, tag, expected_type.__name__)
         )
         super().__init__(error, fix_msg, tag, self.reject_type)
+
+
+class BindClosedError(RuntimeError):
+    """Bind was closed while waiting for session"""
+    def __init__(self):
+        super().__init__('Bind was closed while waiting for session')

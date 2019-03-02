@@ -66,7 +66,14 @@ class FixSession:
         messages during periods of inactivity. Default to 30.
     """
 
-    def __init__(self, store, transport, initiator=True, **kwargs):
+    def __init__(
+        self,
+        store,
+        transport,
+        initiator=True,
+        on_close=None,
+        **kwargs
+    ):
         self.store = store
         self.transport = transport
         self.config = get_options(**kwargs)
@@ -86,7 +93,7 @@ class FixSession:
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
         self._initiator = initiator
-
+        self._on_close = on_close
         self.parser = FixParser()
 
     def __aiter__(self):
@@ -172,6 +179,8 @@ class FixSession:
         await self._cancel_heartbeat_timer()
         await self.transport.close()
         await self.store.close()
+        if self._on_close is not None:
+            await maybe_await(self._on_close, self)
 
     async def send(self, msg, skip_headers=False):
         """
@@ -190,7 +199,14 @@ class FixSession:
             await self._incr_local_sequence()
 
         await self._store_message(msg)
-        await self.transport.write(msg.encode())
+
+        try:
+            await self.transport.write(msg.encode())
+        except ConnectionError:
+            print('connect error')
+            await self.close()
+            return
+
         await self._reset_heartbeat_timer()
 
     async def _incr_local_sequence(self):
@@ -346,6 +362,12 @@ class FixSession:
                     data = await self.transport.read()
             except (asyncio.CancelledError, asyncio.TimeoutError):
                 raise asyncio.TimeoutError
+            except ConnectionError:
+                # TODO does this session naturally close
+                # at some point after (as a result of) this
+                # exception?
+                await self.close()
+                raise
             self.parser.append_buffer(data)
         return msg
 
@@ -619,7 +641,7 @@ class FixSession:
 
     async def _handle_reject(self, msg):
         reason = msg.get(self._tags.Text)
-        raise FixRejectionError(reason)
+        raise FixRejectionError(msg, reason)
 
     async def _handle_resend_request(self, msg):
         start = int(msg.get(self._tags.BeginSeqNo))

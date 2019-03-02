@@ -42,17 +42,13 @@ class TCPTransport(Transport):
     async def read(self):
         data = await self.reader.read(4096)
         if data == b'':
-            logger.error('Peer closed the connection!')
-            raise ConnectionAbortedError
+            raise ConnectionAbortedError(
+                'Peer closed the connection!')
         return data
 
     async def write(self, msg):
         self.writer.write(msg)
-        try:
-            await self.writer.drain()
-        except ConnectionError as error:
-            logger.error(error)
-            await self.close()
+        await self.writer.drain()
 
     async def connect(self, host, port):
         self.reader, self.writer = await asyncio.open_connection(

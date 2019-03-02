@@ -3,8 +3,9 @@ from async_timeout import timeout as aiotimeout
 from collections.abc import Coroutine
 import logging
 
+from . import constants as fix
 from .parse import FixParser
-from .exceptions import FIXAuthenticationError
+from .exceptions import FIXAuthenticationError, BindClosedError
 from .store import MemoryStoreInterface
 from .session import FixSession
 from .transport import TCPTransport, TCPListenerTransport
@@ -103,7 +104,12 @@ class _FixConnectionManager(Coroutine):
         return await self._coro
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if isinstance(exc_val, ConnectionError):
+            await self.session.close()
+            return False
+        await self._wait_for_logout(self.session)
         await self.session.close()
+        return True
 
     def send(self, arg):
         self._coro.send(arg)
@@ -113,6 +119,15 @@ class _FixConnectionManager(Coroutine):
 
     def close(self):
         self._coro.close()
+
+    async def _wait_for_logout(self, session):
+        if session.logged_on:
+            await session.logout()
+            while True:
+                with aiotimeout(5):
+                    msg = await session.receive(timeout=5)
+                    if msg.msg_type == fix.FixMsgType.LOGOUT:
+                        break
 
     async def _make_session(self):
         store_if = self.engine.store_interface
@@ -151,15 +166,18 @@ class FixBind:
     async def __anext__(self):
         try:
             return await self.get_session()
-        except (asyncio.CancelledError, ConnectionError) as error:
+        except (asyncio.CancelledError, BindClosedError) as error:
             logger.error(error)
             raise StopAsyncIteration
 
     async def get_session(self):
-        return await self._session_queue.get()
+        session = await self._session_queue.get()
+        if session is None:
+            raise BindClosedError
+        return session
 
     def _on_session_close(self, session):
-        del self.sessions[session.id]
+        self.sessions.pop(session.id, None)
 
     def _authenticate_client(self, msg):
         sender = msg.get(49)
@@ -210,7 +228,10 @@ class FixBind:
             return
 
         session = FixSession(
-            store, transport, initiator=False, **conf)
+            store, transport,
+            initiator=False,
+            on_close=self._on_session_close,
+            **conf)
 
         # TODO this is probably technically
         # an authentication error and should be
@@ -222,7 +243,6 @@ class FixBind:
             return
 
         session.parser = session_parser
-
         self.sessions[session.id] = session
 
         # TODO what happens if we hit an invalid
@@ -236,10 +256,10 @@ class FixBind:
 
     async def close(self):
         self.server.close()
-        for session in self.sessions.values():
+        for session in list(self.sessions.values()):
             await session.close()
-        self.sessions.clear()
         await self.server.wait_closed()
+        self._session_queue.put_nowait(None)
 
 
 class _FixBindManager(Coroutine):

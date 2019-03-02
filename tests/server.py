@@ -15,9 +15,8 @@ class MockFixServer(object):
     async def stream_client_session(self, session):
         try:
             async for msg in session:
-                # print(msg)
                 pass
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, ConnectionError):
             pass
 
     async def listen(self):

@@ -248,20 +248,23 @@ async def test_message_recovery(engine, test_server, client_config):
     client_config['heartbeat_interval'] = 1
     host = test_server.config['host']
     port = test_server.config['port']
-    async with engine.connect(host, port, client_config) as session:
-        await session.logon()
 
-        msg = await session.receive()
-        assert msg.msg_type == fix.FixMsgType.LOGON
+    with pytest.raises(ConnectionAbortedError):
+        async with engine.connect(host, port, client_config) as session:
+            await session.logon()
 
-        pairs = (
-            (TAGS.MsgType, fix.FixMsgType.NEWS, True),
-            (TAGS.Headline, 'BREAKING NEWS', False),
-            (TAGS.LinesOfText, 1, False),
-            (TAGS.Text, 'Government admits turning frogs gay.', False),
-        )
-        news_msg = FixMessage.from_pairs(pairs)
-        await test_server.client_sessions[0].send(news_msg)
+            msg = await session.receive()
+            assert msg.msg_type == fix.FixMsgType.LOGON
+
+            pairs = (
+                (TAGS.MsgType, fix.FixMsgType.NEWS, True),
+                (TAGS.Headline, 'BREAKING NEWS', False),
+                (TAGS.LinesOfText, 1, False),
+                (TAGS.Text, 'Government admits turning frogs gay.', False),
+            )
+            news_msg = FixMessage.from_pairs(pairs)
+            await test_server.client_sessions[0].send(news_msg)
+            raise ConnectionAbortedError
 
     async with engine.connect(host, port, client_config) as session:
         await session.logon()
