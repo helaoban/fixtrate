@@ -1,4 +1,5 @@
 import asyncio
+import aioredis
 import pytest
 from fixtrate import constants as fix
 from tests.server import MockFixServer
@@ -8,12 +9,19 @@ from fixtrate.engine import FixEngine
 
 @pytest.fixture(params=['inmemory', 'redis'])
 async def store_interface(request):
-    store_interface = MemoryStoreInterface()
+    redis_url = 'redis://localhost:6379'
+    prefix = 'fix-test'
     if request.param == 'redis':
-        url = 'redis://localhost:6379'
-        prefix = 'fix-test'
-        store_interface = RedisStoreInterface(url, prefix)
-    return store_interface
+        store_interface = RedisStoreInterface(redis_url, prefix)
+    else:
+        store_interface = MemoryStoreInterface()
+    yield store_interface
+    if request.param == 'redis':
+        client = await aioredis.create_redis(redis_url)
+        keys = await client.keys('%s*' % prefix)
+        if keys:
+            await client.delete(*keys)
+        client.close()
 
 
 @pytest.fixture
@@ -28,7 +36,7 @@ def client_config():
 
 
 @pytest.fixture
-def server_config(request):
+def server_config(request, store_interface):
     overrides = getattr(request, 'param', {})
     return {
         'host': '127.0.0.1',
@@ -39,6 +47,7 @@ def server_config(request):
             'target_comp_id': 'TESTCLIENT',
             'heartbeat_interval': 30,
         }],
+        'store': store_interface,
         **overrides
     }
 
@@ -52,7 +61,8 @@ async def test_server(request, server_config):
 
 
 @pytest.fixture
-async def engine():
+async def engine(store_interface):
     engine = FixEngine()
+    engine.store_interface = store_interface
     yield engine
     await engine.close()

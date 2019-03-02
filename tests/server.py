@@ -8,9 +8,14 @@ class MockFixServer(object):
 
     def __init__(self, config):
         self.config = config
-        self.engine = FixEngine()
+        self.engine = self._make_engine()
         self.client_sessions = []
         self.tasks = []
+
+    def _make_engine(self):
+        engine = FixEngine()
+        engine.store_interface = self.config['store']
+        return engine
 
     async def stream_client_session(self, session):
         try:

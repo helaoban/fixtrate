@@ -108,8 +108,11 @@ class RedisStore(FixStore):
 
                 yield msg
 
+    async def close(self):
+        pass
 
-class RedisStoreInterface:
+
+class RedisStoreInterface(FixStoreInterface):
 
     def __init__(self, redis_url, prefix='fix'):
         self.redis_url = redis_url
@@ -117,10 +120,10 @@ class RedisStoreInterface:
         self.redis = None
 
     async def connect(self, engine):
-        if self.redis is not None:
+        if self.redis is None:
             self.redis = await aioredis.create_redis_pool(
                 self.redis_url, minsize=5, maxsize=10)
-        return RedisStore(self.redis)
+        return RedisStore(self.redis, self.prefix)
 
     async def close(self, engine):
         self.redis.close()

@@ -71,10 +71,10 @@ class FixEngine:
         for session in self.sessions:
             await session.close()
         self.sessions.clear()
-
         for bind in self.binds:
             await bind.close()
         self.binds.clear()
+        await self.store_interface.close(self)
 
 
 class _FixConnectionManager(Coroutine):
