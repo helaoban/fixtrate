@@ -46,7 +46,7 @@ class FixEngine:
     async def _on_bind(self, bind):
         self.binds.append(bind)
 
-    def connect(self, host, port, conf, transport=None):
+    def connect(self, host, port, conf):
         """
         Coroutine that waits for a successfuly connection to a FIX peer.
         Returns a FixConnection object. Can also be used as an async context
