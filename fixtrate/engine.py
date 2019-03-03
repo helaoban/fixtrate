@@ -7,7 +7,7 @@ from . import constants as fix
 from .parse import FixParser
 from .exceptions import (
     FIXAuthenticationError, BindClosedError,
-    UnresponsiveClientError
+    UnresponsiveClientError, DuplicateSessionError
 )
 from .store import MemoryStoreInterface
 from .session import FixSession
@@ -223,6 +223,9 @@ class FixBind:
                 '' % sender
             ) from error
 
+        if session_id in self.sessions:
+            raise DuplicateSessionError
+
         if begin_string != session_id.begin_string:
             raise FIXAuthenticationError(
                 'Expected %s as value for BeginStr, but got %s '
@@ -264,24 +267,8 @@ class FixBind:
             parser.append_buffer(data)
             session_parser.append_buffer(data)
 
-        try:
-            session_id, conf = self._authenticate_client(msg)
-        except FIXAuthenticationError as error:
-            logger.error(error)
-            writer.close()
-            return
-
-            # TODO this is probably technically
-        # an authentication error and should be
-        # part of the _authenticate handler,
-        # but need reliable way to get session_id
-        # before instantiation a session
-        if session_id in self.sessions:
-            writer.close()
-            return
-
+        session_id, conf = self._authenticate_client(msg)
         store = await self._create_store()
-
         session = FixSession(
             session_id=session_id,
             store=store,
@@ -290,14 +277,13 @@ class FixBind:
             on_close=self._on_session_close,
             **conf
         )
-
         session.parser = session_parser
         return session
 
     async def _accept_client(self, reader, writer):
         try:
             session = await self._create_client_session(reader, writer)
-        except UnresponsiveClientError as error:
+        except (FIXAuthenticationError, UnresponsiveClientError) as error:
             logger.error(error)
             writer.close()
         except Exception as error:

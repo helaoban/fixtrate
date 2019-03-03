@@ -10,6 +10,14 @@ class FIXAuthenticationError(FIXError):
     """Unablet to authenticate client"""
 
 
+class DuplicateSessionError(FIXAuthenticationError):
+    """A connection is already bound to this session."""
+
+    def __init__(self):
+        msg = 'A connection is already bound to this session.'
+        super().__init__(msg)
+
+
 class SequenceGapError(FIXError):
     """
     A SequenceGap occured
