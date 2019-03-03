@@ -237,7 +237,7 @@ class FixBind:
             )
         return session_id, conf
 
-    async def _accept_client(self, reader, writer):
+    async def _create_client_session(self, reader, writer):
         store_if = self.engine.store_interface
         store = await store_if.connect(self.engine)
 
@@ -285,12 +285,23 @@ class FixBind:
             return
 
         session.parser = session_parser
-        self.sessions[session.id] = session
+        return session
 
-        # TODO what happens if we hit an invalid
-        # (not authentication related) message here
-        # await session._process_message(msg)
-        self._session_queue.put_nowait(session)
+    async def _accept_client(self, reader, writer):
+        try:
+            session = await self._create_client_session(reader, writer)
+        except UnresponsiveClientError as error:
+            logger.error(error)
+            writer.close()
+        except Exception as error:
+            logger.exception(error)
+            await self.close()
+        else:
+            self.sessions[session.id] = session
+            # TODO what happens if we hit an invalid
+            # (not authentication related) message here
+            # await session._process_message(msg)
+            self._session_queue.put_nowait(session)
 
     async def bind(self):
         self.server = await asyncio.start_server(
