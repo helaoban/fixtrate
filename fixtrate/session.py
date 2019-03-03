@@ -178,7 +178,6 @@ class FixSession:
         """
         await self._cancel_heartbeat_timer()
         await self.transport.close()
-        await self.store.close()
         if self._on_close is not None:
             await maybe_await(self._on_close, self)
 

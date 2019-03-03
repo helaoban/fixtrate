@@ -117,7 +117,3 @@ class FixStore:
             :rtype AsyncIterator[:class:`FixMessage`]
         """
         raise NotImplementedError
-
-    async def close(self):
-        """Close the store"""
-        raise NotImplementedError

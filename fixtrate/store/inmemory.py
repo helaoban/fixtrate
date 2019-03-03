@@ -88,9 +88,6 @@ class MemoryStore(FixStore):
 
             yield msg
 
-    async def close(self):
-        pass
-
 
 class MemoryStoreInterface(FixStoreInterface):
 

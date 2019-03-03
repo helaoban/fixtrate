@@ -108,9 +108,6 @@ class RedisStore(FixStore):
 
                 yield msg
 
-    async def close(self):
-        pass
-
 
 class RedisStoreInterface(FixStoreInterface):
 
