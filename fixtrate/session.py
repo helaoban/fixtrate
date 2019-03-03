@@ -138,13 +138,13 @@ class FixSession:
 
     def _get_tags(self, begin_string):
         tags = {
-           'FIX.4.2': fc.FixTag.FIX42,
-           'FIX.4.4': fc.FixTag.FIX44,
+            fc.FixVersion.FIX42: fc.FixTag.FIX42,
+            fc.FixVersion.FIX44: fc.FixTag.FIX44,
         }.get(begin_string)
-        if not tags:
+        if tags is None:
             raise ValueError(
-               '%s is an invalid or unsupported '
-               'FIX version' % begin_string)
+                '%s is an invalid or unsupported '
+                'FIX version' % begin_string)
         return tags
 
     def __aiter__(self):
