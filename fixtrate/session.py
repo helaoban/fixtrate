@@ -122,27 +122,29 @@ class FixSession:
         self.store = store
         self.transport = transport
         self.config = get_options(**kwargs)
-        self.logged_on = False
+        self.tags = self._get_tags(
+            session_id.begin_string)
+
         self._session_id = session_id
-        self._tags = self._get_tags()
         self._initiator = initiator
         self._on_close = on_close
         self._waiting_resend = False
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
         self._hearbeat_cb = None
+
+        self.logged_on = False
         self.parser = FixParser()
 
-    def _get_tags(self):
-        version = self._session_id.begin_string
+    def _get_tags(self, begin_string):
         tags = {
            'FIX.4.2': fc.FixTag.FIX42,
            'FIX.4.4': fc.FixTag.FIX44,
-        }.get(version)
+        }.get(begin_string)
         if not tags:
             raise ValueError(
                '%s is an invalid or unsupported '
-               'FIX version' % version)
+               'FIX version' % begin_string)
         return tags
 
     def __aiter__(self):
@@ -271,10 +273,10 @@ class FixSession:
         timestamp=None
     ):
         pairs = (
-            (self._tags.BeginString, self._session_id.begin_string),
-            (self._tags.SenderCompID, self._session_id.sender),
-            (self._tags.TargetCompID, self._session_id.target),
-            (self._tags.MsgSeqNum, seq_num),
+            (self.tags.BeginString, self._session_id.begin_string),
+            (self.tags.SenderCompID, self._session_id.sender),
+            (self.tags.TargetCompID, self._session_id.target),
+            (self.tags.MsgSeqNum, seq_num),
         )
 
         for tag, val in pairs:
@@ -282,7 +284,7 @@ class FixSession:
 
         timestamp = timestamp or dt.datetime.utcnow()
         msg.append_utc_timestamp(
-            self._tags.SendingTime,
+            self.tags.SendingTime,
             timestamp=timestamp,
             precision=6,
             header=True
@@ -383,7 +385,7 @@ class FixSession:
                     await self._send_gap_fill(gap_start, gap_end)
                     gap_start, gap_end = None, None
                 msg.append_pair(
-                    self._tags.PossDupFlag,
+                    self.tags.PossDupFlag,
                     fc.PossDupFlag.YES,
                     header=True
                 )
@@ -566,7 +568,7 @@ class FixSession:
             if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
                 # Reject any SeqReset<4> message that attempts
                 # to lower the next expected sequence number
-                tag = self._tags.NewSeqNo
+                tag = self.tags.NewSeqNo
                 new = int(msg.get(tag))
                 expected = await self.get_remote_sequence()
                 if new < expected:
@@ -623,9 +625,9 @@ class FixSession:
 
     async def _validate_header(self, msg):
         for tag, value, type_ in (
-            (self._tags.BeginString,  self._session_id.begin_string, str),
-            (self._tags.TargetCompID,  self._session_id.sender, str),
-            (self._tags.SenderCompID,  self._session_id.target, str)
+            (self.tags.BeginString,  self._session_id.begin_string, str),
+            (self.tags.TargetCompID,  self._session_id.sender, str),
+            (self.tags.SenderCompID,  self._session_id.target, str)
         ):
             self._validate_tag_value(msg, tag, value, type_)
 
@@ -658,7 +660,7 @@ class FixSession:
             await self._set_remote_sequence(2)
 
         self._validate_tag_value(
-            msg, self._tags.HeartBtInt,
+            msg, self.tags.HeartBtInt,
             self.config['heartbeat_interval'], int)
 
         if not self._initiator:
@@ -676,23 +678,23 @@ class FixSession:
         self.logged_on = False
 
     async def _handle_test_request(self, msg):
-        test_request_id = msg.get(self._tags.TestReqID)
+        test_request_id = msg.get(self.tags.TestReqID)
         await self._send_heartbeat(test_request_id=test_request_id)
 
     async def _handle_reject(self, msg):
-        reason = msg.get(self._tags.Text)
+        reason = msg.get(self.tags.Text)
         raise FixRejectionError(msg, reason)
 
     async def _handle_resend_request(self, msg):
-        start = int(msg.get(self._tags.BeginSeqNo))
-        end = int(msg.get(self._tags.EndSeqNo))
+        start = int(msg.get(self.tags.BeginSeqNo))
+        end = int(msg.get(self.tags.EndSeqNo))
         if end == 0:
             # EndSeqNo of 0 means infinity
             end = float('inf')
         await self._resend_messages(start, end)
 
     async def _handle_sequence_reset(self, msg):
-        new_seq_num = int(msg.get(self._tags.NewSeqNo))
+        new_seq_num = int(msg.get(self.tags.NewSeqNo))
         await self._set_remote_sequence(new_seq_num)
 
     async def _cancel_heartbeat_timer(self):
@@ -719,9 +721,9 @@ class FixSession:
             raise
 
     def _is_gap_fill(self, msg):
-        gf_flag = msg.get(self._tags.GapFillFlag)
+        gf_flag = msg.get(self.tags.GapFillFlag)
         return gf_flag == fc.GapFillFlag.YES
 
     def _is_reset(self, msg):
-        reset_seq = msg.get(self._tags.ResetSeqNumFlag)
+        reset_seq = msg.get(self.tags.ResetSeqNumFlag)
         return reset_seq == fc.ResetSeqNumFlag.YES
