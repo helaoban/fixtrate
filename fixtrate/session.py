@@ -122,18 +122,15 @@ class FixSession:
         self.store = store
         self.transport = transport
         self.config = get_options(**kwargs)
+        self.logged_on = False
         self._session_id = session_id
         self._tags = self._get_tags()
-
-        self._hearbeat_cb = None
-
-        self.logged_on = False
-
+        self._initiator = initiator
+        self._on_close = on_close
         self._waiting_resend = False
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
-        self._initiator = initiator
-        self._on_close = on_close
+        self._hearbeat_cb = None
         self.parser = FixParser()
 
     def _get_tags(self):
