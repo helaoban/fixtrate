@@ -123,3 +123,14 @@ class BindClosedError(RuntimeError):
     """Bind was closed while waiting for session"""
     def __init__(self):
         super().__init__('Bind was closed while waiting for session')
+
+
+class UnresponsiveClientError(TimeoutError):
+    """Did not receive a respone from the client in the alloted time"""
+
+    def __init__(self):
+        msg = (
+            'Did not receive a respone from '
+            'the client in the alloted time'
+        )
+        super().__init__(msg)

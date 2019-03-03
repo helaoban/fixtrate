@@ -5,7 +5,10 @@ import logging
 
 from . import constants as fix
 from .parse import FixParser
-from .exceptions import FIXAuthenticationError, BindClosedError
+from .exceptions import (
+    FIXAuthenticationError, BindClosedError,
+    UnresponsiveClientError
+)
 from .store import MemoryStoreInterface
 from .session import FixSession
 from .transport import TCPTransport, TCPListenerTransport
@@ -251,8 +254,8 @@ class FixBind:
                 # connection made?
                 with aiotimeout(1):
                     data = await transport.read()
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                raise asyncio.TimeoutError
+            except asyncio.TimeoutError as error:
+                raise UnresponsiveClientError from error
             parser.append_buffer(data)
             session_parser.append_buffer(data)
 
