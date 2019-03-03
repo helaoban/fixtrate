@@ -125,7 +125,6 @@ class FixSession:
         self._session_id = session_id
         self._tags = self._get_tags()
 
-        self._is_resetting = False
         self._hearbeat_cb = None
 
         self.logged_on = False
@@ -248,7 +247,6 @@ class FixSession:
         try:
             await self.transport.write(msg.encode())
         except ConnectionError:
-            print('connect error')
             await self.close()
             return
 

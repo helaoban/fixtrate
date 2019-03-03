@@ -7,7 +7,7 @@ from . import constants as fix
 from .parse import FixParser
 from .exceptions import FIXAuthenticationError, BindClosedError
 from .store import MemoryStoreInterface
-from .session import FixSession, SessionID
+from .session import FixSession
 from .transport import TCPTransport, TCPListenerTransport
 from .helpers import parse_session_id_from_conf
 
