@@ -58,12 +58,19 @@ class FixEngine:
         :rtype: FixConnection
         """
         return _FixConnectionManager(
-            self, host, port, conf,
-            on_connect=self._on_session_connect)
+            engine=self,
+            host=host,
+            port=port,
+            session_conf=conf,
+            on_connect=self._on_session_connect
+        )
 
     def bind(self, host, port, session_confs):
         return _FixBindManager(
-            self, host, port, session_confs,
+            engine=self,
+            host=host,
+            port=port,
+            session_confs=session_confs,
             on_bind=self._on_bind
         )
 
