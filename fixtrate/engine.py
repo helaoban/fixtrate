@@ -237,10 +237,21 @@ class FixBind:
             )
         return session_id, conf
 
-    async def _create_client_session(self, reader, writer):
-        store_if = self.engine.store_interface
-        store = await store_if.connect(self.engine)
+    async def _create_store(self):
+        return await self.engine.store_interface.connect(
+            self.engine)
 
+    async def _read_client_data(self, transport):
+        try:
+            # TODO How long to wait for Logon msg after TCP
+            # connection made?
+            with aiotimeout(1):
+                data = await transport.read()
+        except asyncio.TimeoutError as error:
+            raise UnresponsiveClientError from error
+        return data
+
+    async def _create_client_session(self, reader, writer):
         transport = TCPListenerTransport()
         await transport.connect(reader, writer)
 
@@ -249,13 +260,7 @@ class FixBind:
             msg = parser.get_message()
             if msg:
                 break
-            try:
-                # TODO How long to wait for Logon msg after TCP
-                # connection made?
-                with aiotimeout(1):
-                    data = await transport.read()
-            except asyncio.TimeoutError as error:
-                raise UnresponsiveClientError from error
+            data = await self._read_client_data(transport)
             parser.append_buffer(data)
             session_parser.append_buffer(data)
 
@@ -266,6 +271,17 @@ class FixBind:
             writer.close()
             return
 
+            # TODO this is probably technically
+        # an authentication error and should be
+        # part of the _authenticate handler,
+        # but need reliable way to get session_id
+        # before instantiation a session
+        if session_id in self.sessions:
+            writer.close()
+            return
+
+        store = await self._create_store()
+
         session = FixSession(
             session_id=session_id,
             store=store,
@@ -274,15 +290,6 @@ class FixBind:
             on_close=self._on_session_close,
             **conf
         )
-
-        # TODO this is probably technically
-        # an authentication error and should be
-        # part of the _authenticate handler,
-        # but need reliable way to get session_id
-        # before instantiation a session
-        if session.id in self.sessions:
-            writer.close()
-            return
 
         session.parser = session_parser
         return session
