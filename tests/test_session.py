@@ -93,7 +93,7 @@ async def test_receive_timeout(engine, test_server, client_config):
         {
             'client_session_confs': [
                 {
-                    'fix_version': fix.FixVersion.FIX42,
+                    'begin_string': fix.FixVersion.FIX42,
                     'sender_comp_id': 'TESTSERVER',
                     'target_comp_id': 'TESTCLIENT',
                     'heartbeat_interval': 1,
@@ -232,7 +232,7 @@ async def test_sequence_reset(engine, test_server, client_config):
         {
             'client_session_confs': [
                 {
-                    'fix_version': fix.FixVersion.FIX42,
+                    'begin_string': fix.FixVersion.FIX42,
                     'sender_comp_id': 'TESTSERVER',
                     'target_comp_id': 'TESTCLIENT',
                     'heartbeat_interval': 1,

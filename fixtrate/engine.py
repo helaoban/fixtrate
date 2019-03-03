@@ -7,9 +7,9 @@ from . import constants as fix
 from .parse import FixParser
 from .exceptions import FIXAuthenticationError, BindClosedError
 from .store import MemoryStoreInterface
-from .session import FixSession
+from .session import FixSession, SessionID
 from .transport import TCPTransport, TCPListenerTransport
-
+from .helpers import parse_session_id_from_conf
 
 logger = logging.getLogger(__name__)
 
@@ -137,11 +137,17 @@ class _FixConnectionManager(Coroutine):
                         break
 
     async def _make_session(self):
+        session_id, conf = parse_session_id_from_conf(
+            self.session_conf)
         store_if = self.engine.store_interface
         store = await store_if.connect(self.engine)
         await self.transport.connect(self.host, self.port)
         session = FixSession(
-            store, self.transport, **self.session_conf)
+            session_id=session_id,
+            store=store,
+            transport=self.transport,
+            **conf
+        )
         if self._on_connect is not None:
             await self._on_connect(session)
         self.session = session
@@ -159,13 +165,20 @@ class FixBind:
         self.engine = engine
         self.host = host
         self.port = port
-        self.session_confs = {
-            c['target_comp_id']: c
-            for c in session_confs
-        }
         self.sessions = {}
-        self._session_queue = asyncio.Queue()
         self.server = None
+
+        self._allowed_sessions = self._parse_session_confs(
+            session_confs)
+        self._session_queue = asyncio.Queue()
+
+    @staticmethod
+    def _parse_session_confs(confs):
+        ids = {}
+        for c in confs:
+            sid, conf = parse_session_id_from_conf(c)
+            ids[sid.target] = sid, conf
+        return ids
 
     def __aiter__(self):
         return self
@@ -187,24 +200,39 @@ class FixBind:
         self.sessions.pop(session.id, None)
 
     def _authenticate_client(self, msg):
-        sender = msg.get(49)
-        try:
-            conf = self.session_confs[sender]
-        except KeyError as error:
-            raise FIXAuthenticationError from error
-
-        target = msg.get(56)
-        if target != conf['sender_comp_id']:
-            raise FIXAuthenticationError
-
-        # TODO should an incorrect begin_string
-        # really result in a connection termination?
-        # Or should we send a reject message.
         begin_string = msg.get(8)
-        if begin_string != conf['fix_version']:
-            raise FIXAuthenticationError
+        try:
+            fix_version = fix.FixVersion(begin_string)
+        except ValueError as error:
+            raise FIXAuthenticationError(
+                '%s in an invalid or unsupported FIX version'
+                '' % begin_string
+            ) from error
 
-        return conf
+        tags = getattr(fix.FixTag, fix_version.name)
+
+        sender = msg.get(tags.SenderCompID)
+        try:
+            session_id, conf = self._allowed_sessions[sender]
+        except KeyError as error:
+            raise FIXAuthenticationError(
+                'No session with SenderCompID of %s was found '
+                '' % sender
+            ) from error
+
+        if begin_string != session_id.begin_string:
+            raise FIXAuthenticationError(
+                'Expected %s as value for BeginStr, but got %s '
+                '' % (session_id.begin_string, begin_string)
+            )
+
+        target = msg.get(tags.TargetCompID)
+        if target != session_id.sender:
+            raise FIXAuthenticationError(
+                'Expected %s as value for TargetCompId, but got %s '
+                '' % (session_id.target, target)
+            )
+        return session_id, conf
 
     async def _accept_client(self, reader, writer):
         store_if = self.engine.store_interface
@@ -229,16 +257,20 @@ class FixBind:
             session_parser.append_buffer(data)
 
         try:
-            conf = self._authenticate_client(msg)
-        except FIXAuthenticationError:
+            session_id, conf = self._authenticate_client(msg)
+        except FIXAuthenticationError as error:
+            logger.error(error)
             writer.close()
             return
 
         session = FixSession(
-            store, transport,
+            session_id=session_id,
+            store=store,
+            transport=transport,
             initiator=False,
             on_close=self._on_session_close,
-            **conf)
+            **conf
+        )
 
         # TODO this is probably technically
         # an authentication error and should be

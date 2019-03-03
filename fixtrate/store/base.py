@@ -9,7 +9,7 @@ class FixStoreInterface:
 
 class FixStore:
 
-    async def incr_local(self, session):
+    async def incr_local(self, session_id):
         """ Increment the local sequence number by 1.
 
         :param session: The current session.
@@ -18,7 +18,7 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def incr_remote(self, session):
+    async def incr_remote(self, session_id):
         """ Increment the remote sequence number by 1.
 
         :param session: The current session.
@@ -27,7 +27,7 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def get_local(self, session):
+    async def get_local(self, session_id):
         """ Get the local sequence number.
 
         :param session: The current session.
@@ -36,7 +36,7 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def get_remote(self, session):
+    async def get_remote(self, session_id):
         """ Get the remote sequence number.
 
         :param session: The current session.
@@ -45,7 +45,7 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def set_local(self, session, new_seq_num):
+    async def set_local(self, session_id, new_seq_num):
         """ Set the local sequence number to a new number.
 
         :param session: The current session.
@@ -57,7 +57,7 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def set_remote(self, session, new_seq_num):
+    async def set_remote(self, session_id, new_seq_num):
         """ Set the remote sequence number to a new number.
 
         :param session: The current session.
@@ -69,7 +69,7 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def store_message(self, session, msg):
+    async def store_message(self, session_id, msg):
         """ Store a message in the store.
 
         :param session: The current session.

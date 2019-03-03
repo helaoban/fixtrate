@@ -28,13 +28,7 @@ ADMIN_MESSAGES = {
 }
 
 DEFAULT_OPTIONS = {
-    'fix_version': fc.FixVersion.FIX42,
     'heartbeat_interval': 30,
-    'sender_comp_id': None,
-    'target_comp_id': None,
-    'session_qualifier': None,
-    'host': None,
-    'port': None,
     'receive_timeout': None,
     'fix_dict': None,
     'headers': []
@@ -54,6 +48,56 @@ def get_options(**kwargs):
     return rv
 
 
+class SessionID:
+    def __init__(
+        self,
+        begin_string,
+        sender_comp_id,
+        target_comp_id,
+        qualifier=None
+    ):
+        self.begin_string = begin_string
+        self.sender_comp_id = sender_comp_id
+        self.target_comp_id = target_comp_id
+        self.qualifier = qualifier
+
+    def __str__(self):
+        return ':'.join(filter(None, (
+            self.begin_string, self.sender_comp_id,
+            self.target_comp_id, self.qualifier)))
+
+    def __hash__(self):
+        return hash(self.__str__())
+
+    @property
+    def target(self):
+        return self.target_comp_id
+
+    @property
+    def sender(self):
+        return self.sender_comp_id
+
+    @property
+    def fix_version(self):
+        return self.begin_string
+
+    @classmethod
+    def from_dict(cls, dic):
+        parts = {
+            'begin_string',
+            'sender_comp_id',
+            'target_comp_id',
+            'session_qualifier'
+        }
+        kw = {p: dic[p] for p in parts}
+        return cls(**kw)
+
+    @classmethod
+    def from_str(cls, val, delimiter=':'):
+        items = val.split(delimiter)[:4]
+        return cls(*items)
+
+
 class FixSession:
     """
     FIX Session Manager
@@ -68,6 +112,7 @@ class FixSession:
 
     def __init__(
         self,
+        session_id,
         store,
         transport,
         initiator=True,
@@ -77,12 +122,8 @@ class FixSession:
         self.store = store
         self.transport = transport
         self.config = get_options(**kwargs)
-
-        version = self.config.get('fix_version')
-        self._tags = {
-            'FIX.4.2': fc.FixTag.FIX42,
-            'FIX.4.4': fc.FixTag.FIX44,
-        }.get(version, fc.FixTag.FIX42)
+        self._session_id = session_id
+        self._tags = self._get_tags()
 
         self._is_resetting = False
         self._hearbeat_cb = None
@@ -95,6 +136,18 @@ class FixSession:
         self._initiator = initiator
         self._on_close = on_close
         self.parser = FixParser()
+
+    def _get_tags(self):
+        version = self._session_id.begin_string
+        tags = {
+           'FIX.4.2': fc.FixTag.FIX42,
+           'FIX.4.4': fc.FixTag.FIX44,
+        }.get(version)
+        if not tags:
+            raise ValueError(
+               '%s is an invalid or unsupported '
+               'FIX version' % version)
+        return tags
 
     def __aiter__(self):
         return self
@@ -113,14 +166,7 @@ class FixSession:
 
         :return: str
         """
-        parts = (
-            'fix_version',
-            'sender_comp_id',
-            'target_comp_id',
-            'session_qualifier'
-        )
-        return ':'.join(filter(
-            None, (self.config.get(p) for p in parts)))
+        return self._session_id
 
     @property
     def closed(self):
@@ -137,21 +183,21 @@ class FixSession:
 
         :rtype AsyncIterator[:class:`~fixtrate.message.FixMessage`]
         """
-        return self.store.get_messages(self, *args, **kwargs)
+        return self.store.get_messages(self._session_id, *args, **kwargs)
 
     async def get_local_sequence(self):
         """ Return the current local sequence number.
 
         :rtype int
         """
-        return await self.store.get_local(self)
+        return await self.store.get_local(self._session_id)
 
     async def get_remote_sequence(self):
         """ Return the current remote sequence number.
 
         :rtype int
         """
-        return await self.store.get_remote(self)
+        return await self.store.get_remote(self._session_id)
 
     async def logon(self, reset=False):
         """ Logon to a FIX Session. Sends a Logon<A> message to peer.
@@ -209,19 +255,19 @@ class FixSession:
         await self._reset_heartbeat_timer()
 
     async def _incr_local_sequence(self):
-        return await self.store.incr_local(self)
+        return await self.store.incr_local(self._session_id)
 
     async def _incr_remote_sequence(self):
-        return await self.store.incr_remote(self)
+        return await self.store.incr_remote(self._session_id)
 
     async def _set_local_sequence(self, new_seq_num):
-        return await self.store.set_local(self, new_seq_num)
+        return await self.store.set_local(self._session_id, new_seq_num)
 
     async def _set_remote_sequence(self, new_seq_num):
-        return await self.store.set_remote(self, new_seq_num)
+        return await self.store.set_remote(self._session_id, new_seq_num)
 
     async def _store_message(self, msg):
-        await self.store.store_message(self, msg)
+        await self.store.store_message(self._session_id, msg)
 
     def _append_standard_header(
         self,
@@ -230,9 +276,9 @@ class FixSession:
         timestamp=None
     ):
         pairs = (
-            (self._tags.BeginString, self.config.get('fix_version')),
-            (self._tags.SenderCompID, self.config.get('sender_comp_id')),
-            (self._tags.TargetCompID, self.config.get('target_comp_id')),
+            (self._tags.BeginString, self._session_id.begin_string),
+            (self._tags.SenderCompID, self._session_id.sender),
+            (self._tags.TargetCompID, self._session_id.target),
             (self._tags.MsgSeqNum, seq_num),
         )
 
@@ -582,9 +628,9 @@ class FixSession:
 
     async def _validate_header(self, msg):
         for tag, value, type_ in (
-            (self._tags.BeginString,  self.config['fix_version'], str),
-            (self._tags.TargetCompID,  self.config['sender_comp_id'], str),
-            (self._tags.SenderCompID,  self.config['target_comp_id'], str)
+            (self._tags.BeginString,  self._session_id.begin_string, str),
+            (self._tags.TargetCompID,  self._session_id.sender, str),
+            (self._tags.SenderCompID,  self._session_id.target, str)
         ):
             self._validate_tag_value(msg, tag, value, type_)
 

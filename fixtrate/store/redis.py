@@ -17,50 +17,50 @@ class RedisStore(FixStore):
 
     def make_redis_key(self, session_id, key):
         return ':'.join(filter(None, (
-            self.prefix, session_id, key)))
+            self.prefix, str(session_id), key)))
 
-    async def get_local(self, session):
+    async def get_local(self, session_id):
         seq_num = await self.redis.get(
-            self.make_redis_key(session.id, 'seq_num_local'))
-        seq_num = seq_num or await self.incr_local(session)
+            self.make_redis_key(session_id, 'seq_num_local'))
+        seq_num = seq_num or await self.incr_local(session_id)
         return int(seq_num)
 
-    async def get_remote(self, session):
+    async def get_remote(self, session_id):
         seq_num = await self.redis.get(
-            self.make_redis_key(session.id, 'seq_num_remote'))
-        seq_num = seq_num or await self.incr_remote(session)
+            self.make_redis_key(session_id, 'seq_num_remote'))
+        seq_num = seq_num or await self.incr_remote(session_id)
         return int(seq_num)
 
-    async def incr_local(self, session):
+    async def incr_local(self, session_id):
         seq_num = await self.redis.incr(
-            self.make_redis_key(session.id, 'seq_num_local'))
+            self.make_redis_key(session_id, 'seq_num_local'))
         return int(seq_num)
 
-    async def incr_remote(self, session):
+    async def incr_remote(self, session_id):
         seq_num = await self.redis.incr(
-            self.make_redis_key(session.id, 'seq_num_remote'))
+            self.make_redis_key(session_id, 'seq_num_remote'))
         return int(seq_num)
 
-    async def set_local(self, session, new_seq_num):
+    async def set_local(self, session_id, new_seq_num):
         await self.redis.set(
-            self.make_redis_key(session.id, 'seq_num_local'),
+            self.make_redis_key(session_id, 'seq_num_local'),
             str(new_seq_num))
 
-    async def set_remote(self, session, new_seq_num):
+    async def set_remote(self, session_id, new_seq_num):
         await self.redis.set(
-            self.make_redis_key(session.id, 'seq_num_remote'),
+            self.make_redis_key(session_id, 'seq_num_remote'),
             str(new_seq_num))
 
-    async def store_message(self, session, msg):
+    async def store_message(self, session_id, msg):
         uid = str(uuid.uuid4())
         store_time = time.time()
         await self.redis.zadd(
-            self.make_redis_key(session.id, 'messages_by_time'),
+            self.make_redis_key(session_id, 'messages_by_time'),
             store_time,
             uid
         )
         await self.redis.hset(
-            self.make_redis_key(session.id, 'messages'),
+            self.make_redis_key(session_id, 'messages'),
             uid,
             msg.encode()
         )
@@ -68,7 +68,7 @@ class RedisStore(FixStore):
 
     async def get_messages(
         self,
-        session,
+        session_id,
         start=None,
         end=None,
         min=float('-inf'),
@@ -87,11 +87,11 @@ class RedisStore(FixStore):
             kwargs['max'] = end
 
         uids = await self.redis.zrangebyscore(
-            self.make_redis_key(session.id, 'messages_by_time'), **kwargs)
+            self.make_redis_key(session_id, 'messages_by_time'), **kwargs)
 
         for chunk in chunked(uids, 500):
             msgs = await self.redis.hmget(
-                self.make_redis_key(session.id, 'messages'), *chunk)
+                self.make_redis_key(session_id, 'messages'), *chunk)
             for msg in msgs:
                 msg = FixMessage.from_raw(msg)
                 if not min <= msg.seq_num <= max:
@@ -99,7 +99,7 @@ class RedisStore(FixStore):
 
                 if direction is not None:
                     sender = msg.get(49)
-                    is_sent = sender == session.config['sender_comp_id']
+                    is_sent = sender == session_id.sender
 
                     if direction == 'sent' and not is_sent:
                         continue

@@ -27,7 +27,7 @@ async def store_interface(request):
 @pytest.fixture
 def client_config():
     config = {
-        'fix_version': fix.FixVersion.FIX42,
+        'begin_string': fix.FixVersion.FIX42,
         'sender_comp_id': 'TESTCLIENT',
         'target_comp_id': 'TESTSERVER',
         'heartbeat_interval': 30,
@@ -42,7 +42,7 @@ def server_config(request, store_interface):
         'host': '127.0.0.1',
         'port': 8686,
         'client_session_confs': [{
-            'fix_version': fix.FixVersion.FIX42,
+            'begin_string': fix.FixVersion.FIX42,
             'sender_comp_id': 'TESTSERVER',
             'target_comp_id': 'TESTCLIENT',
             'heartbeat_interval': 30,
