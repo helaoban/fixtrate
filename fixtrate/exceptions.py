@@ -22,53 +22,22 @@ class DuplicateSessionError(FIXAuthenticationError):
         super().__init__(msg)
 
 
-class SequenceGapError(FIXError):
-    """
-    A SequenceGap occured
-    """
-    def __init__(self, actual, expected):
-        super().__init__('Sequence gap detected, expected {} '
-                         'but got {}'.format(expected, actual))
-        self._actual = actual
-        self._expected = expected
-
-    @property
-    def actual(self):
-        """ The sequence number of the offending message"""
-        return self._actual
-
-    @property
-    def expected(self):
-        """
-        The excepted sequence number before offended message
-        was received.
-        """
-        return self._expected
-
-
 class FatalSequenceGapError(FIXError):
     """
     A fatal sequence gap occured (remote sequence number
     is lower than expected).
     """
-    def __init__(self, actual, expected):
-        super().__init__('Remote sequence number is lower than expected, '
-                         'expected {} but got {}'.format(expected, actual))
-        self._actual = actual
-        self._expected = expected
-
-    @property
-    def actual(self):
-        """ The sequence number of the offending message"""
-        return self._actual
-
-    @property
-    def expected(self):
-        """
-        The excepted sequence number before offended message
-        was received.
-        """
-        return self._expected
+    def __init__(self, fix_msg, gap):
+        expected = fix_msg.seq_num - gap
+        error = (
+            'Remote sequence number is lower than '
+            'expected, expected %s but got %s'
+            '' % (expected, fix_msg.seq_num)
+        )
+        super().__init__(error)
+        self.fix_msg = fix_msg
+        self.gap = gap
+        self.expected = expected
 
 
 class FixRejectionError(FIXError):

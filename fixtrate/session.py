@@ -6,7 +6,7 @@ import async_timeout
 
 from . import constants as fc
 from .exceptions import (
-    SequenceGapError, FatalSequenceGapError,
+    FatalSequenceGapError,
     InvalidMessageError, FixRejectionError,
     IncorrectTagValueError, FIXError,
     InvalidTypeError, SessionError
@@ -453,8 +453,6 @@ class FixSession:
             )
             await self.close()
             raise
-        except SequenceGapError as error:
-            logger.warning(str(error))
         except FixRejectionError as error:
             logger.error(str(error))
 
@@ -462,159 +460,145 @@ class FixSession:
         await self._validate_header(msg)
         await self._store_message(msg)
 
-        try:
-            await self._check_sequence_integrity(msg)
-        except FatalSequenceGapError:
-            if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-                if not self._is_gap_fill(msg):
-                    # The sequence number of a SeqReset<4> message
-                    # in 'Reset Mode' (GapFillFlag(123) not present
-                    # or set to 'N') should be ignored,and by extension
-                    # any resulting sequence gaps should also be ignored.
-                    await self._handle_sequence_reset(msg)
+        diff = await self._get_sequence_gap(msg)
+        if diff < 0:
+            await self._handle_fatal_sequence_gap(msg, diff)
+        if diff > 0:
+            await self._handle_sequence_gap(msg, diff)
+
+        if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
+            await self._handle_sequence_reset(msg)
+            return
+
+        await self._incr_remote_sequence()
+
+        if self._waiting_resend:
+            if not msg.is_duplicate:
+                self._waiting_resend = False
+                if self._logout_after_resend:
+                    await self._send_logout()
                     return
 
-            if msg.msg_type == fc.FixMsgType.LOGON:
-                if self._is_reset(msg):
-                    # A Logon<A> message with ResetSeqNumFlag(141)
-                    # set to 'Y' will almost always result in a
-                    # sequence gap where gap < 0, since it should
-                    # be resetting the sequence number to 1. The
-                    # reset request must be obeyed, and so the
-                    # sequence gap is ignored.
-                    await self._handle_logon(msg)
-                    return
-
-            if msg.is_duplicate:
-                # Ignore message if gap < 0 and PossDupFlaf = 'Y'
-                # TODO this is a unique event during message resend,
-                # need to make sure we handle properly
+        if msg.is_duplicate:
+            if msg.msg_type in ADMIN_MESSAGES.difference({
+                fc.FixMsgType.SEQUENCE_RESET
+            }):
                 return
-
-            # All possible exceptions have been exhausted, and
-            # this is now an unrecoverable situation, so we
-            # terminate the session and raise the error.
-            raise
-        except SequenceGapError as error:
-            if msg.msg_type == fc.FixMsgType.RESEND_REQUEST:
-                # Always honor a ResendRequest<2> from the peer no matter
-                # what, even if we are currently waiting for the peer
-                # to resend messages in response to our own ResendRequest<2>.
-                # This handles an edge case that occurs when both sides
-                # detect a sequence gap as a result of the respective
-                # Logon<A> messages. If after detecting a gap the peer
-                # sends both a Logon<A> message (the logon acknowledgment)
-                # AND a ResendRequest<2> AT THE SAME TIME, the following
-                # scenario occurs:
-                #   1. We process the Logon<4> msg, detect a gap, and
-                #      immediately issue our own ResendRequest<2> (using
-                #      the 'through infinity' approach). This puts us into
-                #      a 'waiting-on-resend' mode, which causes us to ignore
-                #      any further out-of-sequence messages (where gap is > 0)
-                #      until the resend is complete.
-                #   2. We process the ResendRequest<2> which is also out-of-
-                #      sequence (gap > 0). If we follow the 'waiting-on-resend'
-                #      rule, then we should ignore this out-of-sequence msg and
-                #      proceeed, but if we do that, the peer's ResendRequest<2>
-                #      is not honored, and the FIX spec dictates that we must
-                #      honor it, so we make an exception and proceed with
-                #      message resend.
-                await self._handle_resend_request(msg)
-
-            if self._waiting_resend:
-                # If we are currently waiting on the peer to finish resending
-                # messages in response to a ResendRequest<2> of our own,
-                # then we ignore any messages that are out of sequence
-                # until the resend is complete. This only applies for
-                # the 'through infinity' strategy.
-                return
-
-            if msg.msg_type == fc.FixMsgType.LOGON:
-                # If msg is a Logon<A>, process it before
-                # sending a ResendRequest<2> message.
-                await self._handle_logon(msg)
-
-            if msg.msg_type == fc.FixMsgType.LOGOUT:
-                if self._waiting_logout_confirm:
-                    # If we are waiting for a logout confirmation,
-                    # then this is the ack for that logout, and we can
-                    # can handle the logout message normally, this will
-                    # close the session.
-                    await self._handle_logout(msg)
-                    return
-                else:
-                    # If we were not waiting for a logout confirmation,
-                    # then the peer is initiating a logout, and we will
-                    # have to honour it after the peer finishes resending
-                    # messages.
-                    self._logout_after_resend = True
-
-            # If the message is a SequenceReset<4>, then there are two
-            # scenarios to contend with (GapFill and Reset).
-            if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-                # If GapFillFlag <123> is set to 'N' or does not exist,
-                # then this Sequence Reset <4> msg is in 'Reset' mode.
-                # In Reset mode, we simply set the next expected remote
-                # seq number to the NewSeqNo(36) value of the msg
-
-                # TODO how should we handle a GAP FILL here?
-                if not self._is_gap_fill(msg):
-                    await self._handle_sequence_reset(msg)
-                    return
-
-            await self._request_resend(
-                start=error.expected,
-                end=0
-            )
-        else:
-            if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-                # Reject any SeqReset<4> message that attempts
-                # to lower the next expected sequence number
-                tag = self.tags.NewSeqNo
-                new = int(msg.get(tag))
-                expected = await self.get_remote_sequence()
-                if new < expected:
-                    error = (
-                        'SeqReset<4> attempting to decrease next '
-                        'expected sequence number. Current expected '
-                        'sequence number is %s, but SeqReset<4> is '
-                        'attempting to set the next expected sequence '
-                        'number to %s, this is now allowed.' % (expected, new)
-                    )
-                    reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
-                    raise InvalidMessageError(msg, tag, reject_type, error)
-
-            await self._incr_remote_sequence()
-
-            if msg.is_duplicate:
-                if msg.msg_type in ADMIN_MESSAGES.difference({
-                    fc.FixMsgType.SEQUENCE_RESET
-                }):
-                    # If the msg is a duplicate and also an admin message,
-                    # then this is an erroneously re-sent admin messsage
-                    # and should be ignored.
-                    # An exception is made for SequenceReset<4> messages,
-                    # which should always be processesed, even when
-                    # PossDupFlag(43) is set to 'Y'. In fact, PossDupFlag(43)
-                    # should always be set to 'Y' on SequenceReset<4> messages.
-                    return
-            else:
-                if self._waiting_resend:
-                    # If the msg is not a duplicate and we are waiting for
-                    # resend completion, then this signifies the end of resent
-                    # messages.
-                    self._waiting_resend = False
-
-                    if self._logout_after_resend:
-                        # If we received a Logout<5> that resulted in a
-                        # sequence gap, then we must honor the Logout<5>
-                        # after resend is complete.
-                        await self._send_logout()
-                        return
 
         handler = self._dispatch(msg)
         if handler is not None:
             await maybe_await(handler, msg)
+
+    async def _handle_sequence_gap(self, msg, gap):
+        """ Handle sequence gap where gap > 0"
+
+        Always honor a ResendRequest<2> from the peer no matter
+        what, even if we are currently waiting for the peer
+        to resend messages in response to our own ResendRequest<2>.
+        This handles an edge case that occurs when both sides
+        detect a sequence gap as a result of the respective
+        Logon<A> messages. If after detecting a gap the peer
+        sends both a Logon<A> message (the logon acknowledgment)
+        AND a ResendRequest<2> AT THE SAME TIME, the following
+        scenario occurs:
+          1. We process the Logon<4> msg, detect a gap, and
+             immediately issue our own ResendRequest<2> (using
+             the 'through infinity' approach). This puts us into
+             a 'waiting-on-resend' mode, which causes us to ignore
+             any further out-of-sequence messages (where gap is > 0)
+             until the resend is complete.
+          2. We process the ResendRequest<2> which is also out-of-
+             sequence (gap > 0). If we follow the 'waiting-on-resend'
+             rule, then we should ignore this out-of-sequence msg and
+             proceeed, but if we do that, the peer's ResendRequest<2>
+             is not honored, and the FIX spec dictates that we must
+             honor it, so we make an exception and proceed with
+             message resend.
+
+        If we are currently waiting on the peer to finish resending
+        messages in response to a ResendRequest<2> of our own,
+        then we ignore any messages that are out of sequence
+        until the resend is complete. This only applies for
+        the 'through infinity' strategy.
+
+        If msg is a Logon<A>, process it before
+        sending a ResendRequest<2> message.
+
+        If we are waiting for a logout confirmation,
+        then this is the ack for that logout, and we can
+        can handle the logout message normally, this will
+        close the session.
+
+        If we were not waiting for a logout confirmation,
+        then the peer is initiating a logout, and we will
+        have to honour it after the peer finishes resending
+        messages.
+
+        If the message is a SequenceReset<4>, then there are two
+        scenarios to contend with (GapFill and Reset).
+
+        If GapFillFlag <123> is set to 'N' or does not exist,
+        then this Sequence Reset <4> msg is in 'Reset' mode.
+        In Reset mode, we simply set the next expected remote
+        seq number to the NewSeqNo(36) value of the msg
+        """
+        if msg.msg_type == fc.FixMsgType.RESEND_REQUEST:
+            await self._handle_resend_request(msg)
+
+        if self._waiting_resend:
+            return
+
+        if msg.msg_type == fc.FixMsgType.LOGON:
+            await self._handle_logon(msg)
+
+        if msg.msg_type == fc.FixMsgType.LOGOUT:
+            if self._waiting_logout_confirm:
+                await self._handle_logout(msg)
+                return
+            else:
+                self._logout_after_resend = True
+
+        if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
+            # TODO how should we handle a GAP FILL here?
+            if not self._is_gap_fill(msg):
+                await self._handle_sequence_reset(msg)
+                return
+
+        await self._request_resend(msg.seq_num - gap, 0)
+
+    async def _handle_fatal_sequence_gap(self, msg, gap):
+        """ Handle a sequence gap where gap <0
+
+        The sequence number of a SeqReset<4> message
+        in 'Reset Mode' (GapFillFlag(123) not present
+        or set to 'N') should be ignored,and by extension
+        any resulting sequence gaps should also be ignored.
+
+        A Logon<A> message with ResetSeqNumFlag(141)
+        set to 'Y' will almost always result in a
+        sequence gap where gap < 0, since it should
+        be resetting the sequence number to 1. The
+        reset request must be obeyed, and so the
+        sequence gap is ignored.
+
+        Ignore duplicate messages.
+
+        If the message does not meet the above criteria,
+        then we are in an unrecoverable situation, so we
+        terminate the session and raise the error.
+
+        """
+        if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
+            logger.debug('SEQUENCE RESET')
+            if not self._is_gap_fill(msg):
+                await self._handle_sequence_reset(msg)
+        elif msg.msg_type == fc.FixMsgType.LOGON:
+            if self._is_reset(msg):
+                await self._handle_logon(msg)
+        elif msg.is_duplicate:
+            pass
+        else:
+            raise FatalSequenceGapError(msg, gap)
 
     def _validate_tag_value(self, msg, tag, expected, type_):
         actual = msg.get(tag)
@@ -635,15 +619,9 @@ class FixSession:
         ):
             self._validate_tag_value(msg, tag, value, type_)
 
-    async def _check_sequence_integrity(self, msg):
-        actual = await self.get_remote_sequence()
-        seq_num = msg.seq_num
-        diff = seq_num - actual
-        if diff == 0:
-            return
-        if diff >= 1:
-            raise SequenceGapError(seq_num, actual)
-        raise FatalSequenceGapError(seq_num, actual)
+    async def _get_sequence_gap(self, msg):
+        expected = await self.get_remote_sequence()
+        return msg.seq_num - expected
 
     def _dispatch(self, msg):
         return {
@@ -695,8 +673,20 @@ class FixSession:
         await self._resend_messages(start, end)
 
     async def _handle_sequence_reset(self, msg):
-        new_seq_num = int(msg.get(self.tags.NewSeqNo))
-        await self._set_remote_sequence(new_seq_num)
+        new = int(msg.get(self.tags.NewSeqNo))
+        expected = await self.get_remote_sequence()
+        if new < expected:
+            error = (
+                'SeqReset<4> attempting to decrease next '
+                'expected sequence number. Current expected '
+                'sequence number is %s, but SeqReset<4> is '
+                'attempting to set the next expected sequence '
+                'number to %s, this is now allowed.' % (expected, new)
+            )
+            reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
+            raise InvalidMessageError(
+                error, msg, self.tags.NewSeqNo, reject_type)
+        await self._set_remote_sequence(new)
 
     async def _cancel_heartbeat_timer(self):
         if self._hearbeat_cb is not None:
