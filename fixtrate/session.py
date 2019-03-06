@@ -612,7 +612,9 @@ class FixSession:
                         await self._send_logout()
                         return
 
-            await self._dispatch(msg)
+        handler = self._dispatch(msg)
+        if handler is not None:
+            await maybe_await(handler, msg)
 
     def _validate_tag_value(self, msg, tag, expected, type_):
         actual = msg.get(tag)
@@ -643,8 +645,8 @@ class FixSession:
             raise SequenceGapError(seq_num, actual)
         raise FatalSequenceGapError(seq_num, actual)
 
-    async def _dispatch(self, msg):
-        handler = {
+    def _dispatch(self, msg):
+        return {
             fc.FixMsgType.LOGON: self._handle_logon,
             fc.FixMsgType.LOGOUT: self._handle_logout,
             fc.FixMsgType.TEST_REQUEST: self._handle_test_request,
@@ -652,9 +654,6 @@ class FixSession:
             fc.FixMsgType.RESEND_REQUEST: self._handle_resend_request,
             fc.FixMsgType.SEQUENCE_RESET: self._handle_sequence_reset,
         }.get(msg.msg_type)
-
-        if handler is not None:
-            await maybe_await(handler, msg)
 
     async def _handle_logon(self, msg):
         is_reset = self._is_reset(msg)
