@@ -9,7 +9,7 @@ from .exceptions import (
     SequenceGapError, FatalSequenceGapError,
     InvalidMessageError, FixRejectionError,
     IncorrectTagValueError, FIXError,
-    InvalidTypeError
+    InvalidTypeError, SessionError
 )
 from .factories import fix42
 from .parse import FixParser
@@ -264,7 +264,11 @@ class FixSession:
         return await self.store.set_remote(self._session_id, new_seq_num)
 
     async def _store_message(self, msg):
-        await self.store.store_message(self._session_id, msg)
+        try:
+            await self.store.store_message(self._session_id, msg)
+        except Exception as error:
+            raise SessionError(
+                'Unable to store message: %s' % error) from error
 
     def _append_standard_header(
         self,
