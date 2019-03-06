@@ -6,6 +6,10 @@ class FIXError(Exception):
     pass
 
 
+class SessionError(FIXError):
+    """A FIX session-level error occured"""
+
+
 class FIXAuthenticationError(FIXError):
     """Unablet to authenticate client"""
 
