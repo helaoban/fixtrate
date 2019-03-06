@@ -76,8 +76,8 @@ def resend_request(start_sequence, end_sequence):
 
 
 def sequence_reset(
-        new_sequence_number,
-        gap_fill=fc.GapFillFlag.YES
+    new_sequence_number,
+    gap_fill=True
 ):
     msg = FixMessage()
     msg.append_pair(
@@ -86,7 +86,10 @@ def sequence_reset(
         header=True
     )
     msg.append_pair(TAGS.NewSeqNo, new_sequence_number)
-    msg.append_pair(TAGS.GapFillFlag, gap_fill)
+    if gap_fill:
+        msg.append_pair(TAGS.GapFillFlag, fc.GapFillFlag.YES)
+    else:
+        msg.append_pair(TAGS.GapFillFlag, fc.GapFillFlag.NO)
     return msg
 
 
