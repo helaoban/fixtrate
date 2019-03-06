@@ -373,9 +373,7 @@ class FixSession:
         gap_start = None
         gap_end = None
 
-        async for msg in self.history(
-                min=start, max=end, direction='sent'):
-
+        for msg in await self.store.get_sent(self.id, min=start, max=end):
             if msg.msg_type in ADMIN_MESSAGES:
                 if gap_start is None:
                     gap_start = msg.seq_num

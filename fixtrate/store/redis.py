@@ -11,7 +11,7 @@ from fixtrate.utils.iterators import chunked
 
 class RedisStore(FixStore):
 
-    def __init__(self, redis, prefix='fix'):
+    def __init__(self, redis, prefix=None):
         self.redis = redis
         self.prefix = prefix
 
@@ -54,60 +54,98 @@ class RedisStore(FixStore):
     async def store_message(self, session_id, msg):
         uid = str(uuid.uuid4())
         store_time = time.time()
-        await self.redis.zadd(
-            self.make_redis_key(session_id, 'messages_by_time'),
-            store_time,
-            uid
-        )
+
         await self.redis.hset(
             self.make_redis_key(session_id, 'messages'),
             uid,
             msg.encode()
         )
+
+        await self.redis.zadd(
+            self.make_redis_key(session_id, 'messages_by_time'),
+            store_time,
+            uid
+        )
+
+        sent_or_received = 'messages_%s' % (
+            'sent' if msg.get(49) == session_id.sender
+            else 'received'
+        )
+
+        await self.redis.zadd(
+            self.make_redis_key(session_id, sent_or_received),
+            msg.seq_num,
+            uid
+        )
         return uid
+
+    async def get_sent(
+        self,
+        session_id,
+        min=float('-inf'),
+        max=float('inf'),
+        limit=None
+    ):
+        if limit is None:
+            limit = -1
+        if limit > 0:
+            limit = limit + 1
+        message_ids = await self.redis.zrevrangebyscore(
+            self.make_redis_key(session_id, 'messages_sent'),
+            min=min, max=max, offset=0, count=limit
+        )
+        if len(message_ids) == 0:
+            return []
+        message_ids = list(reversed(message_ids))
+        key = self.make_redis_key(session_id, 'messages')
+        msgs = await self.redis.hmget(key, *message_ids)
+        return [FixMessage.from_raw(m) for m in msgs]
+
+    async def get_received(
+        self,
+        session_id,
+        min=float('-inf'),
+        max=float('inf'),
+        limit=None
+    ):
+        if limit is None:
+            limit = -1
+        if limit > 0:
+            limit = limit + 1
+        message_ids = await self.redis.zrevrangebyscore(
+            self.make_redis_key(session_id, 'messages_sent'),
+            min=min, max=max, offset=0, count=limit
+        )
+        if len(message_ids) == 0:
+            return []
+        message_ids = list(reversed(message_ids))
+        key = self.make_redis_key(session_id, 'messages')
+        msgs = await self.redis.hmget(key, *message_ids)
+        return [FixMessage.from_raw(m) for m in msgs]
 
     async def get_messages(
         self,
         session_id,
-        start=None,
-        end=None,
-        min=float('-inf'),
-        max=float('inf'),
-        direction=None
+        start=float('-inf'),
+        end=float('inf'),
+        limit=None,
     ):
-        if isinstance(start, datetime):
-            start = start.timestamp()
-        if isinstance(end, datetime):
-            end = end.timestamp()
+        if limit is None:
+            limit = -1
+        if limit > 0:
+            limit = limit + 1
+        message_ids = await self.redis.zrevrangebyscore(
+            self.make_redis_key(session_id, 'messages_by_time'),
+            min=start, max=end, offset=0, count=limit
+        )
+        if len(message_ids) == 0:
+            return []
+        message_ids = list(reversed(message_ids))
 
-        kwargs = {}
-        if start is not None:
-            kwargs['min'] = start
-        if end is not None:
-            kwargs['max'] = end
-
-        uids = await self.redis.zrangebyscore(
-            self.make_redis_key(session_id, 'messages_by_time'), **kwargs)
-
-        for chunk in chunked(uids, 500):
-            msgs = await self.redis.hmget(
-                self.make_redis_key(session_id, 'messages'), *chunk)
-            for msg in msgs:
-                msg = FixMessage.from_raw(msg)
-                if not min <= msg.seq_num <= max:
-                    continue
-
-                if direction is not None:
-                    sender = msg.get(49)
-                    is_sent = sender == session_id.sender
-
-                    if direction == 'sent' and not is_sent:
-                        continue
-                    if direction == 'received' and is_sent:
-                        continue
-
-                yield msg
-
+        key = self.make_redis_key(session_id, 'messages')
+        msgs = await self.redis.hmget(key, *message_ids)
+        msgs = [FixMessage.from_raw(m) for m in msgs]
+        return msgs
 
 class RedisStoreInterface(FixStoreInterface):
 

@@ -1,6 +1,7 @@
 from copy import deepcopy
 import uuid
 from collections import OrderedDict, defaultdict
+import time
 
 from fixtrate.message import FixMessage
 from .base import FixStoreInterface, FixStore
@@ -12,7 +13,6 @@ class MemoryStore(FixStore):
         if data_store is None:
             data_store = {}
         self._data = data_store
-        self._messages = defaultdict(OrderedDict)
 
     def make_key(self, session_id, key):
         return ':'.join((str(session_id), key))
@@ -50,43 +50,72 @@ class MemoryStore(FixStore):
         self._data[key] = new_seq_num
 
     async def store_message(self, session_id, msg):
-        key = self.make_key(session_id, 'messages')
         uid = str(uuid.uuid4())
-        try:
-            self._data[key][uid] = msg.encode()
-        except KeyError:
-            self._data[key] = OrderedDict(((uid, msg.encode()),))
+        store_time = time.time()
+        msgs = self._get_messages(session_id)
+        msgs[uid] = store_time, msg.encode()
         return uid
+
+    async def get_sent(
+        self,
+        session_id,
+        min=float('-inf'),
+        max=float('inf'),
+        limit=None
+    ):
+        msgs = self._get_messages(session_id)
+        rv = []
+        for time, msg in msgs.values():
+            msg = FixMessage.from_raw(msg)
+            if msg.get(49) != session_id.sender:
+                continue
+            if not min <= msg.seq_num <= max:
+                continue
+            rv.append(msg)
+        if limit is not None:
+            rv = rv[limit * -1:]
+        return rv
+
+    async def get_received(
+        self,
+        session_id,
+        min=float('-inf'),
+        max=float('inf'),
+        limit=None
+    ):
+        msgs = self._get_messages(session_id)
+        rv = []
+        for time, msg in msgs.values():
+            msg = FixMessage.from_raw(msg)
+            if msg.get(49) != session_id.target:
+                continue
+            if not min <= msg.seq_num <= max:
+                continue
+            rv.append(msg)
+        if limit is not None:
+            rv = rv[limit * -1:]
+        return rv
+
+    def _get_messages(self, session_id):
+        key = self.make_key(session_id, 'messages')
+        return self._data.setdefault(key, OrderedDict())
 
     async def get_messages(
         self,
         session_id,
-        start=None,
-        end=None,
-        min=float('-inf'),
-        max=float('inf'),
-        direction=None
+        start=float('-inf'),
+        end=float('inf'),
+        limit=None,
     ):
-        key = self.make_key(session_id, 'messages')
-        try:
-            msgs = self._data[key]
-        except KeyError:
-            self._data[key] = msgs = OrderedDict()
-
-        for msg in deepcopy(msgs).values():
-            msg = FixMessage.from_raw(msg)
-            if not min <= msg.seq_num <= max:
+        rv = []
+        msgs = self._get_messages(session_id)
+        for time_, msg in msgs.values():
+            if not start <= time_ <= end:
                 continue
-            if direction is not None:
-                sender = msg.get(49)
-                is_sent = sender == session_id.sender
-
-                if direction == 'sent' and not is_sent:
-                    continue
-                if direction == 'received' and is_sent:
-                    continue
-
-            yield msg
+            rv.append(msg)
+        if limit is not None:
+            rv = rv[limit * -1:]
+        return rv
 
 
 class MemoryStoreInterface(FixStoreInterface):

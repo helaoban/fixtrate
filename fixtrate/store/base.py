@@ -80,14 +80,30 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def get_messages(
+    async def get_sent(
         self,
-        session,
-        start=None,
-        end=None,
+        session_id,
         min=float('-inf'),
         max=float('inf'),
-        direction=None
+        limit=None
+    ):
+        raise NotImplementedError
+
+    async def get_received(
+        self,
+        session_id,
+        min=float('-inf'),
+        max=float('inf'),
+        limit=None
+    ):
+        raise NotImplementedError
+
+    async def get_messages(
+        self,
+        session_id,
+        start=float('-inf'),
+        end=float('inf'),
+        limit=None,
     ):
         """ Return all messages sent and received in the
             current session. Allows slicing by datetime and
