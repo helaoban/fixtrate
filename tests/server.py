@@ -21,8 +21,15 @@ class MockFixServer(object):
         try:
             async for msg in session:
                 pass
-        except (asyncio.CancelledError, ConnectionError):
+        except asyncio.CancelledError:
             pass
+        except ConnectionError as error:
+            logger.error(error)
+        except Exception as error:
+            logger.exception(error)
+
+        logger.info(
+            'Client sesssion %s closed' % session.id)
 
     async def listen(self):
         host, port = self.config['host'], self.config['port']

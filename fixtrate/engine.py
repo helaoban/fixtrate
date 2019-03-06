@@ -114,12 +114,13 @@ class _FixConnectionManager(Coroutine):
         return await self._coro
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if isinstance(exc_val, ConnectionError):
+        if exc_val is not None:
+            logger.error(exc_val)
             await self.session.close()
             return False
-        await self._wait_for_logout(self.session)
+        else:
+            await self._wait_for_logout(self.session)
         await self.session.close()
-        return True
 
     def send(self, arg):
         self._coro.send(arg)
