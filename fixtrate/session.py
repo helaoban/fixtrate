@@ -175,31 +175,7 @@ class FixSession:
         if self._on_close is not None:
             await maybe_await(self._on_close, self)
 
-    async def _append_standard_header(self, msg, timestamp=None):
-        if msg.get(self.tags.MsgSeqNum) is None:
-            seq_num = await self.get_local_sequence()
-            msg.append_pair(self.tags.MsgSeqNum, seq_num)
-
-        pairs = (
-            (self.tags.BeginString, self._session_id.begin_string),
-            (self.tags.SenderCompID, self._session_id.sender),
-            (self.tags.TargetCompID, self._session_id.target),
-        )
-
-        for tag, val in pairs:
-            msg.append_pair(tag, val, header=True)
-
-        if msg.is_duplicate:
-            orig_send_time = msg.get(self.tags.OrigSendingTime)
-            if orig_send_time is None:
-                orig_send_time = msg.get(self.tags.SendingTime)
-            msg.append_pair(
-                self.tags.OrigSendingTime,
-                orig_send_time,
-                header=True
-            )
-            msg.remove(self.tags.SendingTime)
-
+    def _append_send_time(self, msg, timestamp=None):
         msg.append_utc_timestamp(
             self.tags.SendingTime,
             timestamp=timestamp,
@@ -207,8 +183,26 @@ class FixSession:
             header=True
         )
 
-        for tag, val in self.config.get('headers'):
+    async def _append_standard_header(
+        self, msg, timestamp=None, headers=None):
+        sid = self._session_id
+        t = self.tags
+
+        if msg.get(t.MsgSeqNum) is None:
+            seq_num = await self.get_local_sequence()
+            msg.append_pair(t.MsgSeqNum, seq_num)
+
+        headers = list(headers or [])
+        headers.extend([
+            (t.BeginString, sid.begin_string),
+            (t.SenderCompID, sid.sender),
+            (t.TargetCompID, sid.target)
+        ])
+
+        for tag, val in headers:
             msg.append_pair(tag, val, header=True)
+
+        self._append_send_time(msg, timestamp=timestamp)
 
     async def send(self, msg, skip_headers=False, skip_incr=False):
         """
@@ -220,7 +214,8 @@ class FixSession:
             not append the standard header before sending. Defaults to `False`
         """
         if not skip_headers:
-            await self._append_standard_header(msg)
+            await self._append_standard_header(
+                msg, headers=self.config['headers'])
 
         if (
             not skip_incr
