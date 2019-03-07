@@ -189,6 +189,17 @@ class FixSession:
         for tag, val in pairs:
             msg.append_pair(tag, val, header=True)
 
+        if msg.is_duplicate:
+            orig_send_time = msg.get(self.tags.OrigSendingTime)
+            if orig_send_time is None:
+                orig_send_time = msg.get(self.tags.SendingTime)
+            msg.append_pair(
+                self.tags.OrigSendingTime,
+                orig_send_time,
+                header=True
+            )
+            msg.remove(self.tags.SendingTime)
+
         msg.append_utc_timestamp(
             self.tags.SendingTime,
             timestamp=timestamp,
