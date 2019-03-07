@@ -200,7 +200,9 @@ class FixSession:
         ])
 
         for tag, val in headers:
-            msg.append_pair(tag, val, header=True)
+            existing = msg.get(tag)
+            if existing is None:
+                msg.append_pair(tag, val, header=True)
 
         self._append_send_time(msg, timestamp=timestamp)
 
