@@ -2,7 +2,7 @@ import asyncio
 import pytest
 import uuid
 
-from fixtrate import constants as fix
+from fixtrate import helpers, constants as fix
 from fixtrate.message import FixMessage
 from fixtrate.factories import fix42
 
@@ -233,7 +233,7 @@ async def test_sequence_reset(
         # reset
         server_session = test_server.client_sessions[0]
         await server_session._set_local_sequence(9)
-        sequence_reset = server_session._make_sequence_reset(10)
+        sequence_reset = helpers.make_sequence_reset(10)
         await server_session.send(sequence_reset)
 
         msg = await session.receive()

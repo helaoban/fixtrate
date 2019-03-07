@@ -4,7 +4,7 @@ import logging
 
 import async_timeout
 
-from . import constants as fc
+from . import helpers, constants as fc
 from .exceptions import (
     FatalSequenceGapError,
     InvalidMessageError, FixRejectionError,
@@ -253,38 +253,6 @@ class FixSession:
             raise SessionError(
                 'Unable to store message: %s' % error) from error
 
-    def _make_reject_msg(self, msg, tag, rejection_type, reason):
-        return fix42.reject(
-            ref_sequence_number=msg.seq_num,
-            ref_message_type=msg.msg_type,
-            ref_tag=tag,
-            rejection_type=rejection_type,
-            reject_reason=reason,
-        )
-
-    def _make_logon_msg(self, reset=False):
-        msg = fix42.logon(
-            heartbeat_interval=self.config.get('heartbeat_interval'),
-            reset_sequence=reset
-        )
-        if reset:
-            msg.append_pair(self.tags.MsgSeqNum, 1)
-        return msg
-
-    def _make_logout_msg(self):
-        return fix42.logout()
-
-    def _make_resend_request(self, start, end):
-        return fix42.resend_request(start, end)
-
-    def _make_sequence_reset(self, new_seq_num):
-        return fix42.sequence_reset(new_seq_num, gap_fill=False)
-
-    def _make_gap_fill(self, seq_num, new_seq_num):
-        msg = fix42.sequence_reset(new_seq_num)
-        msg.append_pair(self.tags.MsgSeqNum, seq_num, header=True)
-        return msg
-
     async def _get_resend_msgs(self, start, end):
         """ Used internally by Fixtrate to handle the re-transmission of
         messages as a result of a Resend Request <2> message.
@@ -321,7 +289,7 @@ class FixSession:
                 gap_end = msg.seq_num + 1
             else:
                 if gap_end is not None:
-                    gap_fill = self._make_gap_fill(gap_start, gap_end)
+                    gap_fill = helpers.make_gap_fill(gap_start, gap_end)
                     to_resend.append(gap_fill)
                     gap_start, gap_end = None, None
                 msg.append_pair(
@@ -332,7 +300,7 @@ class FixSession:
                 to_resend.append(msg)
 
         if gap_start is not None:
-            gap_fill = self._make_gap_fill(gap_start, gap_end)
+            gap_fill = helpers.make_gap_fill(gap_start, gap_end)
             to_resend.append(gap_fill)
 
         return to_resend
@@ -378,7 +346,7 @@ class FixSession:
         try:
             rep = await self._handle_message(msg)
         except InvalidMessageError as error:
-            rep = self._make_reject_msg(
+            rep = helpers.make_reject_msg(
                 msg, error.tag, error.reject_type, str(error))
         except FatalSequenceGapError as error:
             logger.error(
@@ -425,7 +393,7 @@ class FixSession:
                 if not msg.is_duplicate:
                     self._waiting_resend = False
                     if self._logout_after_resend:
-                        return self._make_logout_msg()
+                        return helpers.make_logout_msg()
 
             if not self._is_duplicate_admin(msg):
                 handler = self._dispatch(msg)
@@ -515,7 +483,7 @@ class FixSession:
                 self._logout_after_resend = True
 
         self._waiting_resend = True
-        resend_request = self._make_resend_request(
+        resend_request = helpers.make_resend_request(
             msg.seq_num - gap, 0)
         rv.append(resend_request)
         return rv
@@ -596,12 +564,14 @@ class FixSession:
         if is_reset:
             await self._set_remote_sequence(2)
 
+        hb_int = self.config['heartbeat_interval']
+
         self._validate_tag_value(
-            msg, self.tags.HeartBtInt,
-            self.config['heartbeat_interval'], int)
+            msg, self.tags.HeartBtInt, hb_int, int)
 
         if not self._initiator:
-            rv = self._make_logon_msg(reset=is_reset)
+            rv = helpers.make_logon_msg(
+                hb_int, reset=is_reset)
         self.logged_on = True
 
         return rv
@@ -613,7 +583,7 @@ class FixSession:
             await self.close()
         else:
             self._waiting_logout_confirm = True
-            rv = self._make_logout_msg()
+            rv = helpers.make_logout_msg()
         self.logged_on = False
         return rv
 
@@ -651,7 +621,7 @@ class FixSession:
                 'number to %s, this is now allowed.' % (expected, new)
             )
             reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
-            return self._make_reject_msg(
+            return helpers.make_reject_msg(
                 msg, self.tags.NewSeqNo, reject_type, error)
 
         await self._set_remote_sequence(new)
