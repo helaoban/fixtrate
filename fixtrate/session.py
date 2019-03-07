@@ -17,16 +17,6 @@ from .utils.aio import maybe_await
 
 logger = logging.getLogger(__name__)
 
-
-ADMIN_MESSAGES = {
-    fc.FixMsgType.LOGON,
-    fc.FixMsgType.LOGOUT,
-    fc.FixMsgType.HEARTBEAT,
-    fc.FixMsgType.TEST_REQUEST,
-    fc.FixMsgType.RESEND_REQUEST,
-    fc.FixMsgType.SEQUENCE_RESET,
-}
-
 DEFAULT_OPTIONS = {
     'heartbeat_interval': 30,
     'receive_timeout': None,
@@ -277,40 +267,9 @@ class FixSession:
         # the store!
         # TODO support for skipping the resend of certain business messages
         # based on config options (eg. stale order requests)
-        to_resend = []
-
-        gap_start = None
-        gap_end = None
         sent_msgs = await self.store.get_sent(
             self.id, min=start, max=end)
-
-        for msg in sent_msgs:
-            if msg.msg_type in ADMIN_MESSAGES:
-                if gap_start is None:
-                    gap_start = msg.seq_num
-                gap_end = msg.seq_num + 1
-            else:
-                if gap_end is not None:
-                    gap_fill = helpers.make_gap_fill(gap_start, gap_end)
-                    to_resend.append(gap_fill)
-                    gap_start, gap_end = None, None
-
-                dup_flag = msg.get(self.tags.PossDupFlag)
-                if dup_flag != fc.PossDupFlag.YES:
-                    if dup_flag is not None:
-                        msg.remove(self.tags.PossDupFlag)
-                    msg.append_pair(
-                        self.tags.PossDupFlag,
-                        fc.PossDupFlag.YES,
-                        header=True
-                    )
-                to_resend.append(msg)
-
-        if gap_start is not None:
-            gap_fill = helpers.make_gap_fill(gap_start, gap_end)
-            to_resend.append(gap_fill)
-
-        return to_resend
+        return helpers.prepare_msgs_for_resend(sent_msgs)
 
     async def _receive_msg(self, timeout=None):
         while True:
@@ -376,13 +335,6 @@ class FixSession:
                     )
                 await self.send(msg)
 
-    def _is_duplicate_admin(self, msg):
-        if not msg.is_duplicate:
-            return False
-        admin_msgs = ADMIN_MESSAGES.difference({
-            fc.FixMsgType.SEQUENCE_RESET})
-        return msg.msg_type in admin_msgs
-
     async def _handle_message(self, msg):
         await self._validate_header(msg)
         await self._store_message(msg)
@@ -402,7 +354,7 @@ class FixSession:
                     if self._logout_after_resend:
                         return helpers.make_logout_msg()
 
-            if not self._is_duplicate_admin(msg):
+            if not helpers.is_duplicate_admin(msg):
                 handler = self._dispatch(msg)
                 if handler is not None:
                     return await maybe_await(handler, msg)

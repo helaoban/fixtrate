@@ -2,12 +2,31 @@ from . import constants as fix
 from .session_id import SessionID
 from .factories import fix42
 
+TAGS = fix.FixTag.FIX42
+
+ADMIN_MESSAGES = {
+    fix.FixMsgType.LOGON,
+    fix.FixMsgType.LOGOUT,
+    fix.FixMsgType.HEARTBEAT,
+    fix.FixMsgType.TEST_REQUEST,
+    fix.FixMsgType.RESEND_REQUEST,
+    fix.FixMsgType.SEQUENCE_RESET,
+}
+
 SESSION_ID_FIELDS = (
     'begin_string',
     'sender_comp_id',
     'target_comp_id',
     'qualifier'
 )
+
+
+def is_duplicate_admin(msg):
+    if not msg.is_duplicate:
+        return False
+    admin_msgs = ADMIN_MESSAGES.difference({
+        fix.FixMsgType.SEQUENCE_RESET})
+    return msg.msg_type in admin_msgs
 
 
 def parse_session_id_from_conf(conf):
@@ -58,4 +77,37 @@ def make_gap_fill(seq_num, new_seq_num):
     msg.append_pair(
         fix.FixTag.FIX42.MsgSeqNum, seq_num, header=True)
     return msg
+
+
+def prepare_msgs_for_resend(msgs):
+    gap_start = None
+    gap_end = None
+    rv = []
+    for msg in msgs:
+        if msg.msg_type in ADMIN_MESSAGES:
+            if gap_start is None:
+                gap_start = msg.seq_num
+            gap_end = msg.seq_num + 1
+        else:
+            if gap_end is not None:
+                gap_fill = make_gap_fill(gap_start, gap_end)
+                rv.append(gap_fill)
+                gap_start, gap_end = None, None
+
+            dup_flag = msg.get(TAGS.PossDupFlag)
+            if dup_flag != fix.PossDupFlag.YES:
+                if dup_flag is not None:
+                    msg.remove(TAGS.PossDupFlag)
+                msg.append_pair(
+                    TAGS.PossDupFlag,
+                    fix.PossDupFlag.YES,
+                    header=True
+                )
+            rv.append(msg)
+
+    if gap_start is not None:
+        gap_fill = make_gap_fill(gap_start, gap_end)
+        rv.append(gap_fill)
+
+    return rv
 
