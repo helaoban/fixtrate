@@ -199,7 +199,6 @@ class FixSession:
         for tag, val in pairs:
             msg.append_pair(tag, val, header=True)
 
-        timestamp = timestamp or dt.datetime.utcnow()
         msg.append_utc_timestamp(
             self.tags.SendingTime,
             timestamp=timestamp,
