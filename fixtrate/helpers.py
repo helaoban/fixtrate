@@ -1,4 +1,4 @@
-from .session import SessionID
+from .session_id import SessionID
 
 SESSION_ID_FIELDS = (
     'begin_string',
