@@ -292,11 +292,16 @@ class FixSession:
                     gap_fill = helpers.make_gap_fill(gap_start, gap_end)
                     to_resend.append(gap_fill)
                     gap_start, gap_end = None, None
-                msg.append_pair(
-                    self.tags.PossDupFlag,
-                    fc.PossDupFlag.YES,
-                    header=True
-                )
+
+                dup_flag = msg.get(self.tags.PossDupFlag)
+                if dup_flag != fc.PossDupFlag.YES:
+                    if dup_flag is not None:
+                        msg.remove(self.tags.PossDupFlag)
+                    msg.append_pair(
+                        self.tags.PossDupFlag,
+                        fc.PossDupFlag.YES,
+                        header=True
+                    )
                 to_resend.append(msg)
 
         if gap_start is not None:
