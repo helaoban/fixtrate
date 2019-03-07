@@ -103,6 +103,7 @@ def prepare_msgs_for_resend(msgs):
                     fix.PossDupFlag.YES,
                     header=True
                 )
+
             rv.append(msg)
 
     if gap_start is not None:
