@@ -292,6 +292,7 @@ async def test_message_recovery(
         # the news msg
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.NEWS
+
         # gap fill for the second logon msg
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
