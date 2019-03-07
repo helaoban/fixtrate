@@ -210,7 +210,7 @@ class FixSession:
         for tag, val in self.config.get('headers'):
             msg.append_pair(tag, val, header=True)
 
-    async def send(self, msg, skip_headers=False):
+    async def send(self, msg, skip_headers=False, skip_incr=False):
         """
         Send a FIX message to peer.
 
@@ -222,7 +222,11 @@ class FixSession:
         if not skip_headers:
             await self._append_standard_header(msg)
 
-        if not msg.is_duplicate and not self._is_gap_fill(msg):
+        if (
+            not skip_incr
+            and not msg.is_duplicate
+            and not self._is_gap_fill(msg)
+        ):
             await self._incr_local_sequence()
 
         await self._store_message(msg)
