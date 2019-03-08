@@ -149,5 +149,7 @@ async def append_standard_header(
         if existing is None:
             msg.append_pair(tag, val, header=True)
 
-    append_send_time(msg, timestamp=timestamp)
+    send_time = msg.get(TAGS.SendingTime)
+    if timestamp is not None or send_time is None:
+        append_send_time(msg, timestamp=timestamp)
 
