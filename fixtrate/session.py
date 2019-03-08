@@ -184,12 +184,21 @@ class FixSession:
         )
 
     async def _append_standard_header(
-        self, msg, timestamp=None, headers=None):
-        sid = self._session_id
+        self,
+        msg,
+        sid,
+        seq_num=None,
+        timestamp=None,
+        headers=None
+    ):
         t = self.tags
 
         if msg.get(t.MsgSeqNum) is None:
-            seq_num = await self.get_local_sequence()
+            if seq_num is None:
+                raise ValueError(
+                    'MsgSeqNum is not set on msg, and '
+                    'no seq_num was given'
+                )
             msg.append_pair(t.MsgSeqNum, seq_num)
 
         headers = list(headers or [])
@@ -216,8 +225,10 @@ class FixSession:
             not append the standard header before sending. Defaults to `False`
         """
         if not skip_headers:
+            seq_num = await self.get_local_sequence()
             await self._append_standard_header(
-                msg, headers=self.config['headers'])
+                msg, self._session_id, seq_num=seq_num,
+                headers=self.config['headers'])
 
         if (
             not skip_incr
