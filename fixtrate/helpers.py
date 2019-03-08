@@ -112,3 +112,42 @@ def prepare_msgs_for_resend(msgs):
 
     return rv
 
+
+def append_send_time(msg, timestamp=None):
+    msg.append_utc_timestamp(
+        TAGS.SendingTime,
+        timestamp=timestamp,
+        precision=6,
+        header=True
+    )
+
+
+async def append_standard_header(
+    msg,
+    sid,
+    seq_num=None,
+    timestamp=None,
+    headers=None
+):
+    if msg.get(TAGS.MsgSeqNum) is None:
+        if seq_num is None:
+            raise ValueError(
+                'MsgSeqNum is not set on msg, and '
+                'no seq_num was given'
+            )
+        msg.append_pair(TAGS.MsgSeqNum, seq_num)
+
+    headers = list(headers or [])
+    headers.extend([
+        (TAGS.BeginString, sid.begin_string),
+        (TAGS.SenderCompID, sid.sender),
+        (TAGS.TargetCompID, sid.target)
+    ])
+
+    for tag, val in headers:
+        existing = msg.get(tag)
+        if existing is None:
+            msg.append_pair(tag, val, header=True)
+
+    append_send_time(msg, timestamp=timestamp)
+

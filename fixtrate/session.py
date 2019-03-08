@@ -175,46 +175,6 @@ class FixSession:
         if self._on_close is not None:
             await maybe_await(self._on_close, self)
 
-    def _append_send_time(self, msg, timestamp=None):
-        msg.append_utc_timestamp(
-            self.tags.SendingTime,
-            timestamp=timestamp,
-            precision=6,
-            header=True
-        )
-
-    async def _append_standard_header(
-        self,
-        msg,
-        sid,
-        seq_num=None,
-        timestamp=None,
-        headers=None
-    ):
-        t = self.tags
-
-        if msg.get(t.MsgSeqNum) is None:
-            if seq_num is None:
-                raise ValueError(
-                    'MsgSeqNum is not set on msg, and '
-                    'no seq_num was given'
-                )
-            msg.append_pair(t.MsgSeqNum, seq_num)
-
-        headers = list(headers or [])
-        headers.extend([
-            (t.BeginString, sid.begin_string),
-            (t.SenderCompID, sid.sender),
-            (t.TargetCompID, sid.target)
-        ])
-
-        for tag, val in headers:
-            existing = msg.get(tag)
-            if existing is None:
-                msg.append_pair(tag, val, header=True)
-
-        self._append_send_time(msg, timestamp=timestamp)
-
     async def send(self, msg, skip_headers=False, skip_incr=False):
         """
         Send a FIX message to peer.
@@ -226,7 +186,7 @@ class FixSession:
         """
         if not skip_headers:
             seq_num = await self.get_local_sequence()
-            await self._append_standard_header(
+            await helpers.append_standard_header(
                 msg, self._session_id, seq_num=seq_num,
                 headers=self.config['headers'])
 
