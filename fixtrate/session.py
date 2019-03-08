@@ -175,7 +175,7 @@ class FixSession:
         if self._on_close is not None:
             await maybe_await(self._on_close, self)
 
-    async def send(self, msg, skip_headers=False, skip_incr=False):
+    async def send(self, msg, skip_headers=False):
         """
         Send a FIX message to peer.
 
@@ -190,11 +190,7 @@ class FixSession:
                 msg, self._session_id, seq_num=seq_num,
                 headers=self.config['headers'])
 
-        if (
-            not skip_incr
-            and not msg.is_duplicate
-            and not self._is_gap_fill(msg)
-        ):
+        if not msg.is_duplicate and not self._is_gap_fill(msg):
             await self._incr_local_sequence()
 
         await self._store_message(msg)
