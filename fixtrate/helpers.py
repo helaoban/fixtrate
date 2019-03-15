@@ -166,7 +166,22 @@ def validate_tag_value(msg, tag, expected, type_):
             msg, tag, expected, actual)
 
 
+
+HEADER_REQUIRED = (
+    TAGS.BeginString,
+    TAGS.BodyLength,
+    TAGS.TargetCompID,
+    TAGS.SenderCompID,
+    TAGS.SendingTime,
+    TAGS.MsgSeqNum,
+    TAGS.MsgType
+)
+
+
 def validate_header(msg, session_id):
+    for tag in HEADER_REQUIRED:
+        if tag not in msg:
+            raise exc.MissingRequiredTagError(msg, tag)
     for tag, value, type_ in (
         (TAGS.BeginString,  session_id.begin_string, str),
         (TAGS.TargetCompID,  session_id.sender, str),

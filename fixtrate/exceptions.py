@@ -75,6 +75,16 @@ class InvalidMessageError(FIXError):
         super().__init__(msg)
 
 
+class MissingRequiredTagError(InvalidMessageError):
+    """An required tag is missing"""
+    reject_type = fix.SessionRejectReason.REQUIRED_TAG_MISSING
+
+    def __init__(self, fix_msg, tag):
+        self.fix_msg = fix_msg
+        error = 'Missing required tag %s.' % tag
+        super().__init__(error, fix_msg, tag, self.reject_type)
+
+
 class IncorrectTagValueError(InvalidMessageError):
     """An invalid message was received"""
     reject_type = fix.SessionRejectReason.VALUE_IS_INCORRECT
