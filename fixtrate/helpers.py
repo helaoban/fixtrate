@@ -1,4 +1,4 @@
-from . import constants as fix
+from . import constants as fix, exceptions as exc
 from .session_id import SessionID
 from .factories import fix42
 
@@ -152,4 +152,25 @@ async def append_standard_header(
     send_time = msg.get(TAGS.SendingTime)
     if timestamp is not None or send_time is None:
         append_send_time(msg, timestamp=timestamp)
+
+
+def validate_tag_value(msg, tag, expected, type_):
+    actual = msg.get(tag)
+    try:
+        actual = type_(msg.get(tag))
+    except (TypeError, ValueError) as error:
+        raise exc.InvalidTypeError(
+            msg, tag, actual, type_) from error
+    if actual != expected:
+        raise exc.IncorrectTagValueError(
+            msg, tag, expected, actual)
+
+
+def validate_header(msg, session_id):
+    for tag, value, type_ in (
+        (TAGS.BeginString,  session_id.begin_string, str),
+        (TAGS.TargetCompID,  session_id.sender, str),
+        (TAGS.SenderCompID,  session_id.target, str)
+    ):
+        validate_tag_value(msg, tag, value, type_)
 

@@ -315,7 +315,7 @@ class FixSession:
                 await self.send(msg)
 
     async def _handle_message(self, msg):
-        await self._validate_header(msg)
+        helpers.validate_header(msg, self.id)
         await self._store_message(msg)
 
         diff = await self._get_sequence_gap(msg)
@@ -463,25 +463,6 @@ class FixSession:
 
         return rv
 
-    def _validate_tag_value(self, msg, tag, expected, type_):
-        actual = msg.get(tag)
-        try:
-            actual = type_(msg.get(tag))
-        except (TypeError, ValueError) as error:
-            raise InvalidTypeError(
-                msg, tag, actual, type_) from error
-        if actual != expected:
-            raise IncorrectTagValueError(
-                msg, tag, expected, actual)
-
-    async def _validate_header(self, msg):
-        for tag, value, type_ in (
-            (self.tags.BeginString,  self._session_id.begin_string, str),
-            (self.tags.TargetCompID,  self._session_id.sender, str),
-            (self.tags.SenderCompID,  self._session_id.target, str)
-        ):
-            self._validate_tag_value(msg, tag, value, type_)
-
     async def _get_sequence_gap(self, msg):
         expected = await self.get_remote_sequence()
         return msg.seq_num - expected
@@ -504,7 +485,7 @@ class FixSession:
 
         hb_int = self.config['heartbeat_interval']
 
-        self._validate_tag_value(
+        helpers.validate_tag_value(
             msg, self.tags.HeartBtInt, hb_int, int)
 
         if not self._initiator:
