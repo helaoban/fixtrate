@@ -414,6 +414,19 @@ class ExecType(BaseStrEnum):
 
 
 @enum.unique
+class OrdRejReason(BaseStrEnum):
+    BROKER_OPTION = '0'
+    UNKNOWN_SYMBOL = '1'
+    EXCHANGE_CLOSED = '2'
+    ORDER_EXCEEDS_LIMIT = '3'
+    TOO_LATE_TO_ENTER = '4'
+    UNKNOWN_ORDER = '5'
+    DUPLICATE_ORDER = '6'
+    DUPLICATE_VERBAL_COMM_ORDER = '7'
+    STALE_ORDER ='8'
+
+
+@enum.unique
 class PossDupFlag(BaseStrEnum):
     YES = 'Y'
     NO = 'N'
