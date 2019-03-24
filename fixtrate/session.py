@@ -62,9 +62,6 @@ class FixSession:
         self.store = store
         self.transport = transport
         self.config = get_options(**kwargs)
-        self.tags = self._get_tags(
-            session_id.begin_string)
-
         self._session_id = session_id
         self._initiator = initiator
         self._on_close = on_close
@@ -75,17 +72,6 @@ class FixSession:
 
         self.logged_on = False
         self.parser = FixParser()
-
-    def _get_tags(self, begin_string):
-        tags = {
-            fc.FixVersion.FIX42: fc.FixTag.FIX42,
-            fc.FixVersion.FIX44: fc.FixTag.FIX44,
-        }.get(begin_string)
-        if tags is None:
-            raise ValueError(
-                '%s is an invalid or unsupported '
-                'FIX version' % begin_string)
-        return tags
 
     def __aiter__(self):
         return self
@@ -154,7 +140,7 @@ class FixSession:
         )
         if reset:
             await self._set_local_sequence(1)
-            login_msg.append_pair(self.tags.MsgSeqNum, 1)
+            login_msg.append_pair(fc.FixTag.MsgSeqNum, 1)
 
         await self.send(login_msg)
 
@@ -310,7 +296,7 @@ class FixSession:
                 if msg.msg_type == fc.FixMsgType.REJECT:
                     logger.warning(
                         'Invalid message was received and rejected: '
-                        '%s' % msg.get(self.tags.Text)
+                        '%s' % msg.get(fc.FixTag.Text)
                     )
                 await self.send(msg)
 
@@ -486,7 +472,7 @@ class FixSession:
         hb_int = self.config['heartbeat_interval']
 
         helpers.validate_tag_value(
-            msg, self.tags.HeartBtInt, hb_int, int)
+            msg, fc.FixTag.HeartBtInt, hb_int, int)
 
         if not self._initiator:
             rv = helpers.make_logon_msg(
@@ -507,28 +493,28 @@ class FixSession:
         return rv
 
     async def _handle_test_request(self, msg):
-        test_request_id = msg.get(self.tags.TestReqID)
+        test_request_id = msg.get(fc.FixTag.TestReqID)
         return fix42.heartbeat(test_request_id)
 
     def _log_rejection(self, msg):
-        reason = msg.get(self.tags.Text)
+        reason = msg.get(fc.FixTag.Text)
         msg = 'Peer rejected message: %s' % reason
         logger.error(msg)
 
     def _handle_reject(self, msg):
-        reason = msg.get(self.tags.Text)
+        reason = msg.get(fc.FixTag.Text)
         self._log_rejection(msg)
 
     async def _handle_resend_request(self, msg):
-        start = int(msg.get(self.tags.BeginSeqNo))
-        end = int(msg.get(self.tags.EndSeqNo))
+        start = int(msg.get(fc.FixTag.BeginSeqNo))
+        end = int(msg.get(fc.FixTag.EndSeqNo))
         if end == 0:
             # EndSeqNo of 0 means infinity
             end = float('inf')
         return await self._get_resend_msgs(start, end)
 
     async def _handle_sequence_reset(self, msg):
-        new = int(msg.get(self.tags.NewSeqNo))
+        new = int(msg.get(fc.FixTag.NewSeqNo))
         expected = await self.get_remote_sequence()
 
         if new < expected:
@@ -541,7 +527,7 @@ class FixSession:
             )
             reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
             return helpers.make_reject_msg(
-                msg, self.tags.NewSeqNo, reject_type, error)
+                msg, fc.FixTag.NewSeqNo, reject_type, error)
 
         await self._set_remote_sequence(new)
 
@@ -570,9 +556,9 @@ class FixSession:
             raise
 
     def _is_gap_fill(self, msg):
-        gf_flag = msg.get(self.tags.GapFillFlag)
+        gf_flag = msg.get(fc.FixTag.GapFillFlag)
         return gf_flag == fc.GapFillFlag.YES
 
     def _is_reset(self, msg):
-        reset_seq = msg.get(self.tags.ResetSeqNumFlag)
+        reset_seq = msg.get(fc.FixTag.ResetSeqNumFlag)
         return reset_seq == fc.ResetSeqNumFlag.YES

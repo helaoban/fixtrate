@@ -53,7 +53,6 @@ class CustomFixField(enum.IntEnum):
 class FixXMLParser:
 
     def __init__(self):
-        self.tags = None
         self.custom_fields = CustomFixField
         self.components = OrderedDict()
 
@@ -68,7 +67,7 @@ class FixXMLParser:
 
     def parse_tag(self, name_or_number):
         for _tags in [
-            self.tags,
+            fc.FixTag,
             self.custom_fields
         ]:
             try:
@@ -200,7 +199,6 @@ class FixXMLParser:
         doc = doc.fix
 
         version = self.parse_version(doc)
-        self.tags = getattr(fc.FixTag, version.name)
         field_spec = self.parse_field_spec(doc.fields)
 
         components = self.parse_component_spec(doc.components)
@@ -210,7 +208,7 @@ class FixXMLParser:
 
         return FixDictionary(
             version=version,
-            tags=self.tags,
+            tags=fc.FixTag,
             header=header,
             trailer=trailer,
             field_spec=field_spec,

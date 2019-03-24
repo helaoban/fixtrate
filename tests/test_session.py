@@ -6,8 +6,6 @@ from fixtrate import helpers, constants as fix
 from fixtrate.message import FixMessage
 from fixtrate.factories import fix42
 
-TAGS = fix.FixTag.FIX42
-
 
 @pytest.fixture
 def test_request():
@@ -18,10 +16,10 @@ def test_request():
 @pytest.fixture
 def news_msg():
     pairs = (
-        (TAGS.MsgType, fix.FixMsgType.NEWS, True),
-        (TAGS.Headline, 'BREAKING NEWS', False),
-        (TAGS.LinesOfText, 1, False),
-        (TAGS.Text, 'Government admits turning frogs gay.', False),
+        (fix.FixTag.MsgType, fix.FixMsgType.NEWS, True),
+        (fix.FixTag.Headline, 'BREAKING NEWS', False),
+        (fix.FixTag.LinesOfText, 1, False),
+        (fix.FixTag.Text, 'Government admits turning frogs gay.', False),
     )
     return FixMessage.from_pairs(pairs)
 
@@ -70,7 +68,7 @@ async def test_can_iterate(
 
         async for msg in session:
             assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-            assert msg.get(TAGS.TestReqID) == test_request.get(TAGS.TestReqID)
+            assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
             break
 
 
@@ -144,7 +142,7 @@ async def test_incorrect_heartbeat_int(engine, test_server, client_config):
         await session.logon()
         msg = await session.receive(timeout=0.1)
         assert msg.msg_type == fix.FixMsgType.REJECT
-        assert int(msg.get(TAGS.RefTagID)) == TAGS.HeartBtInt
+        assert int(msg.get(fix.FixTag.RefTagID)) == fix.FixTag.HeartBtInt
 
 
 @pytest.mark.asyncio
@@ -186,7 +184,7 @@ async def test_test_request(
 
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-        assert msg.get(TAGS.TestReqID) == test_request.get(TAGS.TestReqID)
+        assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
 
 
 @pytest.mark.asyncio
@@ -205,14 +203,14 @@ async def test_reset_seq_num(
         await session.send(test_request)
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-        assert msg.get(TAGS.TestReqID) == test_request.get(TAGS.TestReqID)
+        assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
         await session.logon(reset=True)
 
         msg = await session.receive()
         local_seq_num = await session.get_local_sequence()
 
         assert msg.msg_type == fix.FixMsgType.LOGON
-        assert msg.get(TAGS.ResetSeqNumFlag) == fix.ResetSeqNumFlag.YES
+        assert msg.get(fix.FixTag.ResetSeqNumFlag) == fix.ResetSeqNumFlag.YES
         assert msg.seq_num == 1
         assert local_seq_num == 2
 
@@ -239,13 +237,13 @@ async def test_sequence_reset(
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
 
-        new_remote_seq_num = int(msg.get(TAGS.NewSeqNo))
+        new_remote_seq_num = int(msg.get(fix.FixTag.NewSeqNo))
         assert new_remote_seq_num == await session.get_remote_sequence()
 
         await session.send(test_request)
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-        assert msg.get(TAGS.TestReqID) == test_request.get(TAGS.TestReqID)
+        assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
 
 
 @pytest.mark.parametrize(

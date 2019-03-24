@@ -213,9 +213,7 @@ class FixBind:
                 '' % begin_string
             ) from error
 
-        tags = getattr(fix.FixTag, fix_version.name)
-
-        sender = msg.get(tags.SenderCompID)
+        sender = msg.get(fix.FixTag.SenderCompID)
         try:
             session_id, conf = self._allowed_sessions[sender]
         except KeyError as error:
@@ -233,7 +231,7 @@ class FixBind:
                 '' % (session_id.begin_string, begin_string)
             )
 
-        target = msg.get(tags.TargetCompID)
+        target = msg.get(fix.FixTag.TargetCompID)
         if target != session_id.sender:
             raise FIXAuthenticationError(
                 'Expected %s as value for TargetCompId, but got %s '

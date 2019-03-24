@@ -1,38 +1,36 @@
 from fixtrate import constants as fc, utils
 from fixtrate.message import FixMessage
 
-TAGS = fc.FixTag.FIX42
-
 
 def heartbeat(test_request_id=None):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.HEARTBEAT,
         header=True
     )
     if test_request_id:
-        msg.append_pair(TAGS.TestReqID, test_request_id)
+        msg.append_pair(fc.FixTag.TestReqID, test_request_id)
     return msg
 
 
 def test_request(test_request_id=None):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.TEST_REQUEST,
         header=True
     )
     if test_request_id is None:
         test_request_id = utils.gen_uuid()
-    msg.append_pair(TAGS.TestReqID, test_request_id)
+    msg.append_pair(fc.FixTag.TestReqID, test_request_id)
     return msg
 
 
 def logout():
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.LOGOUT,
         header=True
     )
@@ -46,32 +44,32 @@ def logon(
 ):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.LOGON,
         header=True
     )
     msg.append_pair(
-        TAGS.EncryptMethod,
+        fc.FixTag.EncryptMethod,
         encrypt_method,
     )
     msg.append_pair(
-        TAGS.HeartBtInt,
+        fc.FixTag.HeartBtInt,
         heartbeat_interval
     )
     if reset_sequence:
-        msg.append_pair(TAGS.ResetSeqNumFlag, 'Y')
+        msg.append_pair(fc.FixTag.ResetSeqNumFlag, 'Y')
     return msg
 
 
 def resend_request(start_sequence, end_sequence):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.RESEND_REQUEST,
         header=True
     )
-    msg.append_pair(TAGS.BeginSeqNo, start_sequence)
-    msg.append_pair(TAGS.EndSeqNo, end_sequence)
+    msg.append_pair(fc.FixTag.BeginSeqNo, start_sequence)
+    msg.append_pair(fc.FixTag.EndSeqNo, end_sequence)
     return msg
 
 
@@ -81,29 +79,29 @@ def sequence_reset(
 ):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.SEQUENCE_RESET,
         header=True
     )
-    msg.append_pair(TAGS.NewSeqNo, new_sequence_number)
+    msg.append_pair(fc.FixTag.NewSeqNo, new_sequence_number)
     if gap_fill:
-        msg.append_pair(TAGS.GapFillFlag, fc.GapFillFlag.YES)
+        msg.append_pair(fc.FixTag.GapFillFlag, fc.GapFillFlag.YES)
     else:
-        msg.append_pair(TAGS.GapFillFlag, fc.GapFillFlag.NO)
+        msg.append_pair(fc.FixTag.GapFillFlag, fc.GapFillFlag.NO)
     return msg
 
 
 def security_list():
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.SecurityListRequest,
         header=True
     )
     uid = utils.gen_uuid()
-    msg.append_pair(TAGS.SecurityReqID, uid)
+    msg.append_pair(fc.FixTag.SecurityReqID, uid)
     msg.append_pair(
-        TAGS.SecurityListRequestType,
+        fc.FixTag.SecurityListRequestType,
         b'0'
     )
     return msg
@@ -119,18 +117,18 @@ def market_data_request(
 
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.MARKET_DATA_REQUEST,
         header=True
     )
-    msg.append_pair(TAGS.MDReqID, utils.gen_uuid())
+    msg.append_pair(fc.FixTag.MDReqID, utils.gen_uuid())
 
     if subscription_type not in fc.SubscriptionRequestType:
         utils.raise_invalid_option(
             'subscription_type', fc.SubscriptionRequestType)
 
     msg.append_pair(
-        TAGS.SubscriptionRequestType,
+        fc.FixTag.SubscriptionRequestType,
         subscription_type
     )
 
@@ -139,7 +137,7 @@ def market_data_request(
             'market_depth', fc.MarketDepth)
 
     msg.append_pair(
-        TAGS.MarketDepth,
+        fc.FixTag.MarketDepth,
         market_depth
     )
 
@@ -149,24 +147,24 @@ def market_data_request(
                 'update_type', fc.MDUpdateType)
 
         msg.append_pair(
-            TAGS.MDUpdateType,
+            fc.FixTag.MDUpdateType,
             update_type
         )
 
     msg.append_pair(
-        TAGS.NoMDEntryTypes,
+        fc.FixTag.NoMDEntryTypes,
         len(entry_types)
     )
     for entry_type in entry_types:
         msg.append_pair(
-            TAGS.MDEntryType,
+            fc.FixTag.MDEntryType,
             entry_type
         )
 
-    msg.append_pair(TAGS.NoRelatedSym, len(symbols))
+    msg.append_pair(fc.FixTag.NoRelatedSym, len(symbols))
     for symbol in symbols:
         msg.append_pair(
-            TAGS.Symbol,
+            fc.FixTag.Symbol,
             symbol
         )
 
@@ -190,38 +188,38 @@ def new_order(
 ):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.NEW_ORDER_SINGLE,
         header=True
     )
-    msg.append_pair(TAGS.Account, account)
+    msg.append_pair(fc.FixTag.Account, account)
 
     if cl_order_id is None:
         cl_order_id = utils.gen_uuid()
-    msg.append_pair(TAGS.ClOrdID, cl_order_id)
+    msg.append_pair(fc.FixTag.ClOrdID, cl_order_id)
 
     if currency is not None:
-        msg.append_pair(TAGS.Currency, currency)
+        msg.append_pair(fc.FixTag.Currency, currency)
 
-    msg.append_pair(TAGS.Symbol, symbol)
-    msg.append_pair(TAGS.HandlInst, handl_inst)
-    msg.append_pair(TAGS.Side, side)
-    msg.append_pair(TAGS.OrderQty, quantity)
-    msg.append_pair(TAGS.OrdType, order_type)
+    msg.append_pair(fc.FixTag.Symbol, symbol)
+    msg.append_pair(fc.FixTag.HandlInst, handl_inst)
+    msg.append_pair(fc.FixTag.Side, side)
+    msg.append_pair(fc.FixTag.OrderQty, quantity)
+    msg.append_pair(fc.FixTag.OrdType, order_type)
 
     if order_type == fc.OrdType.LIMIT:
-        msg.append_pair(TAGS.Price, price)
+        msg.append_pair(fc.FixTag.Price, price)
 
     if time_in_force is not None:
-        msg.append_pair(TAGS.TimeInForce, time_in_force)
+        msg.append_pair(fc.FixTag.TimeInForce, time_in_force)
 
     if security_exchange is not None:
-        msg.append_pair(TAGS.SecurityExchange, security_exchange)
+        msg.append_pair(fc.FixTag.SecurityExchange, security_exchange)
 
     if ex_destination is not None:
-        msg.append_pair(TAGS.ExDestination, ex_destination)
+        msg.append_pair(fc.FixTag.ExDestination, ex_destination)
 
-    msg.append_pair(TAGS.CustomerOrFirm, customer_or_firm)
+    msg.append_pair(fc.FixTag.CustomerOrFirm, customer_or_firm)
 
     return msg
 
@@ -239,23 +237,23 @@ def cancel_replace(
 ):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.ORDER_CANCEL_REPLACE_REQEUST,
         header=True
     )
-    msg.append_pair(TAGS.Account, account)
-    msg.append_pair(TAGS.HandlInst, handle_inst)
-    msg.append_pair(TAGS.OrigClOrdID, orig_cl_order_id)
+    msg.append_pair(fc.FixTag.Account, account)
+    msg.append_pair(fc.FixTag.HandlInst, handle_inst)
+    msg.append_pair(fc.FixTag.OrigClOrdID, orig_cl_order_id)
     if new_cl_order_id is None:
         new_cl_order_id = utils.gen_uuid()
-    msg.append_pair(TAGS.ClOrdID, new_cl_order_id)
-    msg.append_pair(TAGS.Symbol, symbol)
-    msg.append_pair(TAGS.Side, side)
-    msg.append_pair(TAGS.OrderQty, quantity)
-    msg.append_pair(TAGS.OrdType, order_type)
+    msg.append_pair(fc.FixTag.ClOrdID, new_cl_order_id)
+    msg.append_pair(fc.FixTag.Symbol, symbol)
+    msg.append_pair(fc.FixTag.Side, side)
+    msg.append_pair(fc.FixTag.OrderQty, quantity)
+    msg.append_pair(fc.FixTag.OrdType, order_type)
 
     if price is not None:
-        msg.append_pair(TAGS.Price, price)
+        msg.append_pair(fc.FixTag.Price, price)
 
     return msg
 
@@ -270,18 +268,18 @@ def cancel(
 ):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.ORDER_CANCEL_REQUEST,
         header=True
     )
-    msg.append_pair(TAGS.Account, account)
+    msg.append_pair(fc.FixTag.Account, account)
     if cl_order_id is None:
         cl_order_id = utils.gen_uuid()
-    msg.append_pair(TAGS.ClOrdID, cl_order_id)
-    msg.append_pair(TAGS.OrigClOrdID, orig_cl_order_id)
-    msg.append_pair(TAGS.Symbol, symbol)
-    msg.append_pair(TAGS.Side, side)
-    msg.append_pair(TAGS.OrderQty, quantity)
+    msg.append_pair(fc.FixTag.ClOrdID, cl_order_id)
+    msg.append_pair(fc.FixTag.OrigClOrdID, orig_cl_order_id)
+    msg.append_pair(fc.FixTag.Symbol, symbol)
+    msg.append_pair(fc.FixTag.Side, side)
+    msg.append_pair(fc.FixTag.OrderQty, quantity)
 
     return msg
 
@@ -291,11 +289,11 @@ def order_status(
 ):
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.ORDER_STATUS_REQUEST,
         header=True
     )
-    msg.append_pair(TAGS.ClOrdID, cl_order_id)
+    msg.append_pair(fc.FixTag.ClOrdID, cl_order_id)
     return msg
 
 
@@ -317,13 +315,13 @@ def reject(
 
     msg = FixMessage()
     msg.append_pair(
-        TAGS.MsgType,
+        fc.FixTag.MsgType,
         fc.FixMsgType.REJECT,
         header=True
     )
-    msg.append_pair(TAGS.RefSeqNum, ref_sequence_number)
-    msg.append_pair(TAGS.Text, reject_reason)
-    msg.append_pair(TAGS.RefTagID, ref_tag)
-    msg.append_pair(TAGS.RefMsgType, ref_message_type)
-    msg.append_pair(TAGS.SessionRejectReason, rejection_type)
+    msg.append_pair(fc.FixTag.RefSeqNum, ref_sequence_number)
+    msg.append_pair(fc.FixTag.Text, reject_reason)
+    msg.append_pair(fc.FixTag.RefTagID, ref_tag)
+    msg.append_pair(fc.FixTag.RefMsgType, ref_message_type)
+    msg.append_pair(fc.FixTag.SessionRejectReason, rejection_type)
     return msg

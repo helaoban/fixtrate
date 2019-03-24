@@ -8,7 +8,6 @@ class FixMessageFactory:
     def __init__(self, conf):
         self.conf = conf
         self._mod = self.get_helper_mod()
-        self.TAGS = getattr(fc.FixTag, conf.version.name)
 
     def get_helper_mod(self):
         version = self.conf.version.name.lower()
@@ -44,24 +43,24 @@ class FixMessageFactory:
         :return:
         """
         msg.append_pair(
-            self.TAGS.BeginString,
+            fc.FixTag.BeginString,
             self.conf['FIX_VERSION'],
             header=True
         )
         msg.append_pair(
-            self.TAGS.SenderCompID,
+            fc.FixTag.SenderCompID,
             self.conf['FIX_SENDER_COMP_ID'],
             header=True
         )
         msg.append_pair(
-            self.TAGS.TargetCompID,
+            fc.FixTag.TargetCompID,
             self.conf['FIX_TARGET_COMP_ID'],
             header=True
         )
 
         if seq_num:
             msg.append_pair(
-                self.TAGS.MsgSeqNum,
+                fc.FixTag.MsgSeqNum,
                 self.store.increment_local_sequence_number(),
                 header=True
             )
@@ -70,7 +69,7 @@ class FixMessageFactory:
             timestamp = dt.datetime.utcnow()
 
         msg.append_utc_timestamp(
-            self.TAGS.SendingTime,
+            fc.FixTag.SendingTime,
             timestamp=timestamp,
             precision=6,
             header=True

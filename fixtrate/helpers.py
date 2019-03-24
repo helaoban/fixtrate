@@ -2,7 +2,6 @@ from . import constants as fix, exceptions as exc
 from .session_id import SessionID
 from .factories import fix42
 
-TAGS = fix.FixTag.FIX42
 
 ADMIN_MESSAGES = {
     fix.FixMsgType.LOGON,
@@ -55,7 +54,7 @@ def make_logon_msg(hb_int=30, reset=False):
     )
     if reset:
         msg.append_pair(
-            fix.FixTag.FIX42.MsgSeqNum, 1)
+            fix.FixTag.MsgSeqNum, 1)
     return msg
 
 
@@ -75,7 +74,7 @@ def make_sequence_reset(new_seq_num):
 def make_gap_fill(seq_num, new_seq_num):
     msg = fix42.sequence_reset(new_seq_num)
     msg.append_pair(
-        fix.FixTag.FIX42.MsgSeqNum, seq_num, header=True)
+        fix.FixTag.MsgSeqNum, seq_num, header=True)
     return msg
 
 
@@ -94,12 +93,12 @@ def prepare_msgs_for_resend(msgs):
                 rv.append(gap_fill)
                 gap_start, gap_end = None, None
 
-            dup_flag = msg.get(TAGS.PossDupFlag)
+            dup_flag = msg.get(fix.FixTag.PossDupFlag)
             if dup_flag != fix.PossDupFlag.YES:
                 if dup_flag is not None:
-                    msg.remove(TAGS.PossDupFlag)
+                    msg.remove(fix.FixTag.PossDupFlag)
                 msg.append_pair(
-                    TAGS.PossDupFlag,
+                    fix.FixTag.PossDupFlag,
                     fix.PossDupFlag.YES,
                     header=True
                 )
@@ -115,7 +114,7 @@ def prepare_msgs_for_resend(msgs):
 
 def append_send_time(msg, timestamp=None):
     msg.append_utc_timestamp(
-        TAGS.SendingTime,
+        fix.FixTag.SendingTime,
         timestamp=timestamp,
         precision=6,
         header=True
@@ -129,19 +128,19 @@ async def append_standard_header(
     timestamp=None,
     headers=None
 ):
-    if msg.get(TAGS.MsgSeqNum) is None:
+    if msg.get(fix.FixTag.MsgSeqNum) is None:
         if seq_num is None:
             raise ValueError(
                 'MsgSeqNum is not set on msg, and '
                 'no seq_num was given'
             )
-        msg.append_pair(TAGS.MsgSeqNum, seq_num)
+        msg.append_pair(fix.FixTag.MsgSeqNum, seq_num)
 
     headers = list(headers or [])
     headers.extend([
-        (TAGS.BeginString, sid.begin_string),
-        (TAGS.SenderCompID, sid.sender),
-        (TAGS.TargetCompID, sid.target)
+        (fix.FixTag.BeginString, sid.begin_string),
+        (fix.FixTag.SenderCompID, sid.sender),
+        (fix.FixTag.TargetCompID, sid.target)
     ])
 
     for tag, val in headers:
@@ -149,7 +148,7 @@ async def append_standard_header(
         if existing is None:
             msg.append_pair(tag, val, header=True)
 
-    send_time = msg.get(TAGS.SendingTime)
+    send_time = msg.get(fix.FixTag.SendingTime)
     if timestamp is not None or send_time is None:
         append_send_time(msg, timestamp=timestamp)
 
@@ -168,13 +167,13 @@ def validate_tag_value(msg, tag, expected, type_):
 
 
 HEADER_REQUIRED = (
-    TAGS.BeginString,
-    TAGS.BodyLength,
-    TAGS.TargetCompID,
-    TAGS.SenderCompID,
-    TAGS.SendingTime,
-    TAGS.MsgSeqNum,
-    TAGS.MsgType
+    fix.FixTag.BeginString,
+    fix.FixTag.BodyLength,
+    fix.FixTag.TargetCompID,
+    fix.FixTag.SenderCompID,
+    fix.FixTag.SendingTime,
+    fix.FixTag.MsgSeqNum,
+    fix.FixTag.MsgType
 )
 
 
@@ -183,9 +182,9 @@ def validate_header(msg, session_id):
         if tag not in msg:
             raise exc.MissingRequiredTagError(msg, tag)
     for tag, value, type_ in (
-        (TAGS.BeginString,  session_id.begin_string, str),
-        (TAGS.TargetCompID,  session_id.sender, str),
-        (TAGS.SenderCompID,  session_id.target, str)
+        (fix.FixTag.BeginString,  session_id.begin_string, str),
+        (fix.FixTag.TargetCompID,  session_id.sender, str),
+        (fix.FixTag.SenderCompID,  session_id.target, str)
     ):
         validate_tag_value(msg, tag, value, type_)
 
