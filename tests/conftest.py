@@ -1,10 +1,14 @@
 import asyncio
+from datetime import datetime
+import uuid
+
 import aioredis
 import pytest
 from fixtrate import constants as fix
 from tests.server import MockFixServer
 from fixtrate.store import MemoryStoreInterface, RedisStoreInterface
 from fixtrate.engine import FixEngine
+from fixtrate.message import FixMessage
 
 
 @pytest.fixture(params=['inmemory', 'redis'])
@@ -66,3 +70,18 @@ async def engine(store_interface):
     engine.store_interface = store_interface
     yield engine
     await engine.close()
+
+
+@pytest.fixture
+def order_request():
+    order = FixMessage()
+    order.append_pair(fix.FixTag.MsgType, fix.FixMsgType.NEW_ORDER_SINGLE)
+    order.append_pair(fix.FixTag.ClOrdID, str(uuid.uuid4()))
+    order.append_pair(fix.FixTag.OrdType, fix.OrdType.LIMIT)
+    order.append_pair(fix.FixTag.Symbol, 'UGAZ')
+    order.append_pair(fix.FixTag.Side, fix.Side.BUY)
+    order.append_pair(fix.FixTag.OrderQty, 100)
+    order.append_pair(fix.FixTag.Price, 25.0)
+    order.append_utc_timestamp(fix.FixTag.TransactTime, datetime.utcnow())
+    return order
+
