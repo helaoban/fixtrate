@@ -6,7 +6,7 @@ from fixtrate import (
     constants as fc,
     dictionary as fd
 )
-from fixtrate.factories import fix44
+from fixtrate.factories import fix42
 
 here = os.path.dirname(__file__)
 
@@ -18,7 +18,7 @@ def fix_dict():
 
 @pytest.fixture
 def market_data_request(fix_session):
-    msg = fix44.market_data_request(
+    msg = fix42.market_data_request(
         symbols=['GLNG', 'NAT'],
         entry_types=[et for et in fc.MDEntryType],
     )
