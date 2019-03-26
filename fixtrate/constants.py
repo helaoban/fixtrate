@@ -463,7 +463,7 @@ class FixTag(BaseIntEnum):
     LastMkt = 30
     LastPx = 31
     LastQty = 32
-    LinesOfText = 33
+    NoLinesOfText = 33
     MsgSeqNum = 34
     MsgType = 35
     NewSeqNo = 36
@@ -1407,4 +1407,4 @@ class FixTag(BaseIntEnum):
     DiscretionOffsetValue = 389
     TotalNumSecurities = 393
     TradeType = 418
-
+    LinesOfText = 33
