@@ -464,7 +464,6 @@ class FixSession:
         }.get(msg.msg_type)
 
     async def _handle_logon(self, msg):
-        rv = None
         is_reset = self._is_reset(msg)
         if is_reset:
             await self._set_remote_sequence(2)
@@ -474,11 +473,12 @@ class FixSession:
         helpers.validate_tag_value(
             msg, fc.FixTag.HeartBtInt, hb_int, int)
 
+        rv = None
         if not self._initiator:
             rv = helpers.make_logon_msg(
                 hb_int, reset=is_reset)
-        self.logged_on = True
 
+        self.logged_on = True
         return rv
 
     async def _handle_logout(self, msg):
