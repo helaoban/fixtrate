@@ -278,16 +278,12 @@ class FixSession:
                 'Invalid message was received and rejected: '
                 '%s' % msg.get(fc.FixTag.Text)
             )
-            return
         except FatalSequenceGapError as error:
             await self._handle_fatal_sequence_gap(
                 error.fix_msg, error.gap)
-            return
         except SequenceGapError as error:
             await self._handle_sequence_gap(
                 msg, error.gap)
-            return
-
 
     async def _validate_seq_num(self, msg):
         diff = await self._get_sequence_gap(msg)
