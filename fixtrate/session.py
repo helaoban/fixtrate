@@ -289,7 +289,7 @@ class FixSession:
             return
 
 
-    async def validate_seq_num(self, msg):
+    async def _validate_seq_num(self, msg):
         diff = await self._get_sequence_gap(msg)
         if diff > 0:
             raise SequenceGapError(msg, diff)
@@ -305,7 +305,7 @@ class FixSession:
         helpers.validate_header(msg, self.id)
 
         await self._store_message(msg)
-        await self.validate_seq_num(msg)
+        await self._validate_seq_num(msg)
         await self._incr_remote_sequence()
 
         if self._waiting_resend:
