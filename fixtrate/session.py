@@ -450,14 +450,13 @@ class FixSession:
         return msg.seq_num - expected
 
     async def _handle_logon(self, msg):
+        hb_int = self.config['heartbeat_interval']
+        helpers.validate_tag_value(
+            msg, fc.FixTag.HeartBtInt, hb_int, int)
+
         is_reset = self._is_reset(msg)
         if is_reset:
             await self._set_remote_sequence(2)
-
-        hb_int = self.config['heartbeat_interval']
-
-        helpers.validate_tag_value(
-            msg, fc.FixTag.HeartBtInt, hb_int, int)
 
         if not self._initiator:
             reply = helpers.make_logon_msg(
