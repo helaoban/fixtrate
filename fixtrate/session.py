@@ -134,10 +134,8 @@ class FixSession:
             raise FIXError(
                 'Only a session initator can send '
                 'a initate a logon')
-        login_msg = fix42.logon(
-            hb_int=self.config.get('heartbeat_interval'),
-            reset=reset
-        )
+        hb_int = self.config.get('heartbeat_interval')
+        login_msg = fix42.logon(hb_int=hb_int, reset=reset)
         if reset:
             await self._set_local_sequence(1)
             login_msg.append_pair(fc.FixTag.MsgSeqNum, 1)
