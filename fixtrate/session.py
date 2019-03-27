@@ -1,6 +1,7 @@
 import asyncio
 import datetime as dt
 import logging
+import uuid
 
 import async_timeout
 
@@ -123,7 +124,7 @@ class FixSession:
         """
         return await self.store.get_remote(self._session_id)
 
-    async def logon(self, reset=False):
+    async def logon(self):
         """ Logon to a FIX Session. Sends a Logon<A> message to peer.
 
         :param reset: Whether to set ResetSeqNumFlag to 'Y' on the
@@ -135,11 +136,7 @@ class FixSession:
                 'Only a session initator can send '
                 'a initate a logon')
         hb_int = self.config.get('heartbeat_interval')
-        login_msg = fix42.logon(hb_int=hb_int, reset=reset)
-        if reset:
-            await self._set_local_sequence(1)
-            login_msg.append_pair(fc.FixTag.MsgSeqNum, 1)
-
+        login_msg = fix42.logon(hb_int=hb_int)
         await self.send(login_msg)
 
     async def logout(self):
