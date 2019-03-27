@@ -276,14 +276,13 @@ class FixSession:
             await self._handle_invalid_message(error)
             return
         except FatalSequenceGapError as error:
-            logger.error(
-                'Unrecoverable sequence gap error. Received msg '
-                '(%s) with seq num %s, but expected seq num %s. '
-                'Terminating the session...' % (
-                    msg.msg_type, msg.seq_num, error.expected)
-            )
-            await self.close()
-            raise
+            await self._handle_fatal_sequence_gap(
+                error.fix_msg, error.gap)
+            return
+        except SequenceGapError as error:
+            await self._handle_sequence_gap(
+                msg, error.gap)
+            return
 
         if rep is not None:
             if not isinstance(rep, (list, tuple)):
@@ -310,17 +309,9 @@ class FixSession:
 
     async def _handle_message(self, msg):
         helpers.validate_header(msg, self.id)
+
         await self._store_message(msg)
-
-        try:
-            await self.validate_seq_num(msg)
-        except SequenceGapError as error:
-            return await self._handle_sequence_gap(
-                msg, error.gap)
-        except FatalSequenceGapError as error:
-            return await self._handle_fatal_sequence_gap(
-                msg, error.gap)
-
+        await self.validate_seq_num(msg)
         await self._incr_remote_sequence()
 
         if self._waiting_resend:
@@ -393,7 +384,9 @@ class FixSession:
             rv.extend(to_resend)
 
         if self._waiting_resend:
-            return rv
+            for v in rv:
+                await self.send(v)
+            return
 
         if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
             # TODO how should we handle a GAP FILL here?
@@ -401,7 +394,9 @@ class FixSession:
                 rep = await self._handle_sequence_reset(msg)
                 if rep is not None:
                     rv.append(rep)
-                return rv
+                for v in rv:
+                    await self.send(v)
+                return
 
         if msg.msg_type == fc.FixMsgType.LOGON:
             rep = await self._handle_logon(msg)
@@ -420,7 +415,9 @@ class FixSession:
         resend_request = helpers.make_resend_request(
             msg.seq_num - gap, 0)
         rv.append(resend_request)
-        return rv
+
+        for v in rv:
+            await self.send(v)
 
     async def _handle_fatal_sequence_gap(self, msg, gap):
         """ Handle a sequence gap where gap <0
@@ -455,9 +452,17 @@ class FixSession:
 
         else:
             if not msg.is_duplicate:
-                raise FatalSequenceGapError(msg, gap)
-
-        return rv
+                expected = msg.seq_num - gap
+                logger.error(
+                    'Unrecoverable sequence gap error. Received msg '
+                    '(%s) with seq num %s, but expected seq num %s. '
+                    'Terminating the session...' % (
+                        msg.msg_type, msg.seq_num, error.expected)
+                )
+                await self.close()
+                return
+        logger.debug(rv)
+        await self.send(rv)
 
     async def _get_sequence_gap(self, msg):
         expected = await self.get_remote_sequence()
