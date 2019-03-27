@@ -7,6 +7,7 @@ import async_timeout
 
 from . import helpers, constants as fc
 from .exceptions import (
+    SequenceGapError,
     FatalSequenceGapError,
     InvalidMessageError, FixRejectionError,
     IncorrectTagValueError, FIXError,
@@ -295,29 +296,38 @@ class FixSession:
                     )
                 await self.send(msg)
 
+    async def validate_seq_num(self, msg):
+        diff = await self._get_sequence_gap(msg)
+        if diff > 0:
+            raise SequenceGapError(msg, diff)
+        if diff < 0:
+            raise FatalSequenceGap(msg, diff)
+
     async def _handle_message(self, msg):
         helpers.validate_header(msg, self.id)
         await self._store_message(msg)
 
-        diff = await self._get_sequence_gap(msg)
-        if diff < 0:
-            return await self._handle_fatal_sequence_gap(msg, diff)
-        elif diff > 0:
-            return await self._handle_sequence_gap(msg, diff)
-        else:
+        try:
+            await self.validate_seq_num(msg)
+        except SequenceGapError as error:
+            return await self._handle_sequence_gap(
+                msg, error.gap)
+        except FatalSequenceGapError as error:
+            return await self._handle_fatal_sequence_gap(
+                msg, error.gap)
 
-            await self._incr_remote_sequence()
+        await self._incr_remote_sequence()
 
-            if self._waiting_resend:
-                if not msg.is_duplicate:
-                    self._waiting_resend = False
-                    if self._logout_after_resend:
-                        return helpers.make_logout_msg()
+        if self._waiting_resend:
+            if not msg.is_duplicate:
+                self._waiting_resend = False
+                if self._logout_after_resend:
+                    return helpers.make_logout_msg()
 
-            if not helpers.is_duplicate_admin(msg):
-                handler = self._dispatch(msg)
-                if handler is not None:
-                    return await maybe_await(handler, msg)
+        if not helpers.is_duplicate_admin(msg):
+            handler = self._dispatch(msg)
+            if handler is not None:
+                return await maybe_await(handler, msg)
 
     async def _handle_sequence_gap(self, msg, gap):
         """ Handle sequence gap where gap > 0"
