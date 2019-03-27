@@ -550,3 +550,4 @@ class FixSession:
     def _is_reset(self, msg):
         reset_seq = msg.get(fc.FixTag.ResetSeqNumFlag)
         return reset_seq == fc.ResetSeqNumFlag.YES
+
