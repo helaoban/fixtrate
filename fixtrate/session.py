@@ -157,17 +157,14 @@ class FixSession:
         if self._on_close is not None:
             await maybe_await(self._on_close, self)
 
-    async def send(self, msg, skip_headers=False):
+    async def send(self, msg):
         """
         Send a FIX message to peer.
 
         :param msg: message to send.
         :type msg: :class:`~fixtrate.message.FixMessage`
-        :param bool skip_headers: (optional) If set to `True`, the session will
-            not append the standard header before sending. Defaults to `False`
         """
-        if not skip_headers:
-            await self._append_standard_header(msg)
+        await self._append_standard_header(msg)
         if not msg.is_duplicate and not helpers.is_gap_fill(msg):
             await self._incr_local_sequence()
 
