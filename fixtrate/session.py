@@ -271,9 +271,13 @@ class FixSession:
 
     async def _process_message(self, msg):
         try:
-            rep = await self._handle_message(msg)
+            await self._handle_message(msg)
         except InvalidMessageError as error:
             await self._handle_invalid_message(error)
+            logger.warning(
+                'Invalid message was received and rejected: '
+                '%s' % msg.get(fc.FixTag.Text)
+            )
             return
         except FatalSequenceGapError as error:
             await self._handle_fatal_sequence_gap(
@@ -284,16 +288,6 @@ class FixSession:
                 msg, error.gap)
             return
 
-        if rep is not None:
-            if not isinstance(rep, (list, tuple)):
-                rep = [rep]
-            for msg in rep:
-                if msg.msg_type == fc.FixMsgType.REJECT:
-                    logger.warning(
-                        'Invalid message was received and rejected: '
-                        '%s' % msg.get(fc.FixTag.Text)
-                    )
-                await self.send(msg)
 
     async def validate_seq_num(self, msg):
         diff = await self._get_sequence_gap(msg)
@@ -323,7 +317,7 @@ class FixSession:
         if not helpers.is_duplicate_admin(msg):
             handler = self._dispatch(msg)
             if handler is not None:
-                return await maybe_await(handler, msg)
+                await maybe_await(handler, msg)
 
     def _dispatch(self, msg):
         return {
@@ -488,28 +482,28 @@ class FixSession:
         helpers.validate_tag_value(
             msg, fc.FixTag.HeartBtInt, hb_int, int)
 
-        rv = None
         if not self._initiator:
-            rv = helpers.make_logon_msg(
+            reply = helpers.make_logon_msg(
                 hb_int, reset=is_reset)
+            await self.send(reply)
 
         self.logged_on = True
-        return rv
 
     async def _handle_logout(self, msg):
-        rv = None
         if self._waiting_logout_confirm:
             self._waiting_logout_confirm = False
             await self.close()
         else:
             self._waiting_logout_confirm = True
-            rv = helpers.make_logout_msg()
+            reply = helpers.make_logout_msg()
+            await self.send(reply)
+
         self.logged_on = False
-        return rv
 
     async def _handle_test_request(self, msg):
         test_request_id = msg.get(fc.FixTag.TestReqID)
-        return fix42.heartbeat(test_request_id)
+        reply = fix42.heartbeat(test_request_id)
+        await self.send(reply)
 
     def _log_rejection(self, msg):
         reason = msg.get(fc.FixTag.Text)
@@ -526,7 +520,9 @@ class FixSession:
         if end == 0:
             # EndSeqNo of 0 means infinity
             end = float('inf')
-        return await self._get_resend_msgs(start, end)
+        to_resend = await self._get_resend_msgs(start, end)
+        for m in to_resend:
+            await self.send(m)
 
     async def _handle_sequence_reset(self, msg):
         new = int(msg.get(fc.FixTag.NewSeqNo))
@@ -541,8 +537,9 @@ class FixSession:
                 'number to %s, this is now allowed.' % (expected, new)
             )
             reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
-            return helpers.make_reject_msg(
+            reject_msg = helpers.make_reject_msg(
                 msg, fc.FixTag.NewSeqNo, reject_type, error)
+            await self.send(reject_msg)
 
         await self._set_remote_sequence(new)
 
