@@ -29,10 +29,11 @@ class SequenceGapError(FIXError):
     """
     def __init__(self, fix_msg, gap):
         expected = fix_msg.seq_num - gap
+        greater_or_lower = 'greater' if gap > 0 else 'lower'
         error = (
-            'Remote sequence number is lower than '
+            'Remote sequence number is %s than '
             'expected, expected %s but got %s'
-            '' % (expected, fix_msg.seq_num)
+            '' % (greater_or_lower, expected, fix_msg.seq_num)
         )
         super().__init__(error)
         self.fix_msg = fix_msg
