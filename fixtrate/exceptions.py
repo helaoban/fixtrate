@@ -22,10 +22,10 @@ class DuplicateSessionError(FIXAuthenticationError):
         super().__init__(msg)
 
 
-class FatalSequenceGapError(FIXError):
+class SequenceGapError(FIXError):
     """
-    A fatal sequence gap occured (remote sequence number
-    is lower than expected).
+    A sequence gap occured (remote sequence number
+    is greater than expected).
     """
     def __init__(self, fix_msg, gap):
         expected = fix_msg.seq_num - gap
@@ -38,6 +38,13 @@ class FatalSequenceGapError(FIXError):
         self.fix_msg = fix_msg
         self.gap = gap
         self.expected = expected
+
+
+class FatalSequenceGapError(SequenceGapError):
+    """
+    A fatal sequence gap occured (remote sequence number
+    is lower than expected).
+    """
 
 
 class FixRejectionError(FIXError):
