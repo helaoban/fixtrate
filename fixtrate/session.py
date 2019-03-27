@@ -273,8 +273,8 @@ class FixSession:
         try:
             rep = await self._handle_message(msg)
         except InvalidMessageError as error:
-            rep = helpers.make_reject_msg(
-                msg, error.tag, error.reject_type, str(error))
+            await self._handle_invalid_message(error)
+            return
         except FatalSequenceGapError as error:
             logger.error(
                 'Unrecoverable sequence gap error. Received msg '
@@ -302,6 +302,11 @@ class FixSession:
             raise SequenceGapError(msg, diff)
         if diff < 0:
             raise FatalSequenceGap(msg, diff)
+
+    async def _handle_invalid_message(self, error):
+        reject_msg = helpers.make_reject_msg(
+            error.fix_msg, error.tag, error.reject_type, str(error))
+        await self.send(reject_msg)
 
     async def _handle_message(self, msg):
         helpers.validate_header(msg, self.id)
