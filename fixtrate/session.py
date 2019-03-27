@@ -167,13 +167,7 @@ class FixSession:
             not append the standard header before sending. Defaults to `False`
         """
         if not skip_headers:
-            seq_num = msg.seq_num
-            if seq_num is None:
-                seq_num = await self.get_local_sequence()
-            await helpers.append_standard_header(
-                msg, self._session_id, seq_num,
-                headers=self.config['headers'])
-
+            await self._append_standard_header(msg)
         if not msg.is_duplicate and not helpers.is_gap_fill(msg):
             await self._incr_local_sequence()
 
@@ -186,6 +180,27 @@ class FixSession:
             return
 
         await self._reset_heartbeat_timer()
+
+    async def _append_standard_header(self, msg, timestamp=None):
+        if msg.seq_num is None:
+            seq_num = await self.get_local_sequence()
+            msg.append_pair(fc.FixTag.MsgSeqNum, seq_num)
+
+        headers = [
+            (fc.FixTag.BeginString, self.id.begin_string),
+            (fc.FixTag.SenderCompID, self.id.sender),
+            (fc.FixTag.TargetCompID, self.id.target),
+            *self.config['headers']
+        ]
+
+        for tag, val in headers:
+            existing = msg.get(tag)
+            if existing is None:
+                msg.append_pair(tag, val, header=True)
+
+        send_time = msg.get(fc.FixTag.SendingTime)
+        if timestamp is not None or send_time is None:
+            helpers.append_send_time(msg, timestamp=timestamp)
 
     async def _incr_local_sequence(self):
         return await self.store.incr_local(self._session_id)

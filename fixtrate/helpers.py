@@ -118,32 +118,6 @@ def append_send_time(msg, timestamp=None):
     )
 
 
-async def append_standard_header(
-    msg,
-    sid,
-    seq_num,
-    timestamp=None,
-    headers=None
-):
-    msg.append_pair(fix.FixTag.MsgSeqNum, seq_num)
-
-    headers = list(headers or [])
-    headers.extend([
-        (fix.FixTag.BeginString, sid.begin_string),
-        (fix.FixTag.SenderCompID, sid.sender),
-        (fix.FixTag.TargetCompID, sid.target)
-    ])
-
-    for tag, val in headers:
-        existing = msg.get(tag)
-        if existing is None:
-            msg.append_pair(tag, val, header=True)
-
-    send_time = msg.get(fix.FixTag.SendingTime)
-    if timestamp is not None or send_time is None:
-        append_send_time(msg, timestamp=timestamp)
-
-
 def validate_tag_value(msg, tag, expected, type_):
     actual = msg.get(tag)
     try:
