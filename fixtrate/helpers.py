@@ -121,17 +121,11 @@ def append_send_time(msg, timestamp=None):
 async def append_standard_header(
     msg,
     sid,
-    seq_num=None,
+    seq_num,
     timestamp=None,
     headers=None
 ):
-    if msg.get(fix.FixTag.MsgSeqNum) is None:
-        if seq_num is None:
-            raise ValueError(
-                'MsgSeqNum is not set on msg, and '
-                'no seq_num was given'
-            )
-        msg.append_pair(fix.FixTag.MsgSeqNum, seq_num)
+    msg.append_pair(fix.FixTag.MsgSeqNum, seq_num)
 
     headers = list(headers or [])
     headers.extend([

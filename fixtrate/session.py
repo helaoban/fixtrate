@@ -167,9 +167,11 @@ class FixSession:
             not append the standard header before sending. Defaults to `False`
         """
         if not skip_headers:
-            seq_num = await self.get_local_sequence()
+            seq_num = msg.seq_num
+            if seq_num is None:
+                seq_num = await self.get_local_sequence()
             await helpers.append_standard_header(
-                msg, self._session_id, seq_num=seq_num,
+                msg, self._session_id, seq_num,
                 headers=self.config['headers'])
 
         if not msg.is_duplicate and not self._is_gap_fill(msg):
