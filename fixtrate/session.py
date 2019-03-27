@@ -382,46 +382,31 @@ class FixSession:
         In Reset mode, we simply set the next expected remote
         seq number to the NewSeqNo(36) value of the msg
         """
-        rv = []
         if msg.msg_type == fc.FixMsgType.RESEND_REQUEST:
-            to_resend = await self._handle_resend_request(msg)
-            rv.extend(to_resend)
+            await self._handle_resend_request(msg)
 
         if self._waiting_resend:
-            for v in rv:
-                await self.send(v)
             return
 
         if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
             # TODO how should we handle a GAP FILL here?
             if not self._is_gap_fill(msg):
-                rep = await self._handle_sequence_reset(msg)
-                if rep is not None:
-                    rv.append(rep)
-                for v in rv:
-                    await self.send(v)
+                await self._handle_sequence_reset(msg)
                 return
 
         if msg.msg_type == fc.FixMsgType.LOGON:
-            rep = await self._handle_logon(msg)
-            if rep is not None:
-                rv.append(rep)
+            await self._handle_logon(msg)
 
         if msg.msg_type == fc.FixMsgType.LOGOUT:
             if self._waiting_logout_confirm:
-                rep = await self._handle_logout(msg)
-                if rep is not None:
-                    rv.append(rep)
+                await self._handle_logout(msg)
             else:
                 self._logout_after_resend = True
 
         self._waiting_resend = True
         resend_request = helpers.make_resend_request(
             msg.seq_num - gap, 0)
-        rv.append(resend_request)
-
-        for v in rv:
-            await self.send(v)
+        await self.send(resend_request)
 
     async def _handle_fatal_sequence_gap(self, msg, gap):
         """ Handle a sequence gap where gap <0
@@ -445,14 +430,13 @@ class FixSession:
         terminate the session and raise the error.
 
         """
-        rv = None
         if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
             if not self._is_gap_fill(msg):
-                rv = await self._handle_sequence_reset(msg)
+                await self._handle_sequence_reset(msg)
 
         elif msg.msg_type == fc.FixMsgType.LOGON:
             if self._is_reset(msg):
-                rv = await self._handle_logon(msg)
+                await self._handle_logon(msg)
 
         else:
             if not msg.is_duplicate:
@@ -464,9 +448,6 @@ class FixSession:
                         msg.msg_type, msg.seq_num, error.expected)
                 )
                 await self.close()
-                return
-        logger.debug(rv)
-        await self.send(rv)
 
     async def _get_sequence_gap(self, msg):
         expected = await self.get_remote_sequence()
