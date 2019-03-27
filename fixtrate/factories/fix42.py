@@ -38,25 +38,16 @@ def logout():
 
 
 def logon(
-        encrypt_method=fc.EncryptMethod.NONE,
-        heartbeat_interval=30,
-        reset_sequence=False
+    hb_int=30,
+    reset=False,
+    encrypt_method=fc.EncryptMethod.NONE
 ):
     msg = FixMessage()
     msg.append_pair(
-        fc.FixTag.MsgType,
-        fc.FixMsgType.LOGON,
-        header=True
-    )
-    msg.append_pair(
-        fc.FixTag.EncryptMethod,
-        encrypt_method,
-    )
-    msg.append_pair(
-        fc.FixTag.HeartBtInt,
-        heartbeat_interval
-    )
-    if reset_sequence:
+        fc.FixTag.MsgType, fc.FixMsgType.LOGON, header=True)
+    msg.append_pair(fc.FixTag.EncryptMethod, encrypt_method)
+    msg.append_pair(fc.FixTag.HeartBtInt, hb_int)
+    if reset:
         msg.append_pair(fc.FixTag.ResetSeqNumFlag, 'Y')
     return msg
 

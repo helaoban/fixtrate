@@ -48,10 +48,7 @@ def make_reject_msg(msg, tag, rejection_type, reason):
 
 
 def make_logon_msg(hb_int=30, reset=False):
-    msg = fix42.logon(
-        heartbeat_interval=hb_int,
-        reset_sequence=reset
-    )
+    msg = fix42.logon(hb_int=hb_int, reset=reset)
     if reset:
         msg.append_pair(
             fix.FixTag.MsgSeqNum, 1)

@@ -135,8 +135,8 @@ class FixSession:
                 'Only a session initator can send '
                 'a initate a logon')
         login_msg = fix42.logon(
-            heartbeat_interval=self.config.get('heartbeat_interval'),
-            reset_sequence=reset
+            hb_int=self.config.get('heartbeat_interval'),
+            reset=reset
         )
         if reset:
             await self._set_local_sequence(1)
