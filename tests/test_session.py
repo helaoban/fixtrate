@@ -64,8 +64,8 @@ async def test_can_iterate(
             assert msg.msg_type == fix.FixMsgType.LOGON
             break
 
-        await session.send(test_request)
-
+        session.send(test_request)
+        await session.drain()
         async for msg in session:
             assert msg.msg_type == fix.FixMsgType.HEARTBEAT
             assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
@@ -177,7 +177,7 @@ async def test_test_request(
     port = test_server.config['port']
     async with engine.connect(host, port, client_config) as session:
         await session.logon()
-        await session.send(test_request)
+        session.send(test_request)
 
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
@@ -200,7 +200,7 @@ async def test_reset_seq_num(
         assert msg.msg_type == fix.FixMsgType.LOGON
 
         test_id = str(uuid.uuid4())
-        await session.send(test_request)
+        session.send(test_request)
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
         assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
@@ -232,7 +232,7 @@ async def test_sequence_reset(
         server_session = test_server.client_sessions[0]
         await server_session._set_local_sequence(9)
         sequence_reset = helpers.make_sequence_reset(10)
-        await server_session.send(sequence_reset)
+        server_session.send(sequence_reset)
 
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
@@ -240,7 +240,7 @@ async def test_sequence_reset(
         new_remote_seq_num = int(msg.get(fix.FixTag.NewSeqNo))
         assert new_remote_seq_num == await session.get_remote_sequence()
 
-        await session.send(test_request)
+        session.send(test_request)
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.HEARTBEAT
         assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
@@ -277,7 +277,7 @@ async def test_message_recovery(
             msg = await session.receive()
             assert msg.msg_type == fix.FixMsgType.LOGON
 
-            await test_server.client_sessions[0].send(news_msg)
+            test_server.client_sessions[0].send(news_msg)
             raise ConnectionAbortedError
 
     async with engine.connect(host, port, client_config) as session:

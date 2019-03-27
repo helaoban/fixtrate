@@ -71,9 +71,12 @@ class FixSession:
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
         self._hearbeat_cb = None
-
+        self._msg_queue = asyncio.Queue()
         self.logged_on = False
         self.parser = FixParser()
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(self._process_msg_queue())
 
     def __aiter__(self):
         return self
@@ -137,33 +140,47 @@ class FixSession:
                 'Only a session initator can send '
                 'a initate a logon')
         hb_int = self.config.get('heartbeat_interval')
-        login_msg = fix42.logon(hb_int=hb_int)
-        await self.send(login_msg)
+        login_msg = fix42.logon(hb_int=hb_int, reset=reset)
+        self.send(login_msg)
+
+    async def reset(self):
+        test_id = str(uuid.uuid4())
+        test_request = fix42.test_request(test_id)
+        curried = functools.partial(self._initiate_reset, test_id)
+        self._register_msg_cb(fc.FixMsgType.HEARTBEAT, curried)
+        self.send(test_request)
 
     async def logout(self):
         """ Logout from a FIX Session. Sends a Logout<5> message to peer.
         """
         rv = None
         self._waiting_logout_confirm = True
-        await self.send(fix42.logout())
+        self.send(fix42.logout())
 
     async def close(self):
         """
         Close the session. Closes the underlying connection and performs
         cleanup work.
         """
+        await self._msg_queue.put(None)
         await self._cancel_heartbeat_timer()
         await self.transport.close()
         if self._on_close is not None:
             await maybe_await(self._on_close, self)
 
-    async def send(self, msg):
+    def send(self, msg):
         """
         Send a FIX message to peer.
 
         :param msg: message to send.
         :type msg: :class:`~fixtrate.message.FixMessage`
         """
+        self._msg_queue.put_nowait(msg)
+
+    async def drain(self):
+        await self._msg_queue.join()
+
+    async def _send(self, msg):
         await self._append_standard_header(msg)
         if not msg.is_duplicate and not helpers.is_gap_fill(msg):
             await self._incr_local_sequence()
@@ -309,7 +326,7 @@ class FixSession:
     async def _handle_invalid_message(self, error):
         reject_msg = helpers.make_reject_msg(
             error.fix_msg, error.tag, error.reject_type, str(error))
-        await self.send(reject_msg)
+        self.send(reject_msg)
 
     async def _handle_message(self, msg):
         helpers.validate_header(msg, self.id)
@@ -416,7 +433,7 @@ class FixSession:
         self._waiting_resend = True
         resend_request = helpers.make_resend_request(
             msg.seq_num - gap, 0)
-        await self.send(resend_request)
+        self.send(resend_request)
 
     async def _handle_fatal_sequence_gap(self, msg, gap):
         """ Handle a sequence gap where gap <0
@@ -475,7 +492,7 @@ class FixSession:
         if not self._initiator:
             reply = helpers.make_logon_msg(
                 hb_int, reset=is_reset)
-            await self.send(reply)
+            self.send(reply)
 
         self.logged_on = True
 
@@ -486,14 +503,14 @@ class FixSession:
         else:
             self._waiting_logout_confirm = True
             reply = helpers.make_logout_msg()
-            await self.send(reply)
+            self.send(reply)
 
         self.logged_on = False
 
     async def _handle_test_request(self, msg):
         test_request_id = msg.get(fc.FixTag.TestReqID)
         reply = fix42.heartbeat(test_request_id)
-        await self.send(reply)
+        self.send(reply)
 
     def _log_rejection(self, msg):
         reason = msg.get(fc.FixTag.Text)
@@ -512,7 +529,7 @@ class FixSession:
             end = float('inf')
         to_resend = await self._get_resend_msgs(start, end)
         for m in to_resend:
-            await self.send(m)
+            self.send(m)
 
     async def _handle_sequence_reset(self, msg):
         new = int(msg.get(fc.FixTag.NewSeqNo))
@@ -529,7 +546,7 @@ class FixSession:
             reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
             reject_msg = helpers.make_reject_msg(
                 msg, fc.FixTag.NewSeqNo, reject_type, error)
-            await self.send(reject_msg)
+            self.send(reject_msg)
 
         await self._set_remote_sequence(new)
 
@@ -553,8 +570,16 @@ class FixSession:
             interval = self.config.get('heartbeat_interval')
             await asyncio.sleep(interval)
             msg = fix42.heartbeat()
-            await self.send(msg)
+            self.send(msg)
         except asyncio.CancelledError:
             raise
 
+
+    async def _process_msg_queue(self):
+        while True:
+            msg = await self._msg_queue.get()
+            if msg is None:
+                break
+            await self._send(msg)
+            self._msg_queue.task_done()
 
