@@ -179,3 +179,13 @@ def validate_header(msg, session_id):
     ):
         validate_tag_value(msg, tag, value, type_)
 
+
+def is_gap_fill(msg):
+    gf_flag = msg.get(fix.FixTag.GapFillFlag)
+    return gf_flag == fix.GapFillFlag.YES
+
+
+def is_reset(msg):
+    reset_seq = msg.get(fix.FixTag.ResetSeqNumFlag)
+    return reset_seq == fix.ResetSeqNumFlag.YES
+

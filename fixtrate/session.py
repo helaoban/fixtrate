@@ -174,7 +174,7 @@ class FixSession:
                 msg, self._session_id, seq_num,
                 headers=self.config['headers'])
 
-        if not msg.is_duplicate and not self._is_gap_fill(msg):
+        if not msg.is_duplicate and not helpers.is_gap_fill(msg):
             await self._incr_local_sequence()
 
         await self._store_message(msg)
@@ -388,7 +388,7 @@ class FixSession:
 
         if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
             # TODO how should we handle a GAP FILL here?
-            if not self._is_gap_fill(msg):
+            if not helpers.is_gap_fill(msg):
                 await self._handle_sequence_reset(msg)
                 return
 
@@ -429,11 +429,11 @@ class FixSession:
 
         """
         if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-            if not self._is_gap_fill(msg):
+            if not helpers.is_gap_fill(msg):
                 await self._handle_sequence_reset(msg)
 
         elif msg.msg_type == fc.FixMsgType.LOGON:
-            if self._is_reset(msg):
+            if helpers.is_reset(msg):
                 await self._handle_logon(msg)
 
         else:
@@ -456,7 +456,7 @@ class FixSession:
         helpers.validate_tag_value(
             msg, fc.FixTag.HeartBtInt, hb_int, int)
 
-        is_reset = self._is_reset(msg)
+        is_reset = helpers.is_reset(msg)
         if is_reset:
             await self._set_remote_sequence(2)
 
@@ -545,11 +545,4 @@ class FixSession:
         except asyncio.CancelledError:
             raise
 
-    def _is_gap_fill(self, msg):
-        gf_flag = msg.get(fc.FixTag.GapFillFlag)
-        return gf_flag == fc.GapFillFlag.YES
-
-    def _is_reset(self, msg):
-        reset_seq = msg.get(fc.FixTag.ResetSeqNumFlag)
-        return reset_seq == fc.ResetSeqNumFlag.YES
 
