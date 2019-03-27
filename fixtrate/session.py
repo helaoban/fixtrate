@@ -325,6 +325,16 @@ class FixSession:
             if handler is not None:
                 return await maybe_await(handler, msg)
 
+    def _dispatch(self, msg):
+        return {
+            fc.FixMsgType.LOGON: self._handle_logon,
+            fc.FixMsgType.LOGOUT: self._handle_logout,
+            fc.FixMsgType.TEST_REQUEST: self._handle_test_request,
+            fc.FixMsgType.REJECT: self._handle_reject,
+            fc.FixMsgType.RESEND_REQUEST: self._handle_resend_request,
+            fc.FixMsgType.SEQUENCE_RESET: self._handle_sequence_reset,
+        }.get(msg.msg_type)
+
     async def _handle_sequence_gap(self, msg, gap):
         """ Handle sequence gap where gap > 0"
 
@@ -467,16 +477,6 @@ class FixSession:
     async def _get_sequence_gap(self, msg):
         expected = await self.get_remote_sequence()
         return msg.seq_num - expected
-
-    def _dispatch(self, msg):
-        return {
-            fc.FixMsgType.LOGON: self._handle_logon,
-            fc.FixMsgType.LOGOUT: self._handle_logout,
-            fc.FixMsgType.TEST_REQUEST: self._handle_test_request,
-            fc.FixMsgType.REJECT: self._handle_reject,
-            fc.FixMsgType.RESEND_REQUEST: self._handle_resend_request,
-            fc.FixMsgType.SEQUENCE_RESET: self._handle_sequence_reset,
-        }.get(msg.msg_type)
 
     async def _handle_logon(self, msg):
         is_reset = self._is_reset(msg)
