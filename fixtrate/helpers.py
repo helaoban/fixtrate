@@ -163,3 +163,13 @@ def is_reset(msg):
     reset_seq = msg.get(fix.FixTag.ResetSeqNumFlag)
     return reset_seq == fix.ResetSeqNumFlag.YES
 
+
+def is_reset_mode(msg):
+    is_seq_reset = msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
+    return is_seq_reset and not helpers.is_gap_fill(msg)
+
+
+def is_logon_reset(msg):
+    is_logon = msg.msg_type == fix.FixMsgType.LOGON
+    return is_logon and is_reset(msg)
+

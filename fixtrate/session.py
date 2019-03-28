@@ -457,14 +457,10 @@ class FixSession:
         terminate the session and raise the error.
 
         """
-        if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-            if not helpers.is_gap_fill(msg):
-                await self._handle_sequence_reset(msg)
-
-        elif msg.msg_type == fc.FixMsgType.LOGON:
-            if helpers.is_reset(msg):
-                await self._handle_logon(msg)
-
+        if helpers.is_reset_mode(msg):
+            await self._handle_sequence_reset(msg)
+        elif helpers.is_logon_reset(msg):
+            await self._handle_logon(msg)
         else:
             if not msg.is_duplicate:
                 expected = msg.seq_num - gap
