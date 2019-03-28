@@ -321,7 +321,7 @@ class FixSession:
         if diff > 0:
             raise SequenceGapError(msg, diff)
         if diff < 0:
-            raise FatalSequenceGap(msg, diff)
+            raise FatalSequenceGapError(msg, diff)
 
     async def _handle_invalid_message(self, error):
         reject_msg = helpers.make_reject_msg(
