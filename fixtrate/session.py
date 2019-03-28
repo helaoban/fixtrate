@@ -473,7 +473,7 @@ class FixSession:
                     'Unrecoverable sequence gap error. Received msg '
                     '(%s) with seq num %s, but expected seq num %s. '
                     'Terminating the session...' % (
-                        msg.msg_type, msg.seq_num, error.expected)
+                        msg.msg_type, msg.seq_num, expected)
                 )
                 await self.close()
 
