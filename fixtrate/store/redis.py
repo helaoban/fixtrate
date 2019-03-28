@@ -113,7 +113,7 @@ class RedisStore(FixStore):
         if limit > 0:
             limit = limit + 1
         message_ids = await self.redis.zrevrangebyscore(
-            self.make_redis_key(session_id, 'messages_sent'),
+            self.make_redis_key(session_id, 'messages_received'),
             min=min, max=max, offset=0, count=limit
         )
         if len(message_ids) == 0:
