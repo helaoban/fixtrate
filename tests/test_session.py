@@ -199,20 +199,19 @@ async def test_reset_seq_num(
         msg = await session.receive()
         assert msg.msg_type == fix.FixMsgType.LOGON
 
-        test_id = str(uuid.uuid4())
-        session.send(test_request)
-        msg = await session.receive()
-        assert msg.msg_type == fix.FixMsgType.HEARTBEAT
-        assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
-        await session.logon(reset=True)
+        await session.reset()
 
-        msg = await session.receive()
-        local_seq_num = await session.get_local_sequence()
+        async for msg in session:
+            if msg.msg_type == fix.FixMsgType.LOGON:
+                break
 
-        assert msg.msg_type == fix.FixMsgType.LOGON
         assert msg.get(fix.FixTag.ResetSeqNumFlag) == fix.ResetSeqNumFlag.YES
         assert msg.seq_num == 1
+
+        local_seq_num = await session.get_local_sequence()
         assert local_seq_num == 2
+        remote_seq_num = await session.get_remote_sequence()
+        assert remote_seq_num == 2
 
 
 @pytest.mark.asyncio

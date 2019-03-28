@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 import datetime as dt
 import logging
 import uuid
@@ -71,12 +72,15 @@ class FixSession:
         self._waiting_logout_confirm = False
         self._logout_after_resend = False
         self._hearbeat_cb = None
+        self._callbacks = defaultdict(list)
         self._msg_queue = asyncio.Queue()
         self.logged_on = False
         self.parser = FixParser()
+        self._ready = asyncio.Event()
 
         loop = asyncio.get_event_loop()
         loop.create_task(self._process_msg_queue())
+        self._ready.set()
 
     def __aiter__(self):
         return self
@@ -130,25 +134,23 @@ class FixSession:
 
     async def logon(self):
         """ Logon to a FIX Session. Sends a Logon<A> message to peer.
-
-        :param reset: Whether to set ResetSeqNumFlag to 'Y' on the
-            Logon<A> message.
-        :type reset: bool
         """
         if not self._initiator:
             raise FIXError(
                 'Only a session initator can send '
                 'a initate a logon')
         hb_int = self.config.get('heartbeat_interval')
-        login_msg = fix42.logon(hb_int=hb_int, reset=reset)
+        login_msg = fix42.logon(hb_int=hb_int)
         self.send(login_msg)
 
     async def reset(self):
         test_id = str(uuid.uuid4())
         test_request = fix42.test_request(test_id)
-        curried = functools.partial(self._initiate_reset, test_id)
-        self._register_msg_cb(fc.FixMsgType.HEARTBEAT, curried)
         self.send(test_request)
+        await self.drain()
+        self._ready.clear()
+        self._register_msg_cb(
+            fc.FixMsgType.HEARTBEAT, self._initiate_reset, test_id)
 
     async def logout(self):
         """ Logout from a FIX Session. Sends a Logout<5> message to peer.
@@ -315,6 +317,9 @@ class FixSession:
         except SequenceGapError as error:
             await self._handle_sequence_gap(
                 msg, error.gap)
+
+        for cb, *args in self._callbacks.pop(msg.msg_type, []):
+            await maybe_await(cb, *args, msg)
 
     async def _validate_seq_num(self, msg):
         diff = await self._get_sequence_gap(msg)
@@ -570,9 +575,32 @@ class FixSession:
         except asyncio.CancelledError:
             raise
 
+    async def _initiate_reset(self, test_id, msg):
+        if msg.get(fc.FixTag.TestReqID) == test_id:
+            self._register_msg_cb(
+                fc.FixMsgType.LOGON, self._confirm_reset)
+            hb_int = self.config['heartbeat_interval']
+            login_msg = fix42.logon(hb_int=hb_int, reset=True)
+            login_msg.append_pair(fc.FixTag.MsgSeqNum, 1)
+            self.send(login_msg)
+        else:
+            cb = self._initiate_reset
+            self._register_msg_cb(msg.msg_type, cb, test_id)
+
+    async def _confirm_reset(self,  msg):
+        if helpers.is_logon_reset(msg):
+            await self._set_local_sequence(2)
+            self._ready.set()
+        else:
+            self._register_msg_cb(
+                msg.msg_type, self._confirm_reset)
+
+    def _register_msg_cb(self, msg_type, func, *args):
+        self._callbacks[msg_type].append((func, *args))
 
     async def _process_msg_queue(self):
         while True:
+            await self._ready.wait()
             msg = await self._msg_queue.get()
             if msg is None:
                 break
