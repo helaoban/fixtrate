@@ -29,12 +29,14 @@ async def store_interface(request):
 
 
 @pytest.fixture
-def client_config():
+def client_config(request):
+    overrides = getattr(request, 'param', {})
     config = {
         'begin_string': fix.FixVersion.FIX42,
         'sender_comp_id': 'TESTCLIENT',
         'target_comp_id': 'TESTSERVER',
         'heartbeat_interval': 30,
+        **overrides
     }
     return config
 
