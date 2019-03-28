@@ -304,7 +304,7 @@ class FixSession:
 
     async def _process_message(self, msg):
         try:
-            await self._handle_message(msg)
+            await self._validate_msg(msg)
         except InvalidMessageError as error:
             await self._handle_invalid_message(error)
             logger.warning(
@@ -317,7 +317,8 @@ class FixSession:
         except SequenceGapError as error:
             await self._handle_sequence_gap(
                 msg, error.gap)
-
+        else:
+            await self._handle_message(msg)
         for cb, *args in self._callbacks.pop(msg.msg_type, []):
             await maybe_await(cb, *args, msg)
 
@@ -333,11 +334,16 @@ class FixSession:
             error.fix_msg, error.tag, error.reject_type, str(error))
         self.send(reject_msg)
 
-    async def _handle_message(self, msg):
+    async def _validate_msg(self, msg):
         helpers.validate_header(msg, self.id)
-
-        await self._store_message(msg)
+        if msg.msg_type == fc.FixMsgType.LOGON:
+            hb_int = self.config['heartbeat_interval']
+            helpers.validate_tag_value(
+                msg, fc.FixTag.HeartBtInt, hb_int, int)
         await self._validate_seq_num(msg)
+
+    async def _handle_message(self, msg):
+        await self._store_message(msg)
         await self._incr_remote_sequence()
 
         if self._waiting_resend:
@@ -482,15 +488,12 @@ class FixSession:
         return msg.seq_num - expected
 
     async def _handle_logon(self, msg):
-        hb_int = self.config['heartbeat_interval']
-        helpers.validate_tag_value(
-            msg, fc.FixTag.HeartBtInt, hb_int, int)
-
         is_reset = helpers.is_reset(msg)
         if is_reset:
             await self._set_remote_sequence(2)
 
         if not self._initiator:
+            hb_int = self.config['heartbeat_interval']
             reply = helpers.make_logon_msg(
                 hb_int, reset=is_reset)
             self.send(reply)
