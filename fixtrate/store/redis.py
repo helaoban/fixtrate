@@ -147,6 +147,17 @@ class RedisStore(FixStore):
         msgs = [FixMessage.from_raw(m) for m in msgs]
         return msgs
 
+    async def reset(self, session_id):
+        for key in (
+            'messages', 'messages_by_time',
+            'messages_sent', 'messages_received'
+        ):
+            key = self.make_redis_key(session_id, key)
+            await self.redis.delete(key)
+            await self.set_local(session_id, 1)
+            await self.set_remote(session_id, 1)
+
+
 class RedisStoreInterface(FixStoreInterface):
 
     def __init__(self, redis_url, prefix='fix'):

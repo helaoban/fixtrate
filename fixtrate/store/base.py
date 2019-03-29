@@ -133,3 +133,7 @@ class FixStore:
             :rtype AsyncIterator[:class:`FixMessage`]
         """
         raise NotImplementedError
+
+    async def reset(self):
+        raise NotImplementedError
+

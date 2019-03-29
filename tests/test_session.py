@@ -136,7 +136,7 @@ async def test_test_request(session, test_request):
 
 
 @pytest.mark.asyncio
-async def test_reset_seq_num(session):
+async def test_reset_seq_num(session, test_request):
     await session.logon()
 
     msg = await session.receive()
@@ -155,6 +155,15 @@ async def test_reset_seq_num(session):
     assert local_seq_num == 2
     remote_seq_num = await session.get_remote_sequence()
     assert remote_seq_num == 2
+
+    stored = await session.history()
+    assert len(stored) == 2
+
+    session.send(test_request)
+    await session.drain()
+    msg = await session.receive()
+    assert msg.msg_type == fix.FixMsgType.HEARTBEAT
+    assert msg.get(fix.FixTag.TestReqID) == test_request.get(fix.FixTag.TestReqID)
 
 
 @pytest.mark.asyncio

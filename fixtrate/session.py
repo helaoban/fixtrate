@@ -27,6 +27,7 @@ DEFAULT_OPTIONS = {
     'headers': []
 }
 
+DEAD = object()
 
 def get_options(**kwargs):
 
@@ -149,6 +150,7 @@ class FixSession:
         self.send(test_request)
         await self.drain()
         self._ready.clear()
+        self._msg_queue.put_nowait(None)
         self._register_msg_cb(
             fc.FixMsgType.HEARTBEAT, self._initiate_reset, test_id)
 
@@ -164,7 +166,7 @@ class FixSession:
         Close the session. Closes the underlying connection and performs
         cleanup work.
         """
-        await self._msg_queue.put(None)
+        self._msg_queue.put_nowait(DEAD)
         await self._cancel_heartbeat_timer()
         await self.transport.close()
         if self._on_close is not None:
@@ -471,7 +473,7 @@ class FixSession:
         if helpers.is_reset_mode(msg):
             await self._handle_sequence_reset(msg)
         elif helpers.is_logon_reset(msg):
-            await self._handle_logon(msg)
+            await self._handle_logon_reset(msg)
         else:
             if not msg.is_duplicate:
                 expected = msg.seq_num - gap
@@ -488,17 +490,19 @@ class FixSession:
         return msg.seq_num - expected
 
     async def _handle_logon(self, msg):
-        is_reset = helpers.is_reset(msg)
-        if is_reset:
-            await self._set_remote_sequence(2)
-
         if not self._initiator:
             hb_int = self.config['heartbeat_interval']
-            reply = helpers.make_logon_msg(
-                hb_int, reset=is_reset)
+            reply = helpers.make_logon_msg(hb_int)
             self.send(reply)
 
         self.logged_on = True
+
+    async def _handle_logon_reset(self, msg):
+        hb_int = self.config['heartbeat_interval']
+        reply = helpers.make_logon_msg(hb_int, reset=True)
+        await self.store.reset(self._session_id)
+        await self._set_remote_sequence(2)
+        self.send(reply)
 
     async def _handle_logout(self, msg):
         if self._waiting_logout_confirm:
@@ -584,8 +588,8 @@ class FixSession:
                 fc.FixMsgType.LOGON, self._confirm_reset)
             hb_int = self.config['heartbeat_interval']
             login_msg = fix42.logon(hb_int=hb_int, reset=True)
-            login_msg.append_pair(fc.FixTag.MsgSeqNum, 1)
-            self.send(login_msg)
+            await self.store.reset(self._session_id)
+            await self._send(login_msg)
         else:
             cb = self._initiate_reset
             self._register_msg_cb(msg.msg_type, cb, test_id)
@@ -605,8 +609,10 @@ class FixSession:
         while True:
             await self._ready.wait()
             msg = await self._msg_queue.get()
+            self._msg_queue.task_done()
             if msg is None:
+                continue
+            if msg is DEAD:
                 break
             await self._send(msg)
-            self._msg_queue.task_done()
 

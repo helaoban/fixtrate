@@ -117,6 +117,11 @@ class MemoryStore(FixStore):
             rv = rv[limit * -1:]
         return rv
 
+    async def reset(self, session_id):
+        self._data = {}
+        await self.set_local(session_id, 1)
+        await self.set_remote(session_id, 1)
+
 
 class MemoryStoreInterface(FixStoreInterface):
 
