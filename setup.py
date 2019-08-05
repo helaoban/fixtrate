@@ -77,11 +77,6 @@ setup(
     install_requires=REQUIRES,
     extras_require=EXTRAS_REQUIRE,
     include_package_data=True,
-    entry_points={
-        'console_scripts': [
-            'fixtrate = fixtrate.cli:main',
-        ],
-    },
     license='MIT',
     classifiers=[
         'License :: OSI Approved :: MIT License',
