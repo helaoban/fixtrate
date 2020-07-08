@@ -1,81 +1,129 @@
-import asyncio
+import asyncio as aio
+import contextlib
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
+import logging
 import uuid
+import typing as t
 
-import aioredis
-import pytest
-from fixtrate import constants as fix
-from tests.server import MockFixServer
-from fixtrate.store import MemoryStoreInterface, RedisStoreInterface
-from fixtrate.engine import FixEngine
+import aioredis  # type: ignore
+
+import pytest  # type: ignore
+import fix
 from fixtrate.message import FixMessage
+from utils import aio as aioutils
+from fixtrate.store.inmemory import reset_store_data
 
 
-@pytest.fixture(params=['inmemory', 'redis'])
-async def store_interface(request):
-    redis_url = 'redis://localhost:6379'
-    prefix = 'fix-test'
-    if request.param == 'redis':
-        store_interface = RedisStoreInterface(redis_url, prefix)
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MockFixServerConfig:
+    host: str = "127.0.0.1"
+    port: int = 8686
+    clients: t.List[str] = field(default_factory=list)
+    store: str = "inmemory://"
+
+
+class MockFixServer:
+
+    def __init__(
+        self,
+        config: t.Optional[MockFixServerConfig],
+    ) -> None:
+        self.config = config or MockFixServerConfig()
+        self.sessions: t.List[fix.FixSession] = []
+
+    async def stream_client_session(self, session):
+        try:
+            async for msg in session:
+                pass
+        except ConnectionAbortedError:
+            pass
+        except Exception as error:
+            logger.exception(error)
+
+    async def serve(self) -> None:
+        tasks = []
+        try:
+            async with fix.bind(**asdict(self.config)) as server:
+                async for session in server:
+                    self.sessions.append(session)
+                    coro = self.stream_client_session(session)
+                    tasks.append(aio.create_task(coro))
+        except aio.CancelledError:
+            for task in tasks:
+                await aioutils.cancel_suppress(task)
+            raise
+
+
+async def _clear_redis(url: str):
+    redis = await aioredis.create_redis(url)
+    keys = await redis.keys("seatrade-test*")
+    if len(keys) > 0:
+        await redis.delete(*keys)
+    redis.close()
+    await redis.wait_closed()
+
+
+@pytest.fixture
+def store_data():
+    return dict()
+
+
+@pytest.fixture(params=["inmemory", "redis"])
+async def store_dsn(request):
+    if request.param == "redis":
+        redis_url = "redis://127.0.0.1:6379/"
+        await _clear_redis(redis_url)
+        yield redis_url + "?prefix=seatrade-test"
+        await _clear_redis(redis_url)
     else:
-        store_interface = MemoryStoreInterface()
-    yield store_interface
-    if request.param == 'redis':
-        client = await aioredis.create_redis(redis_url)
-        keys = await client.keys('%s*' % prefix)
-        if keys:
-            await client.delete(*keys)
-        client.close()
+        reset_store_data()
+        yield "inmemory://"
+        reset_store_data()
 
 
 @pytest.fixture
-def client_config(request):
-    overrides = getattr(request, 'param', {})
-    config = {
-        'begin_string': fix.FixVersion.FIX42,
-        'sender_comp_id': 'TESTCLIENT',
-        'target_comp_id': 'TESTSERVER',
-        'heartbeat_interval': 30,
-        **overrides
-    }
-    return config
+def hb_int(request):
+    return request.param if hasattr(request, "param") else 30
 
 
 @pytest.fixture
-def server_config(request, store_interface):
-    overrides = getattr(request, 'param', {})
-    return {
-        'host': '127.0.0.1',
-        'port': 8686,
-        'client_session_confs': [{
-            'begin_string': fix.FixVersion.FIX42,
-            'sender_comp_id': 'TESTSERVER',
-            'target_comp_id': 'TESTCLIENT',
-            'heartbeat_interval': 30,
-        }],
-        'store': store_interface,
-        **overrides
-    }
+def server_config(store_dsn, hb_int) -> MockFixServerConfig:
+    clients = [f"fix://TESTCLIENT:TESTSERVER@127.0.0.1:8686/?hb_int={hb_int}"]
+    return MockFixServerConfig(
+        host="127.0.0.1",
+        port=8686,
+        clients=clients,
+        store=store_dsn,
+    )
 
 
 @pytest.fixture
-async def test_server(request, server_config):
+def client_dsn(request, hb_int) -> str:
+    default = f"fix://TESTCLIENT:TESTSERVER@127.0.0.1:8686/?hb_int={hb_int}"
+    rv = request.param if hasattr(request, "param") else default
+    return rv
+
+
+@pytest.fixture
+async def test_server(
+    request,
+    server_config: MockFixServerConfig,
+) -> t.AsyncIterator[MockFixServer]:
     server = MockFixServer(server_config)
-    asyncio.get_event_loop().create_task(server.listen())
+    task = aio.create_task(server.serve())
+    await aio.sleep(0.1)
     yield server
-    await server.close()
+    task.cancel()
+    with contextlib.suppress(aio.CancelledError):
+        await task
 
 
 @pytest.fixture
-async def engine(store_interface):
-    engine = FixEngine()
-    engine.store_interface = store_interface
-    yield engine
-    await engine.close()
-
-
-@pytest.fixture
-def order_request():
+def order_request() -> FixMessage:
     order = FixMessage()
     order.append_pair(fix.FixTag.MsgType, fix.FixMsgType.NEW_ORDER_SINGLE)
     order.append_pair(fix.FixTag.ClOrdID, str(uuid.uuid4()))
@@ -86,4 +134,3 @@ def order_request():
     order.append_pair(fix.FixTag.Price, 25.0)
     order.append_utc_timestamp(fix.FixTag.TransactTime, datetime.utcnow())
     return order
-
