@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fixtrate"
-version = "0.2.15"
+version = "0.3.0"
 description = "Tools for interacting with the FIX protocol."
 authors = ["Carlo Holl <carloholl@gmail.com>"]
 license = "MIT"
