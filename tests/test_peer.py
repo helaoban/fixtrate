@@ -1,10 +1,11 @@
 import pytest  # type: ignore
 import contextlib
-from fix.peer import connect as fix_connect, parse_conn_args
-from fix.fixt.data import MsgType as MT
+from fixtrate.peer import connect as fix_connect, parse_conn_args
+from fixtrate.fixt.data import MsgType as MT
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(1)
 async def test_auto_logs_out(test_server, client_dsn):
     async with fix_connect(client_dsn) as session:
         msg = await session.receive()
@@ -47,17 +48,14 @@ def test_parse_fix_config():
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(2)
 async def test_blocks_dup_conn(
     test_server, client_dsn, store_dsn
 ):
-    async with contextlib.AsyncExitStack() as stack:
+    session1 = await fix_connect(client_dsn, store_dsn=store_dsn)
+    _ = await session1.receive()
 
-        session1 = await stack.enter_async_context(
-            fix_connect(client_dsn, store_dsn=store_dsn))
-        _ = await session1.receive()
+    session2 = await fix_connect(client_dsn, store_dsn=store_dsn)
 
-        session2 = await stack.enter_async_context(
-            fix_connect(client_dsn, store_dsn=store_dsn))
-
-        with pytest.raises(ConnectionAbortedError):
-            _ = await session2.receive()
+    with pytest.raises(ConnectionAbortedError):
+        _ = await session2.receive()

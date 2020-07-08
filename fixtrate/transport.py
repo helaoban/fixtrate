@@ -45,7 +45,6 @@ class TCPTransport(Transport):
 
     async def close(self) -> None:
         self.writer.close()
-        await self.writer.wait_closed()
 
     @classmethod
     async def connect(

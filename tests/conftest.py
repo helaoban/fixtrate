@@ -8,9 +8,12 @@ import typing as t
 import aioredis  # type: ignore
 
 import pytest  # type: ignore
-import fix
+import fixtrate
+from fixtrate.fixt.types import FixTag
+from fixtrate.fixt.data import MsgType
+from fixtrate.fix42.data import OrdType, Side
 from fixtrate.message import FixMessage
-from utils import aio as aioutils
+from fixtrate.utils import aio as aioutils
 from fixtrate.store.inmemory import reset_store_data
 
 
@@ -46,7 +49,7 @@ class MockFixServer:
         config: t.Optional[MockFixServerConfig],
     ) -> None:
         self.config = config or MockFixServerConfig()
-        self.sessions: t.List[fix.FixSession] = []
+        self.sessions: t.List[fixtrate.FixSession] = []
 
     async def stream_client_session(self, session):
         try:
@@ -59,12 +62,13 @@ class MockFixServer:
 
     async def serve(self) -> None:
         tasks = []
+        loop = aio.get_event_loop()
         try:
-            async with fix.bind(**self.config.asdict()) as server:
+            async with fixtrate.bind(**self.config.asdict()) as server:
                 async for session in server:
                     self.sessions.append(session)
                     coro = self.stream_client_session(session)
-                    tasks.append(aio.create_task(coro))
+                    tasks.append(loop.create_task(coro))
         except aio.CancelledError:
             for task in tasks:
                 await aioutils.cancel_suppress(task)
@@ -85,7 +89,7 @@ def store_data():
     return dict()
 
 
-@pytest.fixture(params=["inmemory", "redis"])
+@pytest.fixture(params=["inmemory"])
 async def store_dsn(request):
     if request.param == "redis":
         redis_url = "redis://127.0.0.1:6379/"
@@ -126,8 +130,9 @@ async def test_server(
     request,
     server_config: MockFixServerConfig,
 ) -> t.AsyncIterator[MockFixServer]:
+    loop = aio.get_event_loop()
     server = MockFixServer(server_config)
-    task = aio.create_task(server.serve())
+    task = loop.create_task(server.serve())
     await aio.sleep(0.1)
     yield server
     task.cancel()
@@ -138,12 +143,12 @@ async def test_server(
 @pytest.fixture
 def order_request() -> FixMessage:
     order = FixMessage()
-    order.append_pair(fix.FixTag.MsgType, fix.FixMsgType.NEW_ORDER_SINGLE)
-    order.append_pair(fix.FixTag.ClOrdID, str(uuid.uuid4()))
-    order.append_pair(fix.FixTag.OrdType, fix.OrdType.LIMIT)
-    order.append_pair(fix.FixTag.Symbol, 'UGAZ')
-    order.append_pair(fix.FixTag.Side, fix.Side.BUY)
-    order.append_pair(fix.FixTag.OrderQty, 100)
-    order.append_pair(fix.FixTag.Price, 25.0)
-    order.append_utc_timestamp(fix.FixTag.TransactTime, datetime.utcnow())
+    order.append_pair(FixTag.MsgType, MsgType.NEW_ORDER_SINGLE)
+    order.append_pair(FixTag.ClOrdID, str(uuid.uuid4()))
+    order.append_pair(FixTag.OrdType, OrdType.LIMIT)
+    order.append_pair(FixTag.Symbol, 'UGAZ')
+    order.append_pair(FixTag.Side, Side.BUY)
+    order.append_pair(FixTag.OrderQty, 100)
+    order.append_pair(FixTag.Price, 25.0)
+    order.append_utc_timestamp(FixTag.TransactTime, datetime.utcnow())
     return order
