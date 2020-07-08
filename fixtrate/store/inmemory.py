@@ -7,12 +7,12 @@ import threading
 
 from sortedcontainers import SortedList  # type: ignore
 
-from fix.message import FixMessage
+from fixtrate.message import FixMessage
 from .base import FixStore
 
 
 if t.TYPE_CHECKING:
-    from fix.config import FixSessionConfig
+    from fixtrate.config import FixSessionConfig
 
 
 __all__ = ("MemoryStore", )

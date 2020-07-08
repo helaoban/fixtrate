@@ -1,5 +1,5 @@
 import typing as t
-from fix.utils.enum import BaseStrEnum
+from fixtrate.utils.enum import BaseStrEnum
 
 
 class FixTag(BaseStrEnum):

@@ -1,4 +1,4 @@
-from fix.utils.enum import BaseStrEnum, BaseIntEnum
+from fixtrate.utils.enum import BaseStrEnum, BaseIntEnum
 
 
 class MsgType(BaseStrEnum):

@@ -1,8 +1,8 @@
 import typing as t
 
 if t.TYPE_CHECKING:
-    from fix.message import FixMessage
-    from fix.config import FixSessionConfig
+    from fixtrate.message import FixMessage
+    from fixtrate.config import FixSessionConfig
 
 
 __all__ = ("FixStore", )

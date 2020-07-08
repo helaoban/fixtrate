@@ -1,7 +1,7 @@
 import datetime as dt
 from decimal import Decimal
 import typing as t
-from fix.message import FixMessage
+from fixtrate.message import FixMessage
 from .types import TYPE_MAP
 
 

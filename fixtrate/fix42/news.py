@@ -4,7 +4,7 @@ from collections import OrderedDict
 import datetime as dt
 from decimal import Decimal
 
-from fix.message import FixMessage
+from fixtrate.message import FixMessage
 from .types import FixTag as FT, TYPE_MAP
 from .validate import validate, convert, cast as _cast
 

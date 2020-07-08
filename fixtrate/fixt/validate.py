@@ -5,7 +5,7 @@ from .types import TYPE_MAP
 
 
 if t.TYPE_CHECKING:
-    from fix.message import FixMessage
+    from fixtrate.message import FixMessage
     T = t.TypeVar("T", bound=FixMessage)
 
 

@@ -14,6 +14,15 @@ async def wait_sync_async(func, *args, **kwargs):
     return func(*args, **kwargs)
 
 
+async def cancel_suppress(*tasks: aio.Task):
+    for task in tasks:
+        task.cancel()
+        try:
+            await task
+        except aio.CancelledError:
+            pass
+
+
 class SupportsClose(te.Protocol):
 
     async def close(self) -> None:
