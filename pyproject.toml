@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "fixtrate"
+version = "0.2.15"
+description = "Tools for interacting with the FIX protocol."
+authors = ["Carlo Holl <carloholl@gmail.com>"]
+license = "MIT"
+classifiers=[
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Development Status :: 2 - Pre-Alpha",
+]
+
+[tool.poetry.dependencies]
+python = "^3.6"
+aenum = ">=2.1.2"
+async-timeout = ">=2.0"
+aioredis = ">=1.1.0"
+simplefix = ">=1.0.12"
+untangle = ">=1.1.1"
+python-dateutil = ">=2.6.1"
+
+[tool.poetry.dev-dependencies]
+flake8 = "*"
+pytest = "==3.6.3"
+pytest-asyncio = "==0.8.0"
+sphinx = "==1.7.9"
+sphinxcontrib-asyncio = "==0.2.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
