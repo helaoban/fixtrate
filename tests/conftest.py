@@ -89,7 +89,7 @@ def store_data():
     return dict()
 
 
-@pytest.fixture(params=["inmemory"])
+@pytest.fixture(params=["inmemory", "redis"])
 async def store_dsn(request):
     if request.param == "redis":
         redis_url = "redis://127.0.0.1:6379/"
