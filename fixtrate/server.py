@@ -1,5 +1,4 @@
 import asyncio as aio
-from dataclasses import dataclass
 import logging
 import typing as t
 from copy import copy
@@ -32,11 +31,17 @@ def swap_session_id(session_id: "SessionID"):
     return version, target, sender, qualifier
 
 
-@dataclass
 class FixServerConfig:
-    host: str
-    port: int
-    store: str = "inmemory://"
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        store: str = "inmemory://",
+    ):
+        self.host = host
+        self.port = port
+        self.store = store
 
 
 class FixServer:

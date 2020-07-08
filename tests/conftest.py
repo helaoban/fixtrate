@@ -1,6 +1,5 @@
 import asyncio as aio
 import contextlib
-from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import logging
 import uuid
@@ -18,12 +17,26 @@ from fixtrate.store.inmemory import reset_store_data
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class MockFixServerConfig:
-    host: str = "127.0.0.1"
-    port: int = 8686
-    clients: t.List[str] = field(default_factory=list)
-    store: str = "inmemory://"
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8686,
+        clients: t.Optional[list] = None,
+        store: str = "inmemory://",
+    ):
+        self.host = host
+        self.port = port
+        self.store = store
+        self.clients = clients or []
+
+    def asdict(self) -> dict:
+        return {
+            "host": self.host,
+            "port": self.port,
+            "store": self.store,
+            "clients": self.clients,
+        }
 
 
 class MockFixServer:
@@ -47,7 +60,7 @@ class MockFixServer:
     async def serve(self) -> None:
         tasks = []
         try:
-            async with fix.bind(**asdict(self.config)) as server:
+            async with fix.bind(**self.config.asdict()) as server:
                 async for session in server:
                     self.sessions.append(session)
                     coro = self.stream_client_session(session)
