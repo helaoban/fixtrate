@@ -21,6 +21,7 @@ aioredis = ">=1.1.0"
 simplefix = ">=1.0.12"
 untangle = ">=1.1.1"
 python-dateutil = ">=2.6.1"
+typing_extensions = "^3.7.4"
 
 [tool.poetry.dev-dependencies]
 flake8 = "*"
