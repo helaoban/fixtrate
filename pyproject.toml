@@ -12,6 +12,9 @@ classifiers=[
     "Programming Language :: Python :: Implementation :: CPython",
     "Development Status :: 2 - Pre-Alpha",
 ]
+packages = [
+    { include = "fixtrate" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.6"
