@@ -1,4 +1,6 @@
-from .__version__ import __version__
-
 import logging
+
+from .peer import connect, bind # NOQA
+
+
 logging.getLogger(__name__).addHandler(logging.NullHandler())

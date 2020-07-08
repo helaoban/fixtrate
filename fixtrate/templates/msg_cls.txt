@@ -1,0 +1,112 @@
+import typing as t
+import typing_extensions as te
+from collections import OrderedDict
+import datetime as dt
+from decimal import Decimal
+
+from fix.message import FixMessage
+from .types import FixTag as FT, TYPE_MAP
+from .validate import validate, convert, cast as _cast
+
+
+{% set required = get_required(msg["fields"]) %}
+{% set optional = get_optional(msg["fields"]) %}
+class {{msg["name"]}}(FixMessage):
+
+    _msg_type = "{{msg["type"]}}"
+
+    _fields = OrderedDict({
+        {% for name, required in msg["fields"].items() %}
+        FT.{{name}}: {{required}},
+        {% endfor %}
+    })
+    {% if required %}
+
+    def __init__(
+        self,
+        {% for name in required %}
+        {{camel_to_snake(name)}}: {{type_map[name]}},
+        {% endfor %}
+    ) -> None:
+        super().__init__()
+        self.append_pair(35, self._msg_type)
+        {% for name in required %}
+        self.append_pair(
+            FT.{{name}},
+            convert("{{fields[name]["type"]}}", {{camel_to_snake(name)}}),
+        )
+        {% endfor %}
+    {% endif %}
+    {% if required|length + optional|length > 1 %}
+    {% if required %}
+    {% for name in required %}
+
+    @t.overload  # NOQA
+    def get(self, tag: te.Literal[FT.{{name}}]) -> {{type_map[name]}}:
+        ...
+    {% endfor %}
+    {% endif %}
+    {% if optional %}
+    {% for name in optional%}
+
+    @t.overload  # NOQA
+    def get(self, tag: te.Literal[FT.{{name}}]) -> t.Optional[{{type_map[name]}}]:
+        ...
+    {% endfor %}
+    {% endif %}
+    {% endif %}
+
+    {% if required|length + optional|length > 1 %}
+    def get(self, tag: FT):  # NOQA
+        is_required = self._fields[tag]
+        val = self.get_raw(tag)
+        if val is None:
+            if is_required:
+                raise ValueError
+            return None
+        return validate(TYPE_MAP[tag], val)
+    {% elif required|length == 1 %}
+    def get(self, tag: te.Literal[FT.{{required[0]}}]) -> {{type_map[required[0]]}}:
+        val = self.get_raw(tag)
+        if val is None:
+            raise ValueError
+        return validate(TYPE_MAP[tag], val)
+    {% else %}
+    def get(self, tag: te.Literal[FT.{{optional[0]}}]) -> t.Optional[{{type_map[optional[0]]}}]:
+        val = self.get_raw(tag)
+        if val is None:
+            return None
+        return validate(TYPE_MAP[tag], val)
+    {% endif %}
+    {% for name, required in msg["fields"].items() %}
+
+    @t.overload  # NOQA
+    def append(
+        self,
+        tag: te.Literal[FT.{{name}}],
+        {% if required %}
+        val: {{type_map[name]}},
+        {% else %}
+        val: t.Optional[{{type_map[name]}}],
+        {% endif %}
+    ) -> None:
+        ...
+    {% endfor %}
+
+    {% set as_list = (msg["fields"].keys()|list) %}
+    def append(self, tag: FT, val: t.Any):  # NOQA
+        if tag is FT.{{as_list[0]}}:
+            assert isinstance(val, {{type_map[as_list[0]]}})
+            converted = convert("{{fields[as_list[0]]["type"]}}", val)
+        {% for name in as_list[1:] %}
+        elif tag is FT.{{name}}:
+            assert isinstance(val, {{type_map[name]}})
+            converted = convert("{{fields[name]["type"]}}", val)
+        {% endfor %}
+        else:
+            raise ValueError(f"{tag} is not a valid FIX tag")
+        self.append_pair(tag, converted)
+
+    @classmethod
+    def cast(cls, msg: FixMessage) -> "{{msg["name"]}}":
+        return _cast(cls, msg)

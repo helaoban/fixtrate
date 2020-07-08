@@ -1,175 +1,245 @@
-from . import constants as fix, exceptions as exc
-from .session_id import SessionID
-from .factories import fix42
+import typing as t
+import uuid
+
+from . import exceptions as exc
+from .message import FixMessage
+from .fixt import data as VALUES
+from .fixt.types import FixTag as TAG
+
+if t.TYPE_CHECKING:
+    from .store.base import FixStore
+    from .config import FixSessionConfig
+
+
+MTYPE = VALUES.MsgType
 
 
 ADMIN_MESSAGES = {
-    fix.FixMsgType.LOGON,
-    fix.FixMsgType.LOGOUT,
-    fix.FixMsgType.HEARTBEAT,
-    fix.FixMsgType.TEST_REQUEST,
-    fix.FixMsgType.RESEND_REQUEST,
-    fix.FixMsgType.SEQUENCE_RESET,
+    MTYPE.LOGON,
+    MTYPE.LOGOUT,
+    MTYPE.HEARTBEAT,
+    MTYPE.TEST_REQUEST,
+    MTYPE.RESEND_REQUEST,
+    MTYPE.SEQUENCE_RESET,
 }
 
-SESSION_ID_FIELDS = (
-    'begin_string',
-    'sender_comp_id',
-    'target_comp_id',
-    'qualifier'
-)
+
+def get_or_raise(msg: "FixMessage", tag: TAG) -> str:
+    val = msg.get_raw(tag)
+    if val is None:
+        raise exc.MissingRequiredTagError(msg, tag)
+    return val
 
 
-def is_duplicate_admin(msg):
+def is_admin(msg: "FixMessage") -> bool:
+    return msg.msg_type in ADMIN_MESSAGES
+
+
+def is_duplicate_admin(msg: "FixMessage") -> bool:
     if not msg.is_duplicate:
         return False
     admin_msgs = ADMIN_MESSAGES.difference({
-        fix.FixMsgType.SEQUENCE_RESET})
+        MTYPE.SEQUENCE_RESET})
     return msg.msg_type in admin_msgs
 
 
-def parse_session_id_from_conf(conf):
-    kw = {f: conf.get(f) for f in SESSION_ID_FIELDS}
-    conf = {
-        k: v for k, v in conf.items()
-        if k not in SESSION_ID_FIELDS
-    }
-    return SessionID(**kw), conf
-
-
-def make_reject_msg(msg, tag, rejection_type, reason):
-    return fix42.reject(
-        ref_sequence_number=msg.seq_num,
-        ref_message_type=msg.msg_type,
-        ref_tag=tag,
-        rejection_type=rejection_type,
-        reject_reason=reason,
-    )
-
-
-def make_logon_msg(hb_int=30, reset=False):
-    msg = fix42.logon(hb_int=hb_int, reset=reset)
-    if reset:
-        msg.append_pair(
-            fix.FixTag.MsgSeqNum, 1)
+def make_gap_fill(seq_num: int, new_seq_num: int) -> "FixMessage":
+    msg = make_sequence_reset(new_seq_num, gap_fill=True)
+    msg.append_pair(TAG.MsgSeqNum, seq_num, header=True)
     return msg
 
 
-def make_logout_msg():
-    return fix42.logout()
+async def get_resend_msgs(
+    store: "FixStore",
+    start: float,
+    end: float,
+) -> t.AsyncIterator["FixMessage"]:
+    gap = []
 
-
-def make_resend_request(start, end):
-    return fix42.resend_request(start, end)
-
-
-def make_sequence_reset(new_seq_num):
-    return fix42.sequence_reset(
-        new_seq_num, gap_fill=False)
-
-
-def make_gap_fill(seq_num, new_seq_num):
-    msg = fix42.sequence_reset(new_seq_num)
-    msg.append_pair(
-        fix.FixTag.MsgSeqNum, seq_num, header=True)
-    return msg
-
-
-def prepare_msgs_for_resend(msgs):
-    gap_start = None
-    gap_end = None
-    rv = []
-    for msg in msgs:
+    async for msg in store.get_sent(min=start, max=end):
         if msg.msg_type in ADMIN_MESSAGES:
-            if gap_start is None:
-                gap_start = msg.seq_num
-            gap_end = msg.seq_num + 1
+            gap.append(msg)
         else:
-            if gap_end is not None:
-                gap_fill = make_gap_fill(gap_start, gap_end)
-                rv.append(gap_fill)
-                gap_start, gap_end = None, None
+            if gap:
+                gap_fill = make_gap_fill(
+                    gap[0].seq_num, gap[-1].seq_num + 1)
+                yield gap_fill
+                gap.clear()
 
-            dup_flag = msg.get(fix.FixTag.PossDupFlag)
-            if dup_flag != fix.PossDupFlag.YES:
-                if dup_flag is not None:
-                    msg.remove(fix.FixTag.PossDupFlag)
-                msg.append_pair(
-                    fix.FixTag.PossDupFlag,
-                    fix.PossDupFlag.YES,
-                    header=True
-                )
+            msg.remove(TAG.PossDupFlag)
+            msg.append_pair(TAG.PossDupFlag, "Y", header=True)
+            yield msg
 
-            rv.append(msg)
-
-    if gap_start is not None:
-        gap_fill = make_gap_fill(gap_start, gap_end)
-        rv.append(gap_fill)
-
-    return rv
-
-
-def append_send_time(msg, timestamp=None):
-    msg.append_utc_timestamp(
-        fix.FixTag.SendingTime,
-        timestamp=timestamp,
-        precision=6,
-        header=True
-    )
-
-
-def validate_tag_value(msg, tag, expected, type_):
-    actual = msg.get(tag)
-    try:
-        actual = type_(msg.get(tag))
-    except (TypeError, ValueError) as error:
-        raise exc.InvalidTypeError(
-            msg, tag, actual, type_) from error
-    if actual != expected:
-        raise exc.IncorrectTagValueError(
-            msg, tag, expected, actual)
-
+    if gap:
+        gap_fill = make_gap_fill(
+            gap[0].seq_num, gap[-1].seq_num + 1)
+        yield gap_fill
 
 
 HEADER_REQUIRED = (
-    fix.FixTag.BeginString,
-    fix.FixTag.BodyLength,
-    fix.FixTag.TargetCompID,
-    fix.FixTag.SenderCompID,
-    fix.FixTag.SendingTime,
-    fix.FixTag.MsgSeqNum,
-    fix.FixTag.MsgType
+    TAG.BeginString,
+    TAG.BodyLength,
+    TAG.TargetCompID,
+    TAG.SenderCompID,
+    TAG.SendingTime,
+    TAG.MsgSeqNum,
+    TAG.MsgType
 )
 
 
-def validate_header(msg, session_id):
+def validate_header(msg: "FixMessage", config: "FixSessionConfig"):
     for tag in HEADER_REQUIRED:
         if tag not in msg:
             raise exc.MissingRequiredTagError(msg, tag)
-    for tag, value, type_ in (
-        (fix.FixTag.BeginString,  session_id.begin_string, str),
-        (fix.FixTag.TargetCompID,  session_id.sender, str),
-        (fix.FixTag.SenderCompID,  session_id.target, str)
+    for tag, expected in (
+        (TAG.BeginString,  config.version),
+        (TAG.TargetCompID,  config.sender),
+        (TAG.SenderCompID,  config.target)
     ):
-        validate_tag_value(msg, tag, value, type_)
+        actual = get_or_raise(msg, tag)
+        if actual != expected:
+            raise exc.IncorrectTagValueError(
+                msg, tag, expected, actual)
 
 
-def is_gap_fill(msg):
-    gf_flag = msg.get(fix.FixTag.GapFillFlag)
-    return gf_flag == fix.GapFillFlag.YES
+def is_gap_fill(msg: "FixMessage") -> bool:
+    gf_flag = msg.get_raw(TAG.GapFillFlag)
+    return gf_flag == "Y"
 
 
-def is_reset(msg):
-    reset_seq = msg.get(fix.FixTag.ResetSeqNumFlag)
-    return reset_seq == fix.ResetSeqNumFlag.YES
+def is_reset(msg: "FixMessage") -> bool:
+    reset_seq = msg.get_raw(TAG.ResetSeqNumFlag)
+    return reset_seq == "Y"
 
 
-def is_reset_mode(msg):
-    is_seq_reset = msg.msg_type == fix.FixMsgType.SEQUENCE_RESET
+def is_reset_mode(msg: "FixMessage") -> bool:
+    is_seq_reset = msg.msg_type == MTYPE.SEQUENCE_RESET
     return is_seq_reset and not is_gap_fill(msg)
 
 
-def is_logon_reset(msg):
-    is_logon = msg.msg_type == fix.FixMsgType.LOGON
+def is_logon_reset(msg: "FixMessage") -> bool:
+    is_logon = msg.msg_type == MTYPE.LOGON
     return is_logon and is_reset(msg)
 
+
+def make_heartbeat_msg(test_request_id: t.Optional[str] = None) -> FixMessage:
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType,
+        MTYPE.HEARTBEAT,
+        header=True
+    )
+    if test_request_id:
+        msg.append_pair(TAG.TestReqID, test_request_id)
+    return msg
+
+
+def make_test_request_msg(
+    test_request_id: t.Optional[str] = None
+) -> FixMessage:
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType,
+        MTYPE.TEST_REQUEST,
+        header=True
+    )
+    if test_request_id is None:
+        test_request_id = str(uuid.uuid4())
+    msg.append_pair(TAG.TestReqID, test_request_id)
+    return msg
+
+
+def make_logout_msg() -> FixMessage:
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType,
+        MTYPE.LOGOUT,
+        header=True
+    )
+    return msg
+
+
+def make_logon_msg(
+    hb_int: int = 30,
+    reset: bool = False,
+    encrypt_method: int = VALUES.EncryptMethod.NONE_OTHER
+) -> FixMessage:
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType, MTYPE.LOGON, header=True)
+    msg.append_pair(TAG.EncryptMethod, encrypt_method)
+    msg.append_pair(TAG.HeartBtInt, hb_int)
+    if reset:
+        msg.append_pair(TAG.MsgSeqNum, 1)
+        msg.append_pair(TAG.ResetSeqNumFlag, 'Y')
+    return msg
+
+
+def make_resend_request(start_sequence: int, end_sequence: int) -> FixMessage:
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType,
+        MTYPE.RESEND_REQUEST,
+        header=True
+    )
+    msg.append_pair(TAG.BeginSeqNo, start_sequence)
+    msg.append_pair(TAG.EndSeqNo, end_sequence)
+    return msg
+
+
+def make_sequence_reset(
+    new_sequence_number: int,
+    gap_fill: bool = False,
+) -> FixMessage:
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType,
+        MTYPE.SEQUENCE_RESET,
+        header=True
+    )
+    msg.append_pair(TAG.NewSeqNo, new_sequence_number)
+    if gap_fill:
+        msg.append_pair(TAG.GapFillFlag, "Y")
+    else:
+        msg.append_pair(TAG.GapFillFlag, "N")
+    return msg
+
+
+def make_reject_msg_from_error(error: exc.InvalidMessageError) -> FixMessage:
+    return make_reject_msg(
+        ref_sequence_number=error.fix_msg.seq_num,
+        ref_message_type=error.fix_msg.msg_type,
+        ref_tag=error.tag,
+        rejection_type=error.reject_type,
+        reject_reason=str(error)
+    )
+
+
+def make_reject_msg(
+    ref_sequence_number: int,
+    ref_tag: TAG,
+    ref_message_type: str,
+    rejection_type: int,
+    reject_reason: str
+) -> FixMessage:
+    """
+    :param ref_sequence_number: sequence number of message being referred to
+    :param ref_tag: Tag number of field being referred to
+    :param ref_message_type: Message type of message being rejected
+    :param rejection_type: Code to identify reject reason
+    :param reject_reason: Verbose explanation of rejection
+    :return:
+    """
+
+    msg = FixMessage()
+    msg.append_pair(
+        TAG.MsgType,
+        VALUES.MsgType.REJECT,
+        header=True
+    )
+    msg.append_pair(TAG.RefSeqNum, ref_sequence_number)
+    msg.append_pair(TAG.Text, reject_reason)
+    msg.append_pair(TAG.RefTagID, ref_tag)
+    msg.append_pair(TAG.RefMsgType, ref_message_type)
+    msg.append_pair(TAG.SessionRejectReason, rejection_type)
+    return msg

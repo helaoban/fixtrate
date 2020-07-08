@@ -368,6 +368,14 @@ class SessionRejectReason(BaseStrEnum):
 
 
 @enum.unique
+class CancelRejectReason(BaseStrEnum):
+    TOO_LATE = "0"
+    UNKNOWN_ORDER = "1"
+    BROKER_OPTION = "2"
+    ALREADY_CANCELLING = "3"
+
+
+@enum.unique
 class ResetSeqNumFlag(BaseStrEnum):
     NO = 'N'
     YES = 'Y'
@@ -414,8 +422,7 @@ class OrdRejReason(BaseStrEnum):
     UNKNOWN_ORDER = '5'
     DUPLICATE_ORDER = '6'
     DUPLICATE_VERBAL_COMM_ORDER = '7'
-    STALE_ORDER ='8'
-
+    STALE_ORDER = '8'
 
 
 @enum.unique
@@ -1407,4 +1414,3 @@ class FixTag(BaseIntEnum):
     DiscretionOffsetValue = 389
     TotalNumSecurities = 393
     TradeType = 418
-

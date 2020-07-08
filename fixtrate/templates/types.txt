@@ -1,0 +1,18 @@
+import typing as t
+from fix.utils.enum import BaseStrEnum
+
+
+class FixTag(BaseStrEnum):
+{% for field in spec["fields"].values() %}
+    {{field["name"]}} = "{{field["number"]}}"
+{% endfor %}
+
+
+FT = FixTag
+
+
+TYPE_MAP: t.Dict[str, str] = {
+{% for field in spec["fields"].values() %}
+    FT.{{field["name"]}}: "{{field["type"]}}",
+{% endfor %}
+}

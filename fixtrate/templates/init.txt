@@ -1,0 +1,7 @@
+from .validate import validate  # NOQA
+from .types import FixTag, TYPE_MAP  # NOQA
+from .data import *  # NOQA
+
+{% for msg in spec["messages"] %}
+from .{{camel_to_snake(msg["name"])}} import {{msg["name"]}}  # NOQA
+{% endfor %}

@@ -9,4 +9,3 @@ class BaseIntEnum(int, enum.Enum):
 class BaseStrEnum(str, enum.Enum):
     def __str__(self):
         return str(self.value)
-

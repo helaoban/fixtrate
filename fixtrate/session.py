@@ -1,618 +1,427 @@
-import asyncio
-from collections import defaultdict
-import datetime as dt
+import asyncio as aio
+from datetime import datetime
 import logging
 import uuid
+import time
+import typing as t
 
-import async_timeout
-
-from . import helpers, constants as fc
-from .exceptions import (
-    SequenceGapError,
-    FatalSequenceGapError,
-    InvalidMessageError, FixRejectionError,
-    IncorrectTagValueError, FIXError,
-    InvalidTypeError, SessionError
-)
-from .factories import fix42
+from . import helpers, exceptions as exc
+from .helpers import get_or_raise
 from .parse import FixParser
-from .utils.aio import maybe_await
+from .fixt import data as VALUES
+from .fixt.types import FixTag as TAGS
+
+
+if t.TYPE_CHECKING:
+    from .store.base import FixStore
+    from .transport import Transport
+    from .message import FixMessage
+    from .config import FixSessionConfig
+    SendHandler = t.Callable[[FixMessage], t.Any]
+
+
+__all__ = ("FixSession", )
+
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_OPTIONS = {
-    'heartbeat_interval': 30,
-    'receive_timeout': None,
-    'fix_dict': None,
-    'headers': []
-}
 
-DEAD = object()
+MTYPE = VALUES.MsgType
+BAD_VAL = VALUES.SessionRejectReason.VALUE_IS_INCORRECT
+INVALID_SEQ_RESET = (
+    "SeqReset<4> attempting to decrease next "
+    "expected sequence number. Current expected "
+    "sequence number is %s, but SeqReset<4> is "
+    "attempting to set the next expected sequence "
+    "number to %s, this is now allowed."
+)
 
-def get_options(**kwargs):
+FLAG_DEFAULT = 1 << 0
+FLAG_WAIT_RESEND = 1 << 1
+FLAG_WAIT_LOGOUT = 1 << 2
+FLAG_LOGOUT_RESEND = 1 << 3
+FLAG_INIT_LOGON = 1 << 4
+FLAG_LOGGED_ON = 1 << 5
+FLAG_CLOSED = 1 << 6
+FLAG_CLOSING = 1 << 7
 
-    rv = dict(DEFAULT_OPTIONS)
-    options = dict(**kwargs)
 
-    for key, value in options.items():
-        if key not in rv:
-            raise TypeError("Unknown option %r" % (key,))
-        rv[key] = value
+class FixSessionState:
 
-    return rv
+    __slots__ = ("_state", )
+
+    def __init__(self):
+        self._state = FLAG_DEFAULT
+
+    def set(self, flag: int) -> None:
+        self._state = self._state | flag
+
+    def unset(self, flag: int) -> None:
+        self._state = self._state & ~flag
+
+    def toggle(self, flag: int) -> None:
+        self._state = self._state ^ flag
+
+    def isset(self, flag: int) -> bool:
+        return bool(self._state & flag)
 
 
 class FixSession:
     """
     FIX Session Manager
 
-    :param sender_comp_id: Identifies the local peer. See
-        http://fixwiki.org/fixwiki/SenderCompID
-    :param target_comp_id: Identifies the remote peer See
-        http://fixwiki.org/fixwiki/TargetCompID
-    :param heartbeat_interval: How often (in seconds) to generate heartbeat
-        messages during periods of inactivity. Default to 30.
+    :param config: Session configuration object
+    :param transport: Session transport
+    :param store: Session store
     """
 
     def __init__(
         self,
-        session_id,
-        store,
-        transport,
-        initiator=True,
-        on_close=None,
-        **kwargs
+        config: "FixSessionConfig",
+        store: "FixStore",
+        transport: "Transport",
     ):
-        self.store = store
-        self.transport = transport
-        self.config = get_options(**kwargs)
-        self._session_id = session_id
-        self._initiator = initiator
-        self._on_close = on_close
-        self._waiting_resend = False
-        self._waiting_logout_confirm = False
-        self._logout_after_resend = False
-        self._hearbeat_cb = None
-        self._callbacks = defaultdict(list)
-        self._msg_queue = asyncio.Queue()
-        self.logged_on = False
-        self.parser = FixParser()
-        self._ready = asyncio.Event()
+        self.config = config
+        self._store = store
+        self._transport = transport
+        self._hb_int = self.config.hb_int
+        self._parser = FixParser()
+        self._reset_request: t.Optional["FixMessage"] = None
+        self._state = FixSessionState()
+        self._lock = aio.Lock()
+        self._gen: t.Optional[t.AsyncIterator["FixMessage"]] = None
+        self._heartbeat_at = time.time() + self._hb_int
+        self._outq: aio.Queue["FixMessage"] = aio.Queue()
+        self.on_close: t.Optional[t.Callable] = None
 
-        loop = asyncio.get_event_loop()
-        loop.create_task(self._process_msg_queue())
-        self._ready.set()
+        self.on_send: "t.Optional[SendHandler]" = None
 
-    def __aiter__(self):
+    def __aiter__(self) -> t.AsyncIterator["FixMessage"]:
         return self
 
-    async def __anext__(self):
-        try:
-            msg = await self.receive()
-        except asyncio.TimeoutError as error:
-            logger.error(error)
-            raise StopAsyncIteration
-        return msg
+    async def __anext__(self) -> "FixMessage":
+        return await self.receive()
 
     @property
-    def id(self):
-        """ Returns the unique identifier for this session
-
-        :return: str
-        """
-        return self._session_id
+    def id(self) -> t.Tuple[str, str, str, t.Optional[str]]:
+        return (
+            self.config.version,
+            self.config.sender,
+            self.config.target,
+            self.config.qualifier,
+        )
 
     @property
-    def closed(self):
+    def logged_on(self) -> bool:
+        return self._state.isset(FLAG_LOGGED_ON)
+
+    @property
+    def closed(self) -> bool:
         """ Returns True if underlying connection
         is closing or has been closed.
 
         :return: bool
         """
-        return self.transport.is_closing()
+        if self._state.isset(FLAG_CLOSING):
+            return True
+        if self._state.isset(FLAG_CLOSED):
+            return True
+        return False
 
-    def history(self, *args, **kwargs):
+    def history(self, *args, **kwargs) -> t.AsyncIterator["FixMessage"]:
         """ Return all messages sent and received in the
         current session.
 
-        :rtype AsyncIterator[:class:`~fixtrate.message.FixMessage`]
+        :rtype AsyncIterator[:class:`~fix.message.FixMessage`]
         """
-        return self.store.get_messages(self._session_id, *args, **kwargs)
+        return self._store.get_msgs(*args, **kwargs)
 
-    async def get_local_sequence(self):
-        """ Return the current local sequence number.
-
-        :rtype int
-        """
-        return await self.store.get_local(self._session_id)
-
-    async def get_remote_sequence(self):
-        """ Return the current remote sequence number.
-
-        :rtype int
-        """
-        return await self.store.get_remote(self._session_id)
-
-    async def logon(self):
+    async def logon(self) -> None:
         """ Logon to a FIX Session. Sends a Logon<A> message to peer.
         """
-        if not self._initiator:
-            raise FIXError(
-                'Only a session initator can send '
-                'a initate a logon')
-        hb_int = self.config.get('heartbeat_interval')
-        login_msg = fix42.logon(hb_int=hb_int)
-        self.send(login_msg)
+        login_msg = helpers.make_logon_msg(hb_int=self._hb_int)
+        await self.send(login_msg)
 
-    async def reset(self):
-        test_id = str(uuid.uuid4())
-        test_request = fix42.test_request(test_id)
-        self.send(test_request)
-        await self.drain()
-        self._ready.clear()
-        self._msg_queue.put_nowait(None)
-        self._register_msg_cb(
-            fc.FixMsgType.HEARTBEAT, self._initiate_reset, test_id)
+    async def test(self, test_req_id: t.Optional[str] = None) -> None:
+        if test_req_id is None:
+            test_req_id = str(uuid.uuid4())
+        test_request_msg = helpers.make_test_request_msg(test_req_id)
+        await self.send(test_request_msg)
 
-    async def logout(self):
-        """ Logout from a FIX Session. Sends a Logout<5> message to peer.
+    async def reset(self) -> None:
+        login_msg = helpers.make_logon_msg(
+            hb_int=self._hb_int, reset=True)
+        login_msg.append_pair(57, str(uuid.uuid4()), header=True)
+        self._reset_request = login_msg
+        await self._send(login_msg, incr=False)
+
+    async def logout(self) -> None:
         """
-        rv = None
-        self._waiting_logout_confirm = True
-        self.send(fix42.logout())
+        Logout from a FIX Session.
+        Sends a Logout<5> message to peer.
+        """
+        self._state.set(FLAG_WAIT_LOGOUT)
+        await self.send(helpers.make_logout_msg())
 
-    async def close(self):
+    async def close(self) -> None:
         """
         Close the session. Closes the underlying connection and performs
         cleanup work.
         """
-        self._msg_queue.put_nowait(DEAD)
-        await self._cancel_heartbeat_timer()
-        await self.transport.close()
-        if self._on_close is not None:
-            await maybe_await(self._on_close, self)
+        if self.closed:
+            return
+        self._state.set(FLAG_CLOSING)
+        if self._state.isset(FLAG_LOGGED_ON):
+            logger.warning(
+                f"Peer {self.config.sender} closed the connection "
+                "without sending a logout message"
+            )
+        await self._transport.close()
+        async with self._lock:
+            await self._store.close()
+        self._state.set(FLAG_CLOSED)
 
-    def send(self, msg):
+        if self.on_close is not None:
+            self.on_close()
+
+    async def send(self, msg: "FixMessage") -> None:
         """
         Send a FIX message to peer.
 
         :param msg: message to send.
-        :type msg: :class:`~fixtrate.message.FixMessage`
+        :type msg: :class:`~fix.message.FixMessage`
         """
-        self._msg_queue.put_nowait(msg)
+        if self.closed:
+            raise exc.SessionClosedError
+        await self._send(msg)
 
-    async def drain(self):
-        await self._msg_queue.join()
-
-    async def _send(self, msg):
-        await self._append_standard_header(msg)
-        if not msg.is_duplicate and not helpers.is_gap_fill(msg):
-            await self._incr_local_sequence()
-
-        await self._store_message(msg)
-
-        try:
-            await self.transport.write(msg.encode())
-        except ConnectionError:
-            await self.close()
-            return
-
-        await self._reset_heartbeat_timer()
-
-    async def _append_standard_header(self, msg, timestamp=None):
-        if msg.seq_num is None:
-            seq_num = await self.get_local_sequence()
-            msg.append_pair(fc.FixTag.MsgSeqNum, seq_num)
-
-        headers = [
-            (fc.FixTag.BeginString, self.id.begin_string),
-            (fc.FixTag.SenderCompID, self.id.sender),
-            (fc.FixTag.TargetCompID, self.id.target),
-            *self.config['headers']
-        ]
-
-        for tag, val in headers:
-            existing = msg.get(tag)
-            if existing is None:
-                msg.append_pair(tag, val, header=True)
-
-        send_time = msg.get(fc.FixTag.SendingTime)
-        if timestamp is not None or send_time is None:
-            helpers.append_send_time(msg, timestamp=timestamp)
-
-    async def _incr_local_sequence(self):
-        return await self.store.incr_local(self._session_id)
-
-    async def _incr_remote_sequence(self):
-        return await self.store.incr_remote(self._session_id)
-
-    async def _set_local_sequence(self, new_seq_num):
-        return await self.store.set_local(self._session_id, new_seq_num)
-
-    async def _set_remote_sequence(self, new_seq_num):
-        return await self.store.set_remote(self._session_id, new_seq_num)
-
-    async def _store_message(self, msg):
-        try:
-            await self.store.store_message(self._session_id, msg)
-        except Exception as error:
-            raise SessionError(
-                'Unable to store message: %s' % error) from error
-
-    async def _get_resend_msgs(self, start, end):
-        """ Used internally by Fixtrate to handle the re-transmission of
-        messages as a result of a Resend Request <2> message.
-
-        The range of messages to be resent is requested from the
-        store and iterated over. Each message is appended with a
-        PossDupFlag tag set to 'Y' (Yes) and resent to the client,
-        except for admin messages.
-
-        Admin messages must not be resent. Contiguous sequences of
-        admin messages are ignored, and a Sequence Reset <4> Gap Fill
-        message is sent to instruct the client to increment the
-        the next expected sequence number to the sequence number
-        of the next non-admin message to be resent (represented by
-        the value of NewSeqNo <36> in the Sequence Reset <4> message).
-
-        For more information, see:
-        https://www.onixs.biz/fix-dictionary/4.2/msgtype_2_2.html
-
-        """
-        # TODO support for end=0 must either be enforced here or in
-        # the store!
-        # TODO support for skipping the resend of certain business messages
-        # based on config options (eg. stale order requests)
-        sent_msgs = await self.store.get_sent(
-            self.id, min=start, max=end)
-        return helpers.prepare_msgs_for_resend(sent_msgs)
-
-    async def _receive_msg(self, timeout=None):
+    async def receive(
+        self,
+        timeout: t.Optional[float] = None,
+        skip_admin: bool = False,
+        skip_duplicate: bool = True,
+    ) -> "FixMessage":
+        gen = await self._get_gen()
         while True:
-            msg = self.parser.get_message()
-            if msg is not None:
-                break
             try:
-                with async_timeout.timeout(timeout):
-                    data = await self.transport.read()
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                raise asyncio.TimeoutError
+                msg = await aio.wait_for(gen.__anext__(), timeout)
+            except aio.TimeoutError:
+                self._gen = None
+                raise
+            if helpers.is_admin(msg) and skip_admin:
+                continue
+            if msg.is_duplicate and skip_duplicate:
+                continue
+            return msg
+
+    async def _send(self, msg: "FixMessage", incr: bool = True) -> None:
+        if msg.msg_type == MTYPE.LOGON:
+            if self._state.isset(FLAG_INIT_LOGON):
+                raise exc.FixError(
+                    "Logon attempted while stil waiting for reply "
+                    "to previous logon attempt"
+                )
+            if not self._state.isset(FLAG_LOGGED_ON):
+                self._state.set(FLAG_INIT_LOGON)
+
+        async with self._lock:
+            await self._set_header(msg)
+            await self._store.store_msg(msg)
+            if incr:
+                await self._store.incr_local()
+            self._outq.put_nowait(msg)
+
+    async def _drain(self) -> None:
+        while True:
+            try:
+                msg = self._outq.get_nowait()
+            except aio.QueueEmpty:
+                break
+            await self._transport.write(msg.encode())
+            self._reset_hb()
+            if self.on_send:
+                self.on_send(msg)
+
+    async def _set_header(self, msg: "FixMessage") -> None:
+        if msg.get_raw(TAGS.MsgSeqNum) is None:
+            seq_num = await self._store.get_local() + 1
+            msg.append_pair(TAGS.MsgSeqNum, seq_num)
+
+        msg.append_pair(TAGS.BeginString, self.config.version)
+        msg.append_pair(TAGS.SenderCompID, self.config.sender)
+        msg.append_pair(TAGS.TargetCompID, self.config.target)
+
+        send_time = msg.get_raw(TAGS.SendingTime)
+        if send_time is None:
+            stamp = datetime.utcnow()
+            msg.append_utc_timestamp(
+                TAGS.SendingTime,
+                timestamp=stamp,
+                precision=6,
+                header=True
+            )
+
+    async def _send_hb(self) -> None:
+        if time.time() > self._heartbeat_at:
+            await self.send(helpers.make_heartbeat_msg())
+
+    def _reset_hb(self) -> None:
+        self._heartbeat_at = time.time() + self._hb_int
+
+    async def _validate_msg(self, msg: "FixMessage") -> None:
+        """
+        Do basic validation of message to make sure key tags
+        are set and have the correct values.
+        """
+        helpers.validate_header(msg, self.config)
+
+        if msg.msg_type == MTYPE.LOGON:
+            hb_int = int(get_or_raise(msg, TAGS.HeartBtInt))
+            if hb_int != self._hb_int:
+                raise exc.IncorrectTagValueError(
+                    msg, TAGS.HeartBtInt, self._hb_int, hb_int)
+
+        try:
+            hasattr(msg, "seq_num")
+        except ValueError:
+            raise exc.SessionError(
+                f"Fatal error: Message {msg} does not "
+                "have a sequence number set"
+            )
+
+    async def _poll(self) -> t.AsyncIterator["FixMessage"]:
+        while True:
+            if self.closed:
+                raise exc.SessionClosedError
+            await self._send_hb()
+            await self._drain()
+            msg = self._parser.get_message()
+            if msg is not None:
+                yield msg
+            try:
+                data = await aio.wait_for(self._transport.read(), 0.01)
             except ConnectionError:
-                # TODO does this session naturally close
-                # at some point after (as a result of) this
-                # exception?
                 await self.close()
                 raise
-            self.parser.append_buffer(data)
-        return msg
-
-    async def receive(self, timeout=None):
-        """ Coroutine that waits for message from peer and returns it.
-
-        :param timeout: (optional) timeout in seconds. If specified, method
-            will raise asyncio.TimeoutError if message in not
-            received after timeout. Defaults to `None`.
-        :type timeout: float, int or None
-
-        :return: :class:`~fixtrate.message.FixMessage` object
-        """
-        if timeout is None:
-            timeout = self.config.get('receive_timeout')
-        msg = await self._receive_msg(timeout=timeout)
-        if self.closed:
-            raise ConnectionAbortedError
-        await self._process_message(msg)
-        return msg
-
-    async def _process_message(self, msg):
-        try:
-            await self._validate_msg(msg)
-        except InvalidMessageError as error:
-            await self._handle_invalid_message(error)
-            logger.warning(
-                'Invalid message was received and rejected: '
-                '%s' % msg.get(fc.FixTag.Text)
-            )
-        except FatalSequenceGapError as error:
-            await self._handle_fatal_sequence_gap(
-                error.fix_msg, error.gap)
-        except SequenceGapError as error:
-            await self._handle_sequence_gap(
-                msg, error.gap)
-        else:
-            await self._handle_message(msg)
-        for cb, *args in self._callbacks.pop(msg.msg_type, []):
-            await maybe_await(cb, *args, msg)
-
-    async def _validate_seq_num(self, msg):
-        diff = await self._get_sequence_gap(msg)
-        if diff > 0:
-            raise SequenceGapError(msg, diff)
-        if diff < 0:
-            raise FatalSequenceGapError(msg, diff)
-
-    async def _handle_invalid_message(self, error):
-        reject_msg = helpers.make_reject_msg(
-            error.fix_msg, error.tag, error.reject_type, str(error))
-        self.send(reject_msg)
-
-    async def _validate_msg(self, msg):
-        helpers.validate_header(msg, self.id)
-        if msg.msg_type == fc.FixMsgType.LOGON:
-            hb_int = self.config['heartbeat_interval']
-            helpers.validate_tag_value(
-                msg, fc.FixTag.HeartBtInt, hb_int, int)
-        await self._validate_seq_num(msg)
-
-    async def _handle_message(self, msg):
-        await self._store_message(msg)
-        await self._incr_remote_sequence()
-
-        if self._waiting_resend:
-            if not msg.is_duplicate:
-                self._waiting_resend = False
-                if self._logout_after_resend:
-                    return helpers.make_logout_msg()
-
-        if not helpers.is_duplicate_admin(msg):
-            handler = self._dispatch(msg)
-            if handler is not None:
-                await maybe_await(handler, msg)
-
-    def _dispatch(self, msg):
-        return {
-            fc.FixMsgType.LOGON: self._handle_logon,
-            fc.FixMsgType.LOGOUT: self._handle_logout,
-            fc.FixMsgType.TEST_REQUEST: self._handle_test_request,
-            fc.FixMsgType.REJECT: self._handle_reject,
-            fc.FixMsgType.RESEND_REQUEST: self._handle_resend_request,
-            fc.FixMsgType.SEQUENCE_RESET: self._handle_sequence_reset,
-        }.get(msg.msg_type)
-
-    async def _handle_sequence_gap(self, msg, gap):
-        """ Handle sequence gap where gap > 0"
-
-        Always honor a ResendRequest<2> from the peer no matter
-        what, even if we are currently waiting for the peer
-        to resend messages in response to our own ResendRequest<2>.
-        This handles an edge case that occurs when both sides
-        detect a sequence gap as a result of the respective
-        Logon<A> messages. If after detecting a gap the peer
-        sends both a Logon<A> message (the logon acknowledgment)
-        AND a ResendRequest<2> AT THE SAME TIME, the following
-        scenario occurs:
-          1. We process the Logon<4> msg, detect a gap, and
-             immediately issue our own ResendRequest<2> (using
-             the 'through infinity' approach). This puts us into
-             a 'waiting-on-resend' mode, which causes us to ignore
-             any further out-of-sequence messages (where gap is > 0)
-             until the resend is complete.
-          2. We process the ResendRequest<2> which is also out-of-
-             sequence (gap > 0). If we follow the 'waiting-on-resend'
-             rule, then we should ignore this out-of-sequence msg and
-             proceeed, but if we do that, the peer's ResendRequest<2>
-             is not honored, and the FIX spec dictates that we must
-             honor it, so we make an exception and proceed with
-             message resend.
-
-        If we are currently waiting on the peer to finish resending
-        messages in response to a ResendRequest<2> of our own,
-        then we ignore any messages that are out of sequence
-        until the resend is complete. This only applies for
-        the 'through infinity' strategy.
-
-        If msg is a Logon<A>, process it before
-        sending a ResendRequest<2> message.
-
-        If we are waiting for a logout confirmation,
-        then this is the ack for that logout, and we can
-        can handle the logout message normally, this will
-        close the session.
-
-        If we were not waiting for a logout confirmation,
-        then the peer is initiating a logout, and we will
-        have to honour it after the peer finishes resending
-        messages.
-
-        If the message is a SequenceReset<4>, then there are two
-        scenarios to contend with (GapFill and Reset).
-
-        If GapFillFlag <123> is set to 'N' or does not exist,
-        then this Sequence Reset <4> msg is in 'Reset' mode.
-        In Reset mode, we simply set the next expected remote
-        seq number to the NewSeqNo(36) value of the msg
-        """
-        if msg.msg_type == fc.FixMsgType.RESEND_REQUEST:
-            await self._handle_resend_request(msg)
-
-        if self._waiting_resend:
-            return
-
-        if msg.msg_type == fc.FixMsgType.SEQUENCE_RESET:
-            # TODO how should we handle a GAP FILL here?
-            if not helpers.is_gap_fill(msg):
-                await self._handle_sequence_reset(msg)
-                return
-
-        if msg.msg_type == fc.FixMsgType.LOGON:
-            await self._handle_logon(msg)
-
-        if msg.msg_type == fc.FixMsgType.LOGOUT:
-            if self._waiting_logout_confirm:
-                await self._handle_logout(msg)
-            else:
-                self._logout_after_resend = True
-
-        self._waiting_resend = True
-        resend_request = helpers.make_resend_request(
-            msg.seq_num - gap, 0)
-        self.send(resend_request)
-
-    async def _handle_fatal_sequence_gap(self, msg, gap):
-        """ Handle a sequence gap where gap <0
-
-        The sequence number of a SeqReset<4> message
-        in 'Reset Mode' (GapFillFlag(123) not present
-        or set to 'N') should be ignored,and by extension
-        any resulting sequence gaps should also be ignored.
-
-        A Logon<A> message with ResetSeqNumFlag(141)
-        set to 'Y' will almost always result in a
-        sequence gap where gap < 0, since it should
-        be resetting the sequence number to 1. The
-        reset request must be obeyed, and so the
-        sequence gap is ignored.
-
-        Ignore duplicate messages.
-
-        If the message does not meet the above criteria,
-        then we are in an unrecoverable situation, so we
-        terminate the session and raise the error.
-
-        """
-        if helpers.is_reset_mode(msg):
-            await self._handle_sequence_reset(msg)
-        elif helpers.is_logon_reset(msg):
-            await self._handle_logon_reset(msg)
-        else:
-            if not msg.is_duplicate:
-                expected = msg.seq_num - gap
-                logger.error(
-                    'Unrecoverable sequence gap error. Received msg '
-                    '(%s) with seq num %s, but expected seq num %s. '
-                    'Terminating the session...' % (
-                        msg.msg_type, msg.seq_num, expected)
-                )
-                await self.close()
-
-    async def _get_sequence_gap(self, msg):
-        expected = await self.get_remote_sequence()
-        return msg.seq_num - expected
-
-    async def _handle_logon(self, msg):
-        if not self._initiator:
-            hb_int = self.config['heartbeat_interval']
-            reply = helpers.make_logon_msg(hb_int)
-            self.send(reply)
-
-        self.logged_on = True
-
-    async def _handle_logon_reset(self, msg):
-        hb_int = self.config['heartbeat_interval']
-        reply = helpers.make_logon_msg(hb_int, reset=True)
-        await self.store.reset(self._session_id)
-        await self._set_remote_sequence(2)
-        self.send(reply)
-
-    async def _handle_logout(self, msg):
-        if self._waiting_logout_confirm:
-            self._waiting_logout_confirm = False
-            await self.close()
-        else:
-            self._waiting_logout_confirm = True
-            reply = helpers.make_logout_msg()
-            self.send(reply)
-
-        self.logged_on = False
-
-    async def _handle_test_request(self, msg):
-        test_request_id = msg.get(fc.FixTag.TestReqID)
-        reply = fix42.heartbeat(test_request_id)
-        self.send(reply)
-
-    def _log_rejection(self, msg):
-        reason = msg.get(fc.FixTag.Text)
-        msg = 'Peer rejected message: %s' % reason
-        logger.error(msg)
-
-    def _handle_reject(self, msg):
-        reason = msg.get(fc.FixTag.Text)
-        self._log_rejection(msg)
-
-    async def _handle_resend_request(self, msg):
-        start = int(msg.get(fc.FixTag.BeginSeqNo))
-        end = int(msg.get(fc.FixTag.EndSeqNo))
-        if end == 0:
-            # EndSeqNo of 0 means infinity
-            end = float('inf')
-        to_resend = await self._get_resend_msgs(start, end)
-        for m in to_resend:
-            self.send(m)
-
-    async def _handle_sequence_reset(self, msg):
-        new = int(msg.get(fc.FixTag.NewSeqNo))
-        expected = await self.get_remote_sequence()
-
-        if new < expected:
-            error = (
-                'SeqReset<4> attempting to decrease next '
-                'expected sequence number. Current expected '
-                'sequence number is %s, but SeqReset<4> is '
-                'attempting to set the next expected sequence '
-                'number to %s, this is now allowed.' % (expected, new)
-            )
-            reject_type = fc.SessionRejectReason.VALUE_IS_INCORRECT
-            reject_msg = helpers.make_reject_msg(
-                msg, fc.FixTag.NewSeqNo, reject_type, error)
-            self.send(reject_msg)
-
-        await self._set_remote_sequence(new)
-
-    async def _cancel_heartbeat_timer(self):
-        if self._hearbeat_cb is not None:
-            self._hearbeat_cb.cancel()
-            try:
-                await self._hearbeat_cb
-            except asyncio.CancelledError:
-                pass
-            self._hearbeat_cb = None
-
-    async def _reset_heartbeat_timer(self):
-        loop = asyncio.get_event_loop()
-        await self._cancel_heartbeat_timer()
-        self._hearbeat_cb = loop.create_task(
-            self._set_heartbeat_timer())
-
-    async def _set_heartbeat_timer(self):
-        try:
-            interval = self.config.get('heartbeat_interval')
-            await asyncio.sleep(interval)
-            msg = fix42.heartbeat()
-            self.send(msg)
-        except asyncio.CancelledError:
-            raise
-
-    async def _initiate_reset(self, test_id, msg):
-        if msg.get(fc.FixTag.TestReqID) == test_id:
-            self._register_msg_cb(
-                fc.FixMsgType.LOGON, self._confirm_reset)
-            hb_int = self.config['heartbeat_interval']
-            login_msg = fix42.logon(hb_int=hb_int, reset=True)
-            await self.store.reset(self._session_id)
-            await self._send(login_msg)
-        else:
-            cb = self._initiate_reset
-            self._register_msg_cb(msg.msg_type, cb, test_id)
-
-    async def _confirm_reset(self,  msg):
-        if helpers.is_logon_reset(msg):
-            await self._set_local_sequence(2)
-            self._ready.set()
-        else:
-            self._register_msg_cb(
-                msg.msg_type, self._confirm_reset)
-
-    def _register_msg_cb(self, msg_type, func, *args):
-        self._callbacks[msg_type].append((func, *args))
-
-    async def _process_msg_queue(self):
-        while True:
-            await self._ready.wait()
-            msg = await self._msg_queue.get()
-            self._msg_queue.task_done()
-            if msg is None:
+            except aio.TimeoutError:
                 continue
-            if msg is DEAD:
-                break
-            await self._send(msg)
+            self._parser.append_buffer(data)
 
+    async def _iter_msgs(self) -> t.AsyncIterator["FixMessage"]:
+        async for msg in self._poll():
+
+            try:
+                await self._validate_msg(msg)
+            except exc.InvalidMessageError as error:
+                reject_msg = helpers.make_reject_msg_from_error(error)
+                await self.send(reject_msg)
+                logger.warning(
+                    f"Invalid message was received and rejected: {error}")
+                continue
+            except exc.SessionError:
+                await self.close()
+                raise
+
+            expected = await self._store.get_remote()
+            gap = msg.seq_num - expected
+
+            if gap > 0:
+                if not (
+                    self._state.isset(FLAG_WAIT_RESEND)
+                    or helpers.is_reset_mode(msg)
+                ):
+                    resend_request = helpers.make_resend_request(expected, 0)
+                    await self.send(resend_request)
+                    self._state.set(FLAG_WAIT_RESEND)
+            elif gap < 0:
+                if not (
+                    helpers.is_reset_mode(msg)
+                    or helpers.is_logon_reset(msg)
+                ):
+                    if not msg.is_duplicate:
+                        raise exc.FatalSequenceGapError(gap)
+            else:
+                async with self._lock:
+                    await self._store.store_msg(msg)
+                    await self._store.incr_remote()
+
+                waiting_resend = self._state.isset(FLAG_WAIT_RESEND)
+                if waiting_resend and not msg.is_duplicate:
+                    self._state.unset(FLAG_WAIT_RESEND)
+                    if self._state.isset(FLAG_LOGOUT_RESEND):
+                        await self.send(helpers.make_logout_msg())
+
+            if msg.msg_type == MTYPE.LOGON:
+                self._state.set(FLAG_LOGGED_ON)
+                if helpers.is_reset(msg):
+                    await self._store.reset()
+                    if self._reset_request:
+                        await self._store.store_msg(self._reset_request, msg)
+                        self._reset_request = None
+                    else:
+                        await self._store.store_msg(msg)
+                        await self._send(
+                            helpers.make_logon_msg(self._hb_int, reset=True),
+                            incr=False
+                        )
+                else:
+                    if self._state.isset(FLAG_INIT_LOGON):
+                        self._state.unset(FLAG_INIT_LOGON)
+                    else:
+                        reply = helpers.make_logon_msg(self._hb_int)
+                        await self.send(reply)
+
+            elif msg.msg_type == MTYPE.LOGOUT:
+                if gap > 0:
+                    self._state.set(FLAG_LOGOUT_RESEND)
+                await self.send(helpers.make_logout_msg())
+                self._state.toggle(FLAG_WAIT_LOGOUT)
+                self._state.unset(FLAG_LOGGED_ON)
+
+            elif msg.msg_type == MTYPE.TEST_REQUEST:
+                test_request_id = msg.get_raw(TAGS.TestReqID)
+                reply = helpers.make_heartbeat_msg(test_request_id)
+                await self.send(reply)
+
+            elif msg.msg_type == MTYPE.REJECT:
+                reason = msg.get_raw(TAGS.Text)
+                logger.warning(
+                    f"Peer {self.config.target} rejected message: {reason}")
+
+            elif msg.msg_type == MTYPE.RESEND_REQUEST:
+                if self._state.isset(FLAG_WAIT_LOGOUT):
+                    logger.warning(
+                        "Received a Resend Request after sending a Logout")
+                start = int(get_or_raise(msg, TAGS.BeginSeqNo))
+                end = float(get_or_raise(msg, TAGS.EndSeqNo))
+                end = float("infinity") if end == 0 else end
+                async for msg in helpers.get_resend_msgs(
+                    self._store, start, end
+                ):
+                    await self._send(msg, incr=False)
+
+            elif msg.msg_type == MTYPE.SEQUENCE_RESET:
+                new = int(get_or_raise(msg, TAGS.NewSeqNo))
+                if new < expected:
+                    err = INVALID_SEQ_RESET % (expected, new)
+                    reject_msg = helpers.make_reject_msg(
+                        ref_sequence_number=msg.seq_num,
+                        ref_message_type=msg.msg_type,
+                        ref_tag=TAGS.NewSeqNo,
+                        rejection_type=BAD_VAL,
+                        reject_reason=err
+                    )
+                    await self.send(reject_msg)
+                    # TODO shouldn't we exit with a fatal error here?
+
+                await self._store.set_remote(new)
+
+            if not helpers.is_logon_reset(msg) and gap:
+                continue
+
+            yield msg
+
+    async def _get_gen(self) -> t.AsyncIterator["FixMessage"]:
+        if self._gen is None:
+            self._gen = self._iter_msgs()
+        return self._gen

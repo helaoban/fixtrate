@@ -1,0 +1,872 @@
+from fix.utils.enum import BaseStrEnum, BaseIntEnum
+
+
+class AdvSide(BaseStrEnum):
+    BUY = "B"
+    SELL = "S"
+    TRADE = "T"
+    CROSS = "X"
+
+
+class AdvTransType(BaseStrEnum):
+    CANCEL = "C"
+    NEW = "N"
+    REPLACE = "R"
+
+
+class CommType(BaseStrEnum):
+    PER_SHARE = "1"
+    PERCENTAGE = "2"
+    ABSOLUTE = "3"
+
+
+class ExecInst(BaseStrEnum):
+    STAY_ON_OFFERSIDE = "0"
+    NOT_HELD = "1"
+    WORK = "2"
+    GO_ALONG = "3"
+    OVER_THE_DAY = "4"
+    HELD = "5"
+    PARTICIPATE_DONT_INITIATE = "6"
+    STRICT_SCALE = "7"
+    TRY_TO_SCALE = "8"
+    STAY_ON_BIDSIDE = "9"
+    NO_CROSS = "A"
+    OK_TO_CROSS = "B"
+    CALL_FIRST = "C"
+    PERCENT_OF_VOLUME = "D"
+    DO_NOT_INCREASE = "E"
+    DO_NOT_REDUCE = "F"
+    ALL_OR_NONE = "G"
+    INSTITUTIONS_ONLY = "I"
+    LAST_PEG = "L"
+    MID_PRICE_PEG = "M"
+    NON_NEGOTIABLE = "N"
+    OPENING_PEG = "O"
+    MARKET_PEG = "P"
+    PRIMARY_PEG = "R"
+    SUSPEND = "S"
+    FIXED_PEG_TO_LOCAL_BEST_BID_OR_OFFER_AT_TIME_OF_ORDER = "T"
+    CUSTOMER_DISPLAY_INSTRUCTION = "U"
+    NETTING = "V"
+    PEG_TO_VWAP = "W"
+
+
+class ExecTransType(BaseStrEnum):
+    NEW = "0"
+    CANCEL = "1"
+    CORRECT = "2"
+    STATUS = "3"
+
+
+class HandlInst(BaseStrEnum):
+    AUTOMATED_EXECUTION_ORDER_PRIVATE_NO_BROKER_INTERVENTION = "1"
+    AUTOMATED_EXECUTION_ORDER_PUBLIC_BROKER_INTERVENTION_OK = "2"
+    MANUAL_ORDER_BEST_EXECUTION = "3"
+
+
+class IDSource(BaseStrEnum):
+    CUSIP = "1"
+    SEDOL = "2"
+    QUIK = "3"
+    ISIN_NUMBER = "4"
+    RIC_CODE = "5"
+    ISO_CURRENCY_CODE = "6"
+    ISO_COUNTRY_CODE = "7"
+    EXCHANGE_SYMBOL = "8"
+    CONSOLIDATED_TAPE_ASSOCIATION = "9"
+
+
+class IOIQltyInd(BaseStrEnum):
+    HIGH = "H"
+    LOW = "L"
+    MEDIUM = "M"
+
+
+class IOIShares(BaseStrEnum):
+    LARGE = "L"
+    MEDIUM = "M"
+    SMALL = "S"
+
+
+class IOITransType(BaseStrEnum):
+    CANCEL = "C"
+    NEW = "N"
+    REPLACE = "R"
+
+
+class LastCapacity(BaseStrEnum):
+    AGENT = "1"
+    CROSS_AS_AGENT = "2"
+    CROSS_AS_PRINCIPAL = "3"
+    PRINCIPAL = "4"
+
+
+class MsgType(BaseStrEnum):
+    HEARTBEAT = "0"
+    TEST_REQUEST = "1"
+    RESEND_REQUEST = "2"
+    REJECT = "3"
+    SEQUENCE_RESET = "4"
+    LOGOUT = "5"
+    INDICATION_OF_INTEREST = "6"
+    ADVERTISEMENT = "7"
+    EXECUTION_REPORT = "8"
+    ORDER_CANCEL_REJECT = "9"
+    QUOTE_STATUS_REQUEST = "a"
+    LOGON = "A"
+    NEWS = "B"
+    QUOTE_ACKNOWLEDGEMENT = "b"
+    EMAIL = "C"
+    SECURITY_DEFINITION_REQUEST = "c"
+    ORDER_SINGLE = "D"
+    SECURITY_DEFINITION = "d"
+    ORDER_LIST = "E"
+    SECURITY_STATUS_REQUEST = "e"
+    SECURITY_STATUS = "f"
+    ORDER_CANCEL_REQUEST = "F"
+    ORDER_CANCEL_REPLACE_REQUEST = "G"
+    TRADING_SESSION_STATUS_REQUEST = "g"
+    ORDER_STATUS_REQUEST = "H"
+    TRADING_SESSION_STATUS = "h"
+    MASS_QUOTE = "i"
+    BUSINESS_MESSAGE_REJECT = "j"
+    ALLOCATION = "J"
+    LIST_CANCEL_REQUEST = "K"
+    BID_REQUEST = "k"
+    BID_RESPONSE = "l"
+    LIST_EXECUTE = "L"
+    LIST_STRIKE_PRICE = "m"
+    LIST_STATUS_REQUEST = "M"
+    LIST_STATUS = "N"
+    ALLOCATION_ACK = "P"
+    DONT_KNOW_TRADE = "Q"
+    QUOTE_REQUEST = "R"
+    QUOTE = "S"
+    SETTLEMENT_INSTRUCTIONS = "T"
+    MARKET_DATA_REQUEST = "V"
+    MARKET_DATA_SNAPSHOT_FULL_REFRESH = "W"
+    MARKET_DATA_INCREMENTAL_REFRESH = "X"
+    MARKET_DATA_REQUEST_REJECT = "Y"
+    QUOTE_CANCEL = "Z"
+
+
+class OrdStatus(BaseStrEnum):
+    NEW = "0"
+    PARTIALLY_FILLED = "1"
+    FILLED = "2"
+    DONE_FOR_DAY = "3"
+    CANCELED = "4"
+    REPLACED = "5"
+    PENDING_CANCEL = "6"
+    STOPPED = "7"
+    REJECTED = "8"
+    SUSPENDED = "9"
+    PENDING_NEW = "A"
+    CALCULATED = "B"
+    EXPIRED = "C"
+    ACCEPTED_FOR_BIDDING = "D"
+    PENDING_REPLACE = "E"
+
+
+class OrdType(BaseStrEnum):
+    MARKET = "1"
+    LIMIT = "2"
+    STOP = "3"
+    STOP_LIMIT = "4"
+    MARKET_ON_CLOSE = "5"
+    WITH_OR_WITHOUT = "6"
+    LIMIT_OR_BETTER = "7"
+    LIMIT_WITH_OR_WITHOUT = "8"
+    ON_BASIS = "9"
+    ON_CLOSE = "A"
+    LIMIT_ON_CLOSE = "B"
+    FOREX_C = "C"
+    PREVIOUSLY_QUOTED = "D"
+    PREVIOUSLY_INDICATED = "E"
+    FOREX_F = "F"
+    FOREX_G = "G"
+    FOREX_H = "H"
+    FUNARI = "I"
+    PEGGED = "P"
+
+
+class Rule80A(BaseStrEnum):
+    AGENCY_SINGLE_ORDER = "A"
+    SHORT_EXEMPT_TRANSACTION_B = "B"
+    PROGRAM_ORDER_NON_INDEX_ARB_FOR_MEMBER_FIRM_ORG = "C"
+    PROGRAM_ORDER_INDEX_ARB_FOR_MEMBER_FIRM_ORG = "D"
+    REGISTERED_EQUITY_MARKET_MAKER_TRADES = "E"
+    SHORT_EXEMPT_TRANSACTION_F = "F"
+    SHORT_EXEMPT_TRANSACTION_H = "H"
+    INDIVIDUAL_INVESTOR_SINGLE_ORDER = "I"
+    PROGRAM_ORDER_INDEX_ARB_FOR_INDIVIDUAL_CUSTOMER = "J"
+    PROGRAM_ORDER_NON_INDEX_ARB_FOR_INDIVIDUAL_CUSTOMER = "K"
+    SHORT_EXEMPT_TRANSACTION_FOR_MEMBER_COMPETING_MARKET_MAKER_AFFILIATED_WITH_THE_FIRM_CLEARING_THE_TRADE = "L"
+    PROGRAM_ORDER_INDEX_ARB_FOR_OTHER_MEMBER = "M"
+    PROGRAM_ORDER_NON_INDEX_ARB_FOR_OTHER_MEMBER = "N"
+    COMPETING_DEALER_TRADES_O = "O"
+    PRINCIPAL = "P"
+    COMPETING_DEALER_TRADES_R = "R"
+    SPECIALIST_TRADES = "S"
+    COMPETING_DEALER_TRADES_T = "T"
+    PROGRAM_ORDER_INDEX_ARB_FOR_OTHER_AGENCY = "U"
+    ALL_OTHER_ORDERS_AS_AGENT_FOR_OTHER_MEMBER = "W"
+    SHORT_EXEMPT_TRANSACTION_FOR_MEMBER_COMPETING_MARKET_MAKER_NOT_AFFILIATED_WITH_THE_FIRM_CLEARING_THE_TRADE = "X"
+    PROGRAM_ORDER_NON_INDEX_ARB_FOR_OTHER_AGENCY = "Y"
+    SHORT_EXEMPT_TRANSACTION_FOR_NON_MEMBER_COMPETING_MARKET_MAKER = "Z"
+
+
+class Side(BaseStrEnum):
+    BUY = "1"
+    SELL = "2"
+    BUY_MINUS = "3"
+    SELL_PLUS = "4"
+    SELL_SHORT = "5"
+    SELL_SHORT_EXEMPT = "6"
+    UNDISCLOSED = "7"
+    CROSS = "8"
+    CROSS_SHORT = "9"
+
+
+class TimeInForce(BaseStrEnum):
+    DAY = "0"
+    GOOD_TILL_CANCEL = "1"
+    AT_THE_OPENING = "2"
+    IMMEDIATE_OR_CANCEL = "3"
+    FILL_OR_KILL = "4"
+    GOOD_TILL_CROSSING = "5"
+    GOOD_TILL_DATE = "6"
+
+
+class Urgency(BaseStrEnum):
+    NORMAL = "0"
+    FLASH = "1"
+    BACKGROUND = "2"
+
+
+class SettlmntTyp(BaseStrEnum):
+    REGULAR = "0"
+    CASH = "1"
+    NEXT_DAY = "2"
+    T_PLUS_2 = "3"
+    T_PLUS_3 = "4"
+    T_PLUS_4 = "5"
+    FUTURE = "6"
+    WHEN_ISSUED = "7"
+    SELLERS_OPTION = "8"
+    T_PLUS_5 = "9"
+
+
+class AllocTransType(BaseStrEnum):
+    NEW = "0"
+    REPLACE = "1"
+    CANCEL = "2"
+    PRELIMINARY = "3"
+    CALCULATED = "4"
+    CALCULATED_WITHOUT_PRELIMINARY = "5"
+
+
+class OpenClose(BaseStrEnum):
+    CLOSE = "C"
+    OPEN = "O"
+
+
+class ProcessCode(BaseStrEnum):
+    REGULAR = "0"
+    SOFT_DOLLAR = "1"
+    STEP_IN = "2"
+    STEP_OUT = "3"
+    SOFT_DOLLAR_STEP_IN = "4"
+    SOFT_DOLLAR_STEP_OUT = "5"
+    PLAN_SPONSOR = "6"
+
+
+class AllocStatus(BaseIntEnum):
+    ACCEPTED = 0
+    REJECTED = 1
+    PARTIAL_ACCEPT = 2
+    RECEIVED = 3
+
+
+class AllocRejCode(BaseIntEnum):
+    UNKNOWN_ACCOUNT = 0
+    INCORRECT_QUANTITY = 1
+    INCORRECT_AVERAGE_PRICE = 2
+    UNKNOWN_EXECUTING_BROKER_MNEMONIC = 3
+    COMMISSION_DIFFERENCE = 4
+    UNKNOWN_ORDERID = 5
+    UNKNOWN_LISTID = 6
+    OTHER = 7
+
+
+class EmailType(BaseStrEnum):
+    NEW = "0"
+    REPLY = "1"
+    ADMIN_REPLY = "2"
+
+
+class EncryptMethod(BaseIntEnum):
+    NONE = 0
+    PKCS = 1
+    DES = 2
+    PKCS_DES = 3
+    PGP_DES = 4
+    PGP_DES_MD5 = 5
+    PEM_DES_MD5 = 6
+
+
+class CxlRejReason(BaseIntEnum):
+    TOO_LATE_TO_CANCEL = 0
+    UNKNOWN_ORDER = 1
+    BROKER_OPTION = 2
+    ORDER_ALREADY_IN_PENDING_CANCEL_OR_PENDING_REPLACE_STATUS = 3
+
+
+class OrdRejReason(BaseIntEnum):
+    BROKER_OPTION = 0
+    UNKNOWN_SYMBOL = 1
+    EXCHANGE_CLOSED = 2
+    ORDER_EXCEEDS_LIMIT = 3
+    TOO_LATE_TO_ENTER = 4
+    UNKNOWN_ORDER = 5
+    DUPLICATE_ORDER = 6
+    DUPLICATE_OF_A_VERBALLY_COMMUNICATED_ORDER = 7
+    STALE_ORDER = 8
+
+
+class IOIQualifier(BaseStrEnum):
+    ALL_OR_NONE = "A"
+    AT_THE_CLOSE = "C"
+    IN_TOUCH_WITH = "I"
+    LIMIT = "L"
+    MORE_BEHIND = "M"
+    AT_THE_OPEN = "O"
+    TAKING_A_POSITION = "P"
+    AT_THE_MARKET = "Q"
+    READY_TO_TRADE = "R"
+    PORTFOLIO_SHOW_N = "S"
+    THROUGH_THE_DAY = "T"
+    VERSUS = "V"
+    INDICATION = "W"
+    CROSSING_OPPORTUNITY = "X"
+    AT_THE_MIDPOINT = "Y"
+    PRE_OPEN = "Z"
+
+
+class DKReason(BaseStrEnum):
+    UNKNOWN_SYMBOL = "A"
+    WRONG_SIDE = "B"
+    QUANTITY_EXCEEDS_ORDER = "C"
+    NO_MATCHING_ORDER = "D"
+    PRICE_EXCEEDS_LIMIT = "E"
+    OTHER = "Z"
+
+
+class MiscFeeType(BaseStrEnum):
+    REGULATORY = "1"
+    TAX = "2"
+    LOCAL_COMMISSION = "3"
+    EXCHANGE_FEES = "4"
+    STAMP = "5"
+    LEVY = "6"
+    OTHER = "7"
+    MARKUP = "8"
+    CONSUMPTION_TAX = "9"
+
+
+class ExecType(BaseStrEnum):
+    NEW = "0"
+    PARTIAL_FILL = "1"
+    FILL = "2"
+    DONE_FOR_DAY = "3"
+    CANCELED = "4"
+    REPLACE = "5"
+    PENDING_CANCEL = "6"
+    STOPPED = "7"
+    REJECTED = "8"
+    SUSPENDED = "9"
+    PENDING_NEW = "A"
+    CALCULATED = "B"
+    EXPIRED = "C"
+    RESTATED = "D"
+    PENDING_REPLACE = "E"
+
+
+class SettlCurrFxRateCalc(BaseStrEnum):
+    MULTIPLY = "M"
+    DIVIDE = "D"
+
+
+class SettlInstMode(BaseStrEnum):
+    DEFAULT = "0"
+    STANDING_INSTRUCTIONS_PROVIDED = "1"
+    SPECIFIC_ALLOCATION_ACCOUNT_OVERRIDING = "2"
+    SPECIFIC_ALLOCATION_ACCOUNT_STANDING = "3"
+
+
+class SettlInstTransType(BaseStrEnum):
+    CANCEL = "C"
+    NEW = "N"
+    REPLACE = "R"
+
+
+class SettlInstSource(BaseStrEnum):
+    BROKERS_INSTRUCTIONS = "1"
+    INSTITUTIONS_INSTRUCTIONS = "2"
+
+
+class SettlLocation(BaseStrEnum):
+    CEDEL = "CED"
+    DEPOSITORY_TRUST_COMPANY = "DTC"
+    EUROCLEAR = "EUR"
+    FEDERAL_BOOK_ENTRY = "FED"
+    LOCAL_MARKET_SETTLE_LOCATION = "ISO Country Code"
+    PHYSICAL = "PNY"
+    PARTICIPANT_TRUST_COMPANY = "PTC"
+
+
+class SecurityType(BaseStrEnum):
+    WILDCARD_ENTRY = "?"
+    BANKERS_ACCEPTANCE = "BA"
+    CONVERTIBLE_BOND = "CB"
+    CERTIFICATE_OF_DEPOSIT = "CD"
+    COLLATERALIZE_MORTGAGE_OBLIGATION = "CMO"
+    CORPORATE_BOND = "CORP"
+    COMMERCIAL_PAPER = "CP"
+    CORPORATE_PRIVATE_PLACEMENT = "CPP"
+    COMMON_STOCK = "CS"
+    FEDERAL_HOUSING_AUTHORITY = "FHA"
+    FEDERAL_HOME_LOAN = "FHL"
+    FEDERAL_NATIONAL_MORTGAGE_ASSOCIATION = "FN"
+    FOREIGN_EXCHANGE_CONTRACT = "FOR"
+    FUTURE = "FUT"
+    GOVERNMENT_NATIONAL_MORTGAGE_ASSOCIATION = "GN"
+    TREASURIES_PLUS_AGENCY_DEBENTURE = "GOVT"
+    MORTGAGE_IOETTE = "IET"
+    MUTUAL_FUND = "MF"
+    MORTGAGE_INTEREST_ONLY = "MIO"
+    MORTGAGE_PRINCIPAL_ONLY = "MPO"
+    MORTGAGE_PRIVATE_PLACEMENT = "MPP"
+    MISCELLANEOUS_PASS_THRU = "MPT"
+    MUNICIPAL_BOND = "MUNI"
+    NO_ISITC_SECURITY_TYPE = "NONE"
+    OPTION = "OPT"
+    PREFERRED_STOCK = "PS"
+    REPURCHASE_AGREEMENT = "RP"
+    REVERSE_REPURCHASE_AGREEMENT = "RVRP"
+    STUDENT_LOAN_MARKETING_ASSOCIATION = "SL"
+    TIME_DEPOSIT = "TD"
+    US_TREASURY_BILL = "USTB"
+    WARRANT = "WAR"
+    CATS_TIGERS_LIONS = "ZOO"
+
+
+class StandInstDbType(BaseIntEnum):
+    OTHER = 0
+    DTC_SID = 1
+    THOMSON_ALERT = 2
+    A_GLOBAL_CUSTODIAN = 3
+
+
+class AllocLinkType(BaseIntEnum):
+    F_X_NETTING = 0
+    F_X_SWAP = 1
+
+
+class PutOrCall(BaseIntEnum):
+    PUT = 0
+    CALL = 1
+
+
+class CoveredOrUncovered(BaseIntEnum):
+    COVERED = 0
+    UNCOVERED = 1
+
+
+class CustomerOrFirm(BaseIntEnum):
+    CUSTOMER = 0
+    FIRM = 1
+
+
+class AllocHandlInst(BaseIntEnum):
+    MATCH = 1
+    FORWARD = 2
+    FORWARD_AND_MATCH = 3
+
+
+class RoutingType(BaseIntEnum):
+    TARGET_FIRM = 1
+    TARGET_LIST = 2
+    BLOCK_FIRM = 3
+    BLOCK_LIST = 4
+
+
+class Benchmark(BaseStrEnum):
+    CURVE = "1"
+    FIVE_YR = "2"
+    OLD_5 = "3"
+    TEN_YR = "4"
+    OLD_10 = "5"
+    THIRTY_YR = "6"
+    OLD_30 = "7"
+    THREE_MO_LIBOR = "8"
+    SIX_MO_LIBOR = "9"
+
+
+class SubscriptionRequestType(BaseStrEnum):
+    SNAPSHOT = "0"
+    SNAPSHOT_PLUS_UPDATES = "1"
+    DISABLE_PREVIOUS_SNAPSHOT_PLUS_UPDATE_REQUEST = "2"
+
+
+class MDUpdateType(BaseIntEnum):
+    FULL_REFRESH = 0
+    INCREMENTAL_REFRESH = 1
+
+
+class MDEntryType(BaseStrEnum):
+    BID = "0"
+    OFFER = "1"
+    TRADE = "2"
+    INDEX_VALUE = "3"
+    OPENING_PRICE = "4"
+    CLOSING_PRICE = "5"
+    SETTLEMENT_PRICE = "6"
+    TRADING_SESSION_HIGH_PRICE = "7"
+    TRADING_SESSION_LOW_PRICE = "8"
+    TRADING_SESSION_VWAP_PRICE = "9"
+
+
+class TickDirection(BaseStrEnum):
+    PLUS_TICK = "0"
+    ZERO_PLUS_TICK = "1"
+    MINUS_TICK = "2"
+    ZERO_MINUS_TICK = "3"
+
+
+class QuoteCondition(BaseStrEnum):
+    OPEN = "A"
+    CLOSED = "B"
+    EXCHANGE_BEST = "C"
+    CONSOLIDATED_BEST = "D"
+    LOCKED = "E"
+    CROSSED = "F"
+    DEPTH = "G"
+    FAST_TRADING = "H"
+    NON_FIRM = "I"
+
+
+class TradeCondition(BaseStrEnum):
+    CASH = "A"
+    AVERAGE_PRICE_TRADE = "B"
+    CASH_TRADE = "C"
+    NEXT_DAY = "D"
+    OPENING = "E"
+    INTRADAY_TRADE_DETAIL = "F"
+    RULE_127_TRADE = "G"
+    RULE_155_TRADE = "H"
+    SOLD_LAST = "I"
+    NEXT_DAY_TRADE = "J"
+    OPENED = "K"
+    SELLER = "L"
+    SOLD = "M"
+    STOPPED_STOCK = "N"
+
+
+class MDUpdateAction(BaseStrEnum):
+    NEW = "0"
+    CHANGE = "1"
+    DELETE = "2"
+
+
+class MDReqRejReason(BaseStrEnum):
+    UNKNOWN_SYMBOL = "0"
+    DUPLICATE_MDREQID = "1"
+    INSUFFICIENT_BANDWIDTH = "2"
+    INSUFFICIENT_PERMISSIONS = "3"
+    UNSUPPORTED_SUBSCRIPTIONREQUESTTYPE = "4"
+    UNSUPPORTED_MARKETDEPTH = "5"
+    UNSUPPORTED_MDUPDATETYPE = "6"
+    UNSUPPORTED_AGGREGATEDBOOK = "7"
+    UNSUPPORTED_MDENTRYTYPE = "8"
+
+
+class DeleteReason(BaseStrEnum):
+    CANCELATION = "0"
+    ERROR = "1"
+
+
+class OpenCloseSettleFlag(BaseStrEnum):
+    DAILY_OPEN = "0"
+    SESSION_OPEN = "1"
+    DELIVERY_SETTLEMENT_PRICE = "2"
+
+
+class FinancialStatus(BaseStrEnum):
+    BANKRUPT = "1"
+
+
+class CorporateAction(BaseStrEnum):
+    EX_DIVIDEND = "A"
+    EX_DISTRIBUTION = "B"
+    EX_RIGHTS = "C"
+    NEW = "D"
+    EX_INTEREST = "E"
+
+
+class QuoteAckStatus(BaseIntEnum):
+    ACCEPTED = 0
+    CANCELED_FOR_SYMBOL = 1
+    CANCELED_FOR_SECURITY_TYPE = 2
+    CANCELED_FOR_UNDERLYING = 3
+    CANCELED_ALL = 4
+    REJECTED = 5
+
+
+class QuoteCancelType(BaseIntEnum):
+    CANCEL_FOR_SYMBOL = 1
+    CANCEL_FOR_SECURITY_TYPE = 2
+    CANCEL_FOR_UNDERLYING_SYMBOL = 3
+    CANCEL_FOR_ALL_QUOTES = 4
+
+
+class QuoteRejectReason(BaseIntEnum):
+    UNKNOWN_SYMBOL = 1
+    EXCHANGE = 2
+    QUOTE_REQUEST_EXCEEDS_LIMIT = 3
+    TOO_LATE_TO_ENTER = 4
+    UNKNOWN_QUOTE = 5
+    DUPLICATE_QUOTE = 6
+    INVALID_BID_ASK_SPREAD = 7
+    INVALID_PRICE = 8
+    NOT_AUTHORIZED_TO_QUOTE_SECURITY = 9
+
+
+class QuoteResponseLevel(BaseIntEnum):
+    NO_ACKNOWLEDGEMENT = 0
+    ACKNOWLEDGE_ONLY_NEGATIVE_OR_ERRONEOUS_QUOTES = 1
+    ACKNOWLEDGE_EACH_QUOTE_MESSAGES = 2
+
+
+class QuoteRequestType(BaseIntEnum):
+    MANUAL = 1
+    AUTOMATIC = 2
+
+
+class SecurityRequestType(BaseIntEnum):
+    REQUEST_SECURITY_IDENTITY_AND_SPECIFICATIONS = 0
+    REQUEST_SECURITY_IDENTITY_FOR_THE_SPECIFICATIONS_PROVIDED = 1
+    REQUEST_LIST_SECURITY_TYPES = 2
+    REQUEST_LIST_SECURITIES = 3
+
+
+class SecurityResponseType(BaseIntEnum):
+    ACCEPT_SECURITY_PROPOSAL_AS_IS = 1
+    ACCEPT_SECURITY_PROPOSAL_WITH_REVISIONS_AS_INDICATED_IN_THE_MESSAGE = 2
+    LIST_OF_SECURITY_TYPES_RETURNED_PER_REQUEST = 3
+    LIST_OF_SECURITIES_RETURNED_PER_REQUEST = 4
+    REJECT_SECURITY_PROPOSAL = 5
+    CAN_NOT_MATCH_SELECTION_CRITERIA = 6
+
+
+class SecurityTradingStatus(BaseIntEnum):
+    OPENING_DELAY = 1
+    MARKET_ON_CLOSE_IMBALANCE_SELL = 10
+    NO_MARKET_IMBALANCE = 12
+    NO_MARKET_ON_CLOSE_IMBALANCE = 13
+    ITS_PRE_OPENING = 14
+    NEW_PRICE_INDICATION = 15
+    TRADE_DISSEMINATION_TIME = 16
+    READY_TO_TRADE = 17
+    NOT_AVAILABLE_FOR_TRADING = 18
+    NOT_TRADED_ON_THIS_MARKET = 19
+    TRADING_HALT = 2
+    UNKNOWN_OR_INVALID = 20
+    RESUME = 3
+    NO_OPEN_NO_RESUME = 4
+    PRICE_INDICATION = 5
+    TRADING_RANGE_INDICATION = 6
+    MARKET_IMBALANCE_BUY = 7
+    MARKET_IMBALANCE_SELL = 8
+    MARKET_ON_CLOSE_IMBALANCE_BUY = 9
+
+
+class HaltReasonChar(BaseStrEnum):
+    NEWS_DISSEMINATION = "D"
+    ORDER_INFLUX = "E"
+    ORDER_IMBALANCE = "I"
+    ADDITIONAL_INFORMATION = "M"
+    NEWS_PENDING = "P"
+    EQUIPMENT_CHANGEOVER = "X"
+
+
+class Adjustment(BaseIntEnum):
+    CANCEL = 1
+    ERROR = 2
+    CORRECTION = 3
+
+
+class TradSesMethod(BaseIntEnum):
+    ELECTRONIC = 1
+    OPEN_OUTCRY = 2
+    TWO_PARTY = 3
+
+
+class TradSesMode(BaseIntEnum):
+    TESTING = 1
+    SIMULATED = 2
+    PRODUCTION = 3
+
+
+class TradSesStatus(BaseIntEnum):
+    HALTED = 1
+    OPEN = 2
+    CLOSED = 3
+    PRE_OPEN = 4
+    PRE_CLOSE = 5
+
+
+class MessageEncoding(BaseStrEnum):
+    EUC_JP = "EUC-JP"
+    ISO_2022_JP = "ISO-2022-JP"
+    SHIFT_JIS = "SHIFT_JIS"
+    UTF_8 = "UTF-8"
+
+
+class QuoteEntryRejectReason(BaseIntEnum):
+    UNKNOWN_SYMBOL = 1
+    EXCHANGE = 2
+    QUOTE_EXCEEDS_LIMIT = 3
+    TOO_LATE_TO_ENTER = 4
+    UNKNOWN_QUOTE = 5
+    DUPLICATE_QUOTE = 6
+    INVALID_BID_ASK_SPREAD = 7
+    INVALID_PRICE = 8
+    NOT_AUTHORIZED_TO_QUOTE_SECURITY = 9
+
+
+class SessionRejectReason(BaseIntEnum):
+    INVALID_TAG_NUMBER = 0
+    REQUIRED_TAG_MISSING = 1
+    SENDINGTIME_ACCURACY_PROBLEM = 10
+    INVALID_MSGTYPE = 11
+    TAG_NOT_DEFINED_FOR_THIS_MESSAGE_TYPE = 2
+    UNDEFINED_TAG = 3
+    TAG_SPECIFIED_WITHOUT_A_VALUE = 4
+    VALUE_IS_INCORRECT = 5
+    INCORRECT_DATA_FORMAT_FOR_VALUE = 6
+    DECRYPTION_PROBLEM = 7
+    SIGNATURE_PROBLEM = 8
+    COMPID_PROBLEM = 9
+
+
+class BidRequestTransType(BaseStrEnum):
+    CANCEL = "C"
+    NO = "N"
+
+
+class ExecRestatementReason(BaseIntEnum):
+    GT_CORPORATE_ACTION = 0
+    GT_RENEWAL = 1
+    VERBAL_CHANGE = 2
+    REPRICING_OF_ORDER = 3
+    BROKER_OPTION = 4
+    PARTIAL_DECLINE_OF_ORDERQTY = 5
+
+
+class BusinessRejectReason(BaseIntEnum):
+    OTHER = 0
+    UNKOWN_ID = 1
+    UNKNOWN_SECURITY = 2
+    UNSUPPORTED_MESSAGE_TYPE = 3
+    APPLICATION_NOT_AVAILABLE = 4
+    CONDITIONALLY_REQUIRED_FIELD_MISSING = 5
+
+
+class MsgDirection(BaseStrEnum):
+    RECEIVE = "R"
+    SEND = "S"
+
+
+class DiscretionInst(BaseStrEnum):
+    RELATED_TO_DISPLAYED_PRICE = "0"
+    RELATED_TO_MARKET_PRICE = "1"
+    RELATED_TO_PRIMARY_PRICE = "2"
+    RELATED_TO_LOCAL_PRIMARY_PRICE = "3"
+    RELATED_TO_MIDPOINT_PRICE = "4"
+    RELATED_TO_LAST_TRADE_PRICE = "5"
+
+
+class LiquidityIndType(BaseIntEnum):
+    FIVE_DAY_MOVING_AVERAGE = 1
+    TWENTY_DAY_MOVING_AVERAGE = 2
+    NORMAL_MARKET_SIZE = 3
+    OTHER = 4
+
+
+class ProgRptReqs(BaseIntEnum):
+    BUYSIDE_EXPLICITLY_REQUESTS_STATUS_USING_STATUSREQUEST = 1
+    SELLSIDE_PERIODICALLY_SENDS_STATUS_USING_LISTSTATUS_PERIOD_OPTIONALLY_SPECIFIED_IN_PROGRESSPERIOD = 2
+    REAL_TIME_EXECUTION_REPORTS = 3
+
+
+class IncTaxInd(BaseIntEnum):
+    NET = 1
+    GROSS = 2
+
+
+class TradeType(BaseStrEnum):
+    AGENCY = "A"
+    VWAP_GUARANTEE = "G"
+    GUARANTEED_CLOSE = "J"
+    RISK_TRADE = "R"
+
+
+class BasisPxType(BaseStrEnum):
+    CLOSING_PRICE_AT_MORNING_SESSION = "2"
+    CLOSING_PRICE = "3"
+    CURRENT_PRICE = "4"
+    SQ = "5"
+    VWAP_THROUGH_A_DAY = "6"
+    VWAP_THROUGH_A_MORNING_SESSION = "7"
+    VWAP_THROUGH_AN_AFTERNOON_SESSION = "8"
+    VWAP_THROUGH_A_DAY_EXCEPT_YORI = "9"
+    VWAP_THROUGH_A_MORNING_SESSION_EXCEPT_YORI = "A"
+    VWAP_THROUGH_AN_AFTERNOON_SESSION_EXCEPT_YORI = "B"
+    STRIKE = "C"
+    OPEN = "D"
+    OTHERS = "Z"
+
+
+class PriceType(BaseIntEnum):
+    PERCENTAGE = 1
+    PER_SHARE = 2
+    FIXED_AMOUNT = 3
+
+
+class GTBookingInst(BaseIntEnum):
+    BOOK_OUT_ALL_TRADES_ON_DAY_OF_EXECUTION = 0
+    ACCUMULATE_EXECUTIONS_UNTIL_ORDER_IS_FILLED_OR_EXPIRES = 1
+    ACCUMULATE_UNTIL_VERBALLY_NOTIFIED_OTHERWISE = 2
+
+
+class NetGrossInd(BaseIntEnum):
+    NET = 1
+    GROSS = 2
+
+
+class ListExecInstType(BaseStrEnum):
+    IMMEDIATE = "1"
+    WAIT_FOR_EXECUTE_INSTRUCTION = "2"
+
+
+class CxlRejResponseTo(BaseStrEnum):
+    ORDER_CANCEL_REQUEST = "1"
+    ORDER_CANCEL_REPLACE_REQUEST = "2"
+
+
+class MultiLegReportingType(BaseStrEnum):
+    SINGLE_SECURITY = "1"
+    INDIVIDUAL_LEG_OF_A_MULTI_LEG_SECURITY = "2"
+    MULTI_LEG_SECURITY = "3"

@@ -1,137 +1,161 @@
-from copy import deepcopy
+from collections import defaultdict
 import uuid
-from collections import OrderedDict, defaultdict
 import time
+import typing as t
+import logging
+import threading
 
-from fixtrate.message import FixMessage
-from .base import FixStoreInterface, FixStore
+from sortedcontainers import SortedList  # type: ignore
+
+from fix.message import FixMessage
+from .base import FixStore
+
+
+if t.TYPE_CHECKING:
+    from fix.config import FixSessionConfig
+
+
+__all__ = ("MemoryStore", )
+
+
+logger = logging.getLogger(__name__)
+
+
+def sortfunc(pair: t.Tuple[float, bytes]) -> float:
+    return pair[0]
+
+
+def parse_msg(raw_msg: bytes) -> FixMessage:
+    msg = FixMessage.from_raw(raw_msg)
+    if msg is None:
+        raise RuntimeError(
+            "Not able to parse fix msg from string")
+    if msg.seq_num is None:
+        raise RuntimeError(
+            "Msg is missing seq num. Msg may be corrupted")
+    return msg
+
+
+def _make_store() -> dict:
+    return {
+        "msgs": dict(),
+        "msgs_by_time": SortedList(key=sortfunc),
+        "msgs_sent": SortedList(key=sortfunc),
+        "msgs_received": SortedList(key=sortfunc),
+        "seq_num_local": 0,
+        "seq_num_remote": 1,
+    }
+
+
+thread_locals = threading.local()
+thread_locals.store_data = defaultdict(lambda: _make_store())
+
+
+def get_store_data():
+    return thread_locals.store_data
+
+
+def reset_store_data():
+    thread_locals.store_data.clear()
 
 
 class MemoryStore(FixStore):
 
-    def __init__(self, data_store=None):
-        if data_store is None:
-            data_store = {}
-        self._data = data_store
+    def __init__(self, config: "FixSessionConfig") -> None:
+        super().__init__(config)
 
-    def make_key(self, session_id, key):
-        return ':'.join((str(session_id), key))
+    def _make_session_id(self) -> str:
+        return ':'.join(filter(None, (
+            self.config.version, self.config.sender,
+            self.config.target, self.config.qualifier)))
 
-    async def incr_local(self, session_id):
-        key = self.make_key(session_id, 'seq_num_local')
-        self._data[key] = self._data.get(key, 0) + 1
-        return self._data[key]
+    def _reset_store(self) -> None:
+        session_id = self._make_session_id()
+        thread_locals.store_data[session_id] = _make_store()
 
-    async def incr_remote(self, session_id):
-        key = self.make_key(session_id, 'seq_num_remote')
-        self._data[key] = self._data.get(key, 0) + 1
-        return self._data[key]
+    def get_store(self) -> dict:
+        session_id = self._make_session_id()
+        return thread_locals.store_data[session_id]
 
-    async def get_local(self, session_id):
-        key = self.make_key(session_id, 'seq_num_local')
-        seq_num = self._data.get(key)
-        if seq_num is None:
-            seq_num = await self.incr_local(session_id)
-        return seq_num
+    async def incr_local(self) -> int:
+        key = "seq_num_local"
+        store = self.get_store()
+        store[key] = store[key] + 1
+        return store[key]
 
-    async def get_remote(self, session_id):
-        key = self.make_key(session_id, 'seq_num_remote')
-        seq_num = self._data.get(key)
-        if seq_num is None:
-            seq_num = await self.incr_remote(session_id)
-        return seq_num
+    async def incr_remote(self) -> int:
+        key = "seq_num_remote"
+        store = self.get_store()
+        store[key] = store[key] + 1
+        return store[key]
 
-    async def set_local(self, session_id, new_seq_num):
-        key = self.make_key(session_id, 'seq_num_local')
-        self._data[key] = new_seq_num
+    async def get_local(self) -> int:
+        store = self.get_store()
+        return store["seq_num_local"]
 
-    async def set_remote(self, session_id, new_seq_num):
-        key = self.make_key(session_id, 'seq_num_remote')
-        self._data[key] = new_seq_num
+    async def get_remote(self) -> int:
+        store = self.get_store()
+        return store["seq_num_remote"]
 
-    async def store_message(self, session_id, msg):
-        uid = str(uuid.uuid4())
-        store_time = time.time()
-        msgs = self._get_messages(session_id)
-        msgs[uid] = store_time, msg.encode()
-        return uid
+    async def set_local(self, new_seq_num: int) -> None:
+        store = self.get_store()
+        store["seq_num_local"] = new_seq_num
 
-    async def get_sent(
+    async def set_remote(self, new_seq_num: int) -> None:
+        store = self.get_store()
+        store["seq_num_remote"] = new_seq_num
+
+    async def store_msg(self, *msgs: FixMessage):
+        store = self.get_store()
+        for msg in msgs:
+            uid = str(uuid.uuid4())
+            store_time = time.time()
+
+            store["msgs"][uid] = msg.encode()
+
+            is_sent = msg.get_raw(49) == self.config.sender
+            suffix = "sent" if is_sent else "received"
+
+            for key in ["msgs_by_time", f"msgs_{suffix}"]:
+                store[key].add((store_time, uid))
+
+    async def get_msgs(
         self,
-        session_id,
-        min=float('-inf'),
-        max=float('inf'),
-        limit=None
-    ):
-        msgs = self._get_messages(session_id)
-        rv = []
-        for time, msg in msgs.values():
-            msg = FixMessage.from_raw(msg)
-            if msg.get(49) != session_id.sender:
-                continue
-            if not min <= msg.seq_num <= max:
-                continue
-            rv.append(msg)
-        if limit is not None:
-            rv = rv[limit * -1:]
-        return rv
+        min: float = float("-inf"),
+        max: float = float("inf"),
+        limit: float = float("inf"),
+        index: str = "by_time",
+        sort: str = "ascending",
+    ) -> t.AsyncGenerator[FixMessage, None]:
+        store = self.get_store()
 
-    async def get_received(
-        self,
-        session_id,
-        min=float('-inf'),
-        max=float('inf'),
-        limit=None
-    ):
-        msgs = self._get_messages(session_id)
-        rv = []
-        for time, msg in msgs.values():
-            msg = FixMessage.from_raw(msg)
-            if msg.get(49) != session_id.target:
-                continue
-            if not min <= msg.seq_num <= max:
-                continue
-            rv.append(msg)
-        if limit is not None:
-            rv = rv[limit * -1:]
-        return rv
+        msgs_ids = store[f"msgs_{index}"]
 
-    def _get_messages(self, session_id):
-        key = self.make_key(session_id, 'messages')
-        return self._data.setdefault(key, OrderedDict())
+        num_msgs = len(msgs_ids)
 
-    async def get_messages(
-        self,
-        session_id,
-        start=float('-inf'),
-        end=float('inf'),
-        limit=None,
-    ):
-        rv = []
-        msgs = self._get_messages(session_id)
-        for time_, msg in msgs.values():
-            if not start <= time_ <= end:
-                continue
-            rv.append(msg)
-        if limit is not None:
-            rv = rv[limit * -1:]
-        return rv
+        if sort == "descending":
+            msgs_ids = reversed(msgs_ids)
 
-    async def reset(self, session_id):
-        self._data = {}
-        await self.set_local(session_id, 1)
-        await self.set_remote(session_id, 1)
+        # This is to iterate over the exact number of messages
+        # at the time of the generator invocation.
+        # msgs_ids can grow while iterating over this list,
+        # and we can get stuck in an inifite loop if we iterate
+        # over the list directly.
 
+        for i, (_, uid) in enumerate(msgs_ids):
+            if i == num_msgs or i == limit:
+                break
 
-class MemoryStoreInterface(FixStoreInterface):
+            raw_msg = store["msgs"][uid]
+            msg = parse_msg(raw_msg)
 
-    def __init__(self, data_store=None):
-        if data_store is None:
-            data_store = {}
-        self.data_store = data_store
+            if min <= msg.seq_num <= max:
+                yield msg
 
-    async def connect(self, engine):
-        return MemoryStore(self.data_store)
+    async def reset(self):
+        self._reset_store()
+        await self.set_local(1)
+        await self.set_remote(2)
 
-    async def close(self, engine):
+    async def close(self) -> None:
         pass

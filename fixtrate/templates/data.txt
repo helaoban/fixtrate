@@ -1,0 +1,19 @@
+from fix.utils.enum import BaseStrEnum, BaseIntEnum
+{% for field in spec["fields"].values() if field["type"] != "BOOLEAN"%}
+{% if field["values"] %}
+
+
+{% if field["type"] == "INT" %}
+class {{field["name"]}}(BaseIntEnum):
+{% else %}
+class {{field["name"]}}(BaseStrEnum):
+{% endif %}
+    {% for label, value in field["values"] %}
+    {% if field["type"] == "INT" %}
+    {{label}} = {{value}}
+    {% else %}
+    {{label}} = "{{value}}"
+    {% endif %}
+    {% endfor %}
+{% endif %}
+{% endfor %}

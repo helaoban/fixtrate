@@ -1,18 +1,21 @@
-import simplefix
+import typing as t
+import simplefix  # type: ignore
 from .message import FixMessage
 
 
-class FixParser(simplefix.FixParser):
+__all__ = ("FixParser", )
 
-    @staticmethod
-    def _convert(msg):
-        converted = FixMessage()
-        for tag, val in msg:
-            converted.append_pair(tag, val)
-        return converted
 
-    def get_message(self):
-        msg = super().get_message()
+class FixParser:
+
+    def __init__(self):
+        self._parser = simplefix.FixParser()
+
+    def get_message(self) -> t.Optional[FixMessage]:
+        msg = self._parser.get_message()
         if msg is None:
-            return msg
-        return self._convert(msg)
+            return None
+        return FixMessage(msg)
+
+    def append_buffer(self, buf: bytes) -> None:
+        self._parser.append_buffer(buf)

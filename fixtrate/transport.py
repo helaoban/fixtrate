@@ -4,70 +4,55 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+__all__ = ("Transport", "TCPTransport")
+
+
 class Transport:
 
-    def __init__(self, options=None):
-        if options is None:
-            options = {}
-        self.options = options
-
-    def is_closing():
+    async def read(self) -> bytes:
         raise NotImplementedError
 
-    async def read(self):
+    async def write(self, msg) -> None:
         raise NotImplementedError
 
-    async def write(self, msg):
-        raise NotImplementedError
-
-    async def connect(self, url):
-        raise NotImplementedError
-
-    async def close(self):
+    async def close(self) -> None:
         raise NotImplementedError
 
 
 class TCPTransport(Transport):
 
-    def __init__(self, options=None):
-        super().__init__(options)
-        self.reader = None
-        self.writer = None
+    def __init__(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter
+    ) -> None:
+        self.reader = reader
+        self.writer = writer
 
-    def is_closing(self):
-        if self.writer is not None:
-            return self.writer.transport.is_closing()
-        return False
-
-    async def read(self):
+    async def read(self) -> bytes:
         data = await self.reader.read(4096)
         if data == b'':
             raise ConnectionAbortedError(
                 'Peer closed the connection!')
         return data
 
-    async def write(self, msg):
-        self.writer.write(msg)
+    async def write(self, msg) -> None:
+        try:
+            self.writer.write(msg)
+        except RuntimeError as error:
+            raise ConnectionError(str(error)) from error
         await self.writer.drain()
 
-    async def connect(self, host, port):
-        self.reader, self.writer = await asyncio.open_connection(
+    async def close(self) -> None:
+        self.writer.close()
+        await self.writer.wait_closed()
+
+    @classmethod
+    async def connect(
+        cls,
+        host: str,
+        port: int
+    ) -> "TCPTransport":
+        reader, writer = await asyncio.open_connection(
             host=host, port=port)
-
-    async def close(self):
-        if self.writer is not None:
-            if not self.writer.transport.is_closing():
-                self.writer.close()
-
-
-class TCPListenerTransport(TCPTransport):
-    async def connect(self, reader, writer):
-        self.reader = reader
-        self.writer = writer
-
-
-def make_transport(options):
-    transport_cls = options['transport']
-    if transport_cls is None:
-        transport_cls = TCPTransport
-    return transport_cls(options['transport_options'])
+        return cls(reader, writer)

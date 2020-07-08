@@ -1,55 +1,59 @@
-class FixStoreInterface:
+import typing as t
 
-    async def connect(self, engine):
-        raise NotImplementedError
+if t.TYPE_CHECKING:
+    from fix.message import FixMessage
+    from fix.config import FixSessionConfig
 
-    async def close(self, engine):
-        raise NotImplementedError
+
+__all__ = ("FixStore", )
 
 
 class FixStore:
 
-    async def incr_local(self, session_id):
+    def __init__(self, config: "FixSessionConfig"):
+        self.config = config
+
+    async def incr_local(self) -> int:
         """ Increment the local sequence number by 1.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         """
         raise NotImplementedError
 
-    async def incr_remote(self, session_id):
+    async def incr_remote(self) -> int:
         """ Increment the remote sequence number by 1.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         """
         raise NotImplementedError
 
-    async def get_local(self, session_id):
+    async def get_local(self) -> int:
         """ Get the local sequence number.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         """
         raise NotImplementedError
 
-    async def get_remote(self, session_id):
+    async def get_remote(self) -> int:
         """ Get the remote sequence number.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         """
         raise NotImplementedError
 
-    async def set_local(self, session_id, new_seq_num):
+    async def set_local(self, new_seq_num: int) -> None:
         """ Set the local sequence number to a new number.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         :param new_seq_num: The new sequence number.
         :type new_seq_num: int
@@ -57,11 +61,11 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def set_remote(self, session_id, new_seq_num):
+    async def set_remote(self, new_seq_num: int) -> None:
         """ Set the remote sequence number to a new number.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         :param new_seq_num: The new sequence number.
         :type new_seq_num: int
@@ -69,48 +73,49 @@ class FixStore:
         """
         raise NotImplementedError
 
-    async def store_message(self, session_id, msg):
+    async def store_msg(self, *msgs: "FixMessage") -> None:
         """ Store a message in the store.
 
         :param session: The current session.
-        :type session: :class:`~fixtrate.session.FixSession`
+        :type session: :class:`~fix.session.FixSession`
 
         :param msg: The message to store.
-        :type msg: :class:`~fixtrate.message.FixMessage`
+        :type msg: :class:`~fix.message.FixMessage`
+
+        :rtype str
         """
         raise NotImplementedError
 
-    async def get_sent(
+    def get_sent(
         self,
-        session_id,
-        min=float('-inf'),
-        max=float('inf'),
-        limit=None
-    ):
-        raise NotImplementedError
+        min: float = float("-inf"),
+        max: float = float("inf"),
+        limit: float = float("inf"),
+    ) -> "t.AsyncIterator[FixMessage]":
+        return self.get_msgs(min, max, limit, "sent")
 
-    async def get_received(
+    def get_received(
         self,
-        session_id,
-        min=float('-inf'),
-        max=float('inf'),
-        limit=None
-    ):
-        raise NotImplementedError
+        min: float = float("-inf"),
+        max: float = float("inf"),
+        limit: float = float("inf"),
+    ) -> "t.AsyncIterator[FixMessage]":
+        return self.get_msgs(min, max, limit, "received")
 
-    async def get_messages(
+    async def get_msgs(
         self,
-        session_id,
-        start=float('-inf'),
-        end=float('inf'),
-        limit=None,
-    ):
-        """ Return all messages sent and received in the
+        min: float = float("-inf"),
+        max: float = float("inf"),
+        limit: float = float("inf"),
+        index: str = "by_time",
+        sort: str = "ascending",
+    ) -> "t.AsyncIterator[FixMessage]":
+        """ Return all max sent and received in the
             current session. Allows slicing by datetime and
             by sequence number.
 
             :param session: The current session.
-            :type session: :class:`~fixtrate.session.FixSession`
+            :type session: :class:`~fix.session.FixSession`
 
             :param start: Beginning datetime. If specified, only returns
                 messages sent or received on or after specified time.
@@ -132,8 +137,14 @@ class FixStore:
 
             :rtype AsyncIterator[:class:`FixMessage`]
         """
+        # Force mypy to register this abtract method as a generator
+        # (WE BE TRICKIN)
+        if False:
+            yield
         raise NotImplementedError
 
-    async def reset(self):
+    async def reset(self) -> None:
         raise NotImplementedError
 
+    async def close(self) -> None:
+        raise NotImplementedError
